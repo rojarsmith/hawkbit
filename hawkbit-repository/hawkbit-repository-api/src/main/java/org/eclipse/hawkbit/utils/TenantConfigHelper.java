@@ -1,17 +1,23 @@
 /**
- * Copyright (c) 2019 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2019 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.utils;
 
 import static org.eclipse.hawkbit.tenancy.configuration.TenantConfigurationProperties.TenantConfigurationKey.MULTI_ASSIGNMENTS_ENABLED;
 import static org.eclipse.hawkbit.tenancy.configuration.TenantConfigurationProperties.TenantConfigurationKey.USER_CONFIRMATION_ENABLED;
 
+import java.io.Serializable;
+import java.util.function.Function;
+
 import org.eclipse.hawkbit.repository.TenantConfigurationManagement;
+import org.eclipse.hawkbit.repository.model.PollStatus;
+import org.eclipse.hawkbit.repository.model.Target;
 import org.eclipse.hawkbit.security.SystemSecurityContext;
 
 /**
@@ -30,11 +36,9 @@ public final class TenantConfigHelper {
 
     /**
      * Setting the context of the tenant.
-     * 
-     * @param systemSecurityContext
-     *            Security context used to get the tenant and for execution
-     * @param tenantConfigurationManagement
-     *            to get the value from
+     *
+     * @param systemSecurityContext Security context used to get the tenant and for execution
+     * @param tenantConfigurationManagement to get the value from
      * @return is active
      */
     public static TenantConfigHelper usingContext(final SystemSecurityContext systemSecurityContext,
@@ -42,14 +46,18 @@ public final class TenantConfigHelper {
         return new TenantConfigHelper(systemSecurityContext, tenantConfigurationManagement);
     }
 
+    public <T extends Serializable> T getConfigValue(final String key, final Class<T> valueType) {
+        return systemSecurityContext
+                .runAsSystem(() -> tenantConfigurationManagement.getConfigurationValue(key, valueType).getValue());
+    }
+
     /**
      * Is multi-assignments enabled for the current tenant
-     * 
+     *
      * @return is active
      */
     public boolean isMultiAssignmentsEnabled() {
-        return systemSecurityContext.runAsSystem(() -> tenantConfigurationManagement
-                .getConfigurationValue(MULTI_ASSIGNMENTS_ENABLED, Boolean.class).getValue());
+        return getConfigValue(MULTI_ASSIGNMENTS_ENABLED, Boolean.class);
     }
 
     /**
@@ -58,7 +66,10 @@ public final class TenantConfigHelper {
      * @return is enabled
      */
     public boolean isConfirmationFlowEnabled() {
-        return systemSecurityContext.runAsSystem(() -> tenantConfigurationManagement
-            .getConfigurationValue(USER_CONFIRMATION_ENABLED, Boolean.class).getValue());
+        return getConfigValue(USER_CONFIRMATION_ENABLED, Boolean.class);
+    }
+
+    public Function<Target, PollStatus> pollStatusResolver() {
+        return tenantConfigurationManagement.pollStatusResolver();
     }
 }

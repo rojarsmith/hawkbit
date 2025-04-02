@@ -1,23 +1,26 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository;
 
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import lombok.Data;
 import org.eclipse.hawkbit.repository.event.remote.TargetPollEvent;
 import org.eclipse.hawkbit.repository.model.ActionStatus;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * Configuration properties for the repository.
- *
  */
+@Data
 @ConfigurationProperties("hawkbit.server.repository")
 public class RepositoryProperties {
 
@@ -55,7 +58,7 @@ public class RepositoryProperties {
     private boolean eagerPollPersistence;
 
     /**
-     * If an {@link Action} has a weight of null this value is used as weight.
+     * If an {@link org.eclipse.hawkbit.repository.model.Action} has a weight of null this value is used as weight.
      */
     private int actionWeightIfAbsent = 1000;
 
@@ -65,60 +68,14 @@ public class RepositoryProperties {
      */
     private long dsInvalidationLockTimeout = 5;
 
-    public boolean isEagerPollPersistence() {
-        return eagerPollPersistence;
-    }
+    private boolean implicitTenantCreateAllowed;
 
-    public void setEagerPollPersistence(final boolean eagerPollPersistence) {
-        this.eagerPollPersistence = eagerPollPersistence;
-    }
+    private List<String> skipImplicitLockForTags =
+            List.of("skip-implicit-lock", "skip_implicit_lock", "SKIP_IMPLICIT_LOCK", "SKIP-IMPLICIT-LOCK");
 
-    public long getPollPersistenceFlushTime() {
-        return pollPersistenceFlushTime;
-    }
-
-    public void setPollPersistenceFlushTime(final long pollPersistenceFlushTime) {
-        this.pollPersistenceFlushTime = pollPersistenceFlushTime;
-    }
-
-    public int getPollPersistenceQueueSize() {
-        return pollPersistenceQueueSize;
-    }
-
-    public void setPollPersistenceQueueSize(final int pollPersistenceQueueSize) {
-        this.pollPersistenceQueueSize = pollPersistenceQueueSize;
-    }
-
-    public boolean isRejectActionStatusForClosedAction() {
-        return rejectActionStatusForClosedAction;
-    }
-
-    public void setRejectActionStatusForClosedAction(final boolean rejectActionStatusForClosedAction) {
-        this.rejectActionStatusForClosedAction = rejectActionStatusForClosedAction;
-    }
-
-    public boolean isPublishTargetPollEvent() {
-        return publishTargetPollEvent;
-    }
-
-    public void setPublishTargetPollEvent(final boolean publishTargetPollEvent) {
-        this.publishTargetPollEvent = publishTargetPollEvent;
-    }
-
-    public int getActionWeightIfAbsent() {
-        return actionWeightIfAbsent;
-    }
-
-    public void setActionWeightIfAbsent(final int actionWeightIfAbsent) {
-        this.actionWeightIfAbsent = actionWeightIfAbsent;
-    }
-
-    public long getDsInvalidationLockTimeout() {
-        return dsInvalidationLockTimeout;
-    }
-
-    public void setDsInvalidationLockTimeout(final long dsInvalidationLockTimeout) {
-        this.dsInvalidationLockTimeout = dsInvalidationLockTimeout;
-    }
-
+    /**
+     * The minimum period (in milli-seconds) on which dynamic rollouts should make attempt to involve
+     * new targets
+     */
+    private long dynamicRolloutsMinInvolvePeriodMS = 60_000;
 }

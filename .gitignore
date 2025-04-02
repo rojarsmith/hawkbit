@@ -13,6 +13,7 @@ target
 .project
 .idea
 artifactrepo
+apt_generated
 
 # Windows image file caches
 Thumbs.db
@@ -55,15 +56,16 @@ classpath-data.json
 # Intellij
 *.iml
 
+# local Spring configs
+application-local.properties
+
 # Maven
 maven.properties
+.flattened-pom.xml
 
 # Test Files
 *.tmp
+spring-shell.log
 
 # Documentation
-docs/themes/**
-docs/public/**
-docs/content/rest-api/*.html
-docs/.hugo_build.lock
 .gitmodules

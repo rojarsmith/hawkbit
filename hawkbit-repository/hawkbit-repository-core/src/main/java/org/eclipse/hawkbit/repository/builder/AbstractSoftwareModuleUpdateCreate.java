@@ -1,36 +1,34 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.builder;
 
 import java.util.Optional;
 
 import org.eclipse.hawkbit.repository.ValidString;
-import org.springframework.util.StringUtils;
 
 /**
  * Create and update builder DTO.
  *
- * @param <T>
- *            update or create builder interface
+ * @param <T> update or create builder interface
  */
 public abstract class AbstractSoftwareModuleUpdateCreate<T> extends AbstractNamedEntityBuilder<T> {
+
     @ValidString
     protected String version;
-
     @ValidString
     protected String vendor;
-
     @ValidString
     protected String type;
 
     public T type(final String type) {
-        this.type = StringUtils.trimWhitespace(type);
+        this.type = AbstractBaseEntityBuilder.strip(type);
         return (T) this;
     }
 
@@ -39,7 +37,7 @@ public abstract class AbstractSoftwareModuleUpdateCreate<T> extends AbstractName
     }
 
     public T vendor(final String vendor) {
-        this.vendor = StringUtils.trimWhitespace(vendor);
+        this.vendor = AbstractBaseEntityBuilder.strip(vendor);
         return (T) this;
     }
 
@@ -48,12 +46,11 @@ public abstract class AbstractSoftwareModuleUpdateCreate<T> extends AbstractName
     }
 
     public T version(final String version) {
-        this.version = StringUtils.trimWhitespace(version);
+        this.version = AbstractBaseEntityBuilder.strip(version);
         return (T) this;
     }
 
     public Optional<String> getVersion() {
         return Optional.ofNullable(version);
     }
-
 }

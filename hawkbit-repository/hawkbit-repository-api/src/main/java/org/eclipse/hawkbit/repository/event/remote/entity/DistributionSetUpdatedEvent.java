@@ -1,43 +1,39 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.event.remote.entity;
 
+import java.io.Serial;
+
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 import org.eclipse.hawkbit.repository.event.entity.EntityUpdatedEvent;
 import org.eclipse.hawkbit.repository.model.DistributionSet;
 
 /**
  * Defines the remote event for updating a {@link DistributionSet}.
- *
  */
+@NoArgsConstructor // for serialization libs like jackson
+@EqualsAndHashCode(callSuper = true)
 public class DistributionSetUpdatedEvent extends RemoteEntityEvent<DistributionSet> implements EntityUpdatedEvent {
 
+    @Serial
     private static final long serialVersionUID = 1L;
 
     private boolean complete;
 
     /**
-     * Default constructor.
-     */
-    public DistributionSetUpdatedEvent() {
-        // for serialization libs like jackson
-    }
-
-    /**
      * Constructor.
-     * 
-     * @param ds
-     *            Distribution Set
-     * @param applicationId
-     *            the origin application id
-     * @param complete
-     *            <code>true</code> if {@link DistributionSet} is after the
-     *            update {@link DistributionSet#isComplete()}
+     *
+     * @param ds Distribution Set
+     * @param applicationId the origin application id
+     * @param complete <code>true</code> if {@link DistributionSet} is after the update {@link DistributionSet#isComplete()}
      */
     public DistributionSetUpdatedEvent(final DistributionSet ds, final String applicationId, final boolean complete) {
         super(ds, applicationId);
@@ -45,11 +41,9 @@ public class DistributionSetUpdatedEvent extends RemoteEntityEvent<DistributionS
     }
 
     /**
-     * @return <code>true</code> if {@link DistributionSet} is after the update
-     *         {@link DistributionSet#isComplete()}
+     * @return <code>true</code> if {@link DistributionSet} is after the update {@link DistributionSet#isComplete()}
      */
     public boolean isComplete() {
         return complete;
     }
-
 }

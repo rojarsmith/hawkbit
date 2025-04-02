@@ -1,10 +1,11 @@
 /**
- * Copyright (c) 2018 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2018 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.jpa.autocleanup;
 
@@ -19,26 +20,24 @@ import java.util.EnumSet;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import lombok.extern.slf4j.Slf4j;
 import org.eclipse.hawkbit.repository.DeploymentManagement;
 import org.eclipse.hawkbit.repository.TenantConfigurationManagement;
 import org.eclipse.hawkbit.repository.model.Action;
 import org.eclipse.hawkbit.repository.model.Action.Status;
 import org.eclipse.hawkbit.repository.model.TenantConfigurationValue;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * A cleanup task for {@link Action} entities which can be used to delete
  * actions which are in a certain {@link Action.Status}. It is recommended to
  * only clean up actions which have terminated already (i.e. actions in status
  * CANCELLED or ERROR).
- * 
+ *
  * The cleanup task can be enabled /disabled and configured on a per tenant
  * basis.
  */
+@Slf4j
 public class AutoActionCleanup implements CleanupTask {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(AutoActionCleanup.class);
 
     private static final String ID = "action-cleanup";
     private static final boolean ACTION_CLEANUP_ENABLED_DEFAULT = false;
@@ -50,23 +49,19 @@ public class AutoActionCleanup implements CleanupTask {
 
     /**
      * Constructs the action cleanup handler.
-     * 
-     * @param deploymentMgmt
-     *            The {@link DeploymentManagement} to operate on.
-     * @param configMgmt
-     *            The {@link TenantConfigurationManagement} service.
+     *
+     * @param deploymentMgmt The {@link DeploymentManagement} to operate on.
+     * @param configMgmt The {@link TenantConfigurationManagement} service.
      */
-    public AutoActionCleanup(final DeploymentManagement deploymentMgmt,
-            final TenantConfigurationManagement configMgmt) {
+    public AutoActionCleanup(final DeploymentManagement deploymentMgmt, final TenantConfigurationManagement configMgmt) {
         this.deploymentMgmt = deploymentMgmt;
         this.config = configMgmt;
     }
 
     @Override
     public void run() {
-
         if (!isEnabled()) {
-            LOGGER.debug("Action cleanup is disabled for this tenant...");
+            log.debug("Action cleanup is disabled for this tenant...");
             return;
         }
 
@@ -74,7 +69,7 @@ public class AutoActionCleanup implements CleanupTask {
         if (!status.isEmpty()) {
             final long lastModified = System.currentTimeMillis() - getExpiry();
             final int actionsCount = deploymentMgmt.deleteActionsByStatusAndLastModifiedBefore(status, lastModified);
-            LOGGER.debug("Deleted {} actions in status {} which have not been modified since {} ({})", actionsCount,
+            log.debug("Deleted {} actions in status {} which have not been modified since {} ({})", actionsCount,
                     status, Instant.ofEpochMilli(lastModified), lastModified);
         }
     }
@@ -107,5 +102,4 @@ public class AutoActionCleanup implements CleanupTask {
             final Class<T> valueType) {
         return config.getConfigurationValue(key, valueType);
     }
-
 }

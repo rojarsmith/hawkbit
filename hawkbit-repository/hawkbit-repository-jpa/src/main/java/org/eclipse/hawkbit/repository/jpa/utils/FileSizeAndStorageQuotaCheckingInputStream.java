@@ -1,10 +1,11 @@
 /**
- * Copyright (c) 2019 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2019 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.jpa.utils;
 
@@ -30,12 +31,9 @@ public class FileSizeAndStorageQuotaCheckingInputStream extends FilterInputStrea
      * Creates a <code>QuotaInputStream</code> using the input stream in and a
      * limiting quota
      *
-     * @param in
-     *            Inner InputStream that read operations will be forwarded to
-     * @param sizeLimit
-     *            Quota file size limit in byte
-     * @param storageLeft
-     *            Storage left until quota is reached
+     * @param in Inner InputStream that read operations will be forwarded to
+     * @param sizeLimit Quota file size limit in byte
+     * @param storageLeft Storage left until quota is reached
      */
     public FileSizeAndStorageQuotaCheckingInputStream(final InputStream in, final long sizeLimit, final long storageLeft) {
         super(in);

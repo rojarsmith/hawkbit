@@ -1,28 +1,28 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.test.util;
 
 import java.util.List;
 
+import lombok.extern.slf4j.Slf4j;
 import org.eclipse.hawkbit.cache.TenantAwareCacheManager;
 import org.eclipse.hawkbit.repository.SystemManagement;
 import org.eclipse.hawkbit.security.SystemSecurityContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.domain.Sort.Direction;
 
+@Slf4j
 public class JpaTestRepositoryManagement {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(JpaTestRepositoryManagement.class);
     private static final Pageable PAGE = PageRequest.of(0, 400, Sort.by(Direction.ASC, "id"));
 
     private final TenantAwareCacheManager cacheManager;
@@ -33,13 +33,10 @@ public class JpaTestRepositoryManagement {
 
     /**
      * Constructor.
-     * 
-     * @param cacheManager
-     *            the cachemanager
-     * @param systemSecurityContext
-     *            the systemSecurityContext
-     * @param systemManagement
-     *            the systemManagement
+     *
+     * @param cacheManager the cachemanager
+     * @param systemSecurityContext the systemSecurityContext
+     * @param systemManagement the systemManagement
      */
     public JpaTestRepositoryManagement(final TenantAwareCacheManager cacheManager,
             final SystemSecurityContext systemSecurityContext, final SystemManagement systemManagement) {
@@ -63,7 +60,7 @@ public class JpaTestRepositoryManagement {
                     return null;
                 });
             } catch (final Exception e) {
-                LOGGER.error("Error while delete tenant", e);
+                log.error("Error while delete tenant", e);
             }
         });
     }

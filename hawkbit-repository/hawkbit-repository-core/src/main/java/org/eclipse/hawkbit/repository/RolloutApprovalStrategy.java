@@ -1,10 +1,11 @@
 /**
- * Copyright (c) 2018 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2018 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository;
 
@@ -21,8 +22,7 @@ public interface RolloutApprovalStrategy {
      * important according to the implementation, e.g. user roles of the rollout
      * creator, state of the system, ....
      *
-     * @param rollout
-     *            rollout to decide for whether approval is needed.
+     * @param rollout rollout to decide for whether approval is needed.
      * @return true if the rollout according to this strategy needs approval.
      */
     boolean isApprovalNeeded(Rollout rollout);
@@ -33,8 +33,7 @@ public interface RolloutApprovalStrategy {
      * Implementations may also decide to provide an empty implementation for this
      * method.
      *
-     * @param rollout
-     *            rollout to create approval task for.
+     * @param rollout rollout to create approval task for.
      */
     void onApprovalRequired(Rollout rollout);
 
@@ -42,9 +41,8 @@ public interface RolloutApprovalStrategy {
      * Returns the user that made a decision to approve or deny the given rollout.
      * Depending on the implementation this may be different to the current user eg.
      * when the decision is made in an external system.
-     * 
-     * @param rollout
-     *            target rollout
+     *
+     * @param rollout target rollout
      * @return identifier of the user that decided on approval
      */
     String getApprovalUser(Rollout rollout);

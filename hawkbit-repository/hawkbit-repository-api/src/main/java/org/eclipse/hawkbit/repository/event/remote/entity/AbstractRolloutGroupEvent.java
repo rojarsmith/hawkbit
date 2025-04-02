@@ -1,22 +1,25 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.event.remote.entity;
 
+import java.io.Serial;
 import java.util.Objects;
 
 import org.eclipse.hawkbit.repository.model.RolloutGroup;
 
 /**
- * Event which is published in case a {@linkplain RolloutGroup} is created or
- * updated
+ * Event which is published in case a {@linkplain RolloutGroup} is created or updated
  */
 public abstract class AbstractRolloutGroupEvent extends RemoteEntityEvent<RolloutGroup> {
+
+    @Serial
     private static final long serialVersionUID = 1L;
 
     private final Long rolloutId;
@@ -40,6 +43,11 @@ public abstract class AbstractRolloutGroupEvent extends RemoteEntityEvent<Rollou
     }
 
     @Override
+    public int hashCode() {
+        return Objects.hash(super.hashCode(), rolloutId);
+    }
+
+    @Override
     public boolean equals(final Object o) {
         if (this == o)
             return true;
@@ -49,10 +57,5 @@ public abstract class AbstractRolloutGroupEvent extends RemoteEntityEvent<Rollou
             return false;
         final AbstractRolloutGroupEvent that = (AbstractRolloutGroupEvent) o;
         return Objects.equals(rolloutId, that.rolloutId);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(super.hashCode(), rolloutId);
     }
 }

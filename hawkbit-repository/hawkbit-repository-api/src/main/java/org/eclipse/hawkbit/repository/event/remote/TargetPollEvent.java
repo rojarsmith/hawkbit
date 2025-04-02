@@ -1,30 +1,36 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.event.remote;
 
+import java.io.Serial;
+
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
 import org.eclipse.hawkbit.repository.model.Target;
 
 /**
- * Event is send in case a target polls either through DDI or DMF.
+ * Event is sent in case a target polls either through DDI or DMF.
  */
+@NoArgsConstructor // for serialization libs like jackson
+@Getter
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
 public class TargetPollEvent extends RemoteTenantAwareEvent {
 
+    @Serial
     private static final long serialVersionUID = 1L;
-    private String controllerId;
-    private String targetAdress;
 
-    /**
-     * Default constructor.
-     */
-    public TargetPollEvent() {
-        // for serialization libs like jackson
-    }
+    private String controllerId;
+    private String targetAddress;
 
     public TargetPollEvent(final String controllerId, final String tenant, final String applicationId) {
         super(controllerId, tenant, applicationId);
@@ -34,14 +40,6 @@ public class TargetPollEvent extends RemoteTenantAwareEvent {
     public TargetPollEvent(final Target target, final String applicationId) {
         super(target.getControllerId(), target.getTenant(), applicationId);
         this.controllerId = target.getControllerId();
-        this.targetAdress = target.getAddress().toString();
-    }
-
-    public String getControllerId() {
-        return controllerId;
-    }
-
-    public String getTargetAdress() {
-        return targetAdress;
+        this.targetAddress = target.getAddress().toString();
     }
 }

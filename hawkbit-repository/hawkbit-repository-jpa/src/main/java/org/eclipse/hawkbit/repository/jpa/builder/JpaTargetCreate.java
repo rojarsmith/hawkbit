@@ -1,10 +1,11 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.jpa.builder;
 
@@ -15,11 +16,10 @@ import org.eclipse.hawkbit.repository.exception.EntityNotFoundException;
 import org.eclipse.hawkbit.repository.jpa.model.JpaTarget;
 import org.eclipse.hawkbit.repository.model.TargetType;
 import org.eclipse.hawkbit.repository.model.TargetUpdateStatus;
-import org.springframework.util.StringUtils;
+import org.springframework.util.ObjectUtils;
 
 /**
  * Create/build implementation.
- *
  */
 public class JpaTargetCreate extends AbstractTargetUpdateCreate<TargetCreate> implements TargetCreate {
 
@@ -28,8 +28,7 @@ public class JpaTargetCreate extends AbstractTargetUpdateCreate<TargetCreate> im
     /**
      * Constructor
      *
-     * @param targetTypeManagement
-     *          Target type management
+     * @param targetTypeManagement Target type management
      */
     JpaTargetCreate(final TargetTypeManagement targetTypeManagement) {
         super(null);
@@ -38,20 +37,19 @@ public class JpaTargetCreate extends AbstractTargetUpdateCreate<TargetCreate> im
 
     @Override
     public JpaTarget build() {
-        JpaTarget target;
-
-        if (StringUtils.isEmpty(securityToken)) {
+        final JpaTarget target;
+        if (ObjectUtils.isEmpty(securityToken)) {
             target = new JpaTarget(controllerId);
         } else {
             target = new JpaTarget(controllerId, securityToken);
         }
 
-        if (!StringUtils.isEmpty(name)) {
+        if (!ObjectUtils.isEmpty(name)) {
             target.setName(name);
         }
 
-        if (targetTypeId != null){
-            TargetType targetType = targetTypeManagement.get(targetTypeId)
+        if (targetTypeId != null) {
+            final TargetType targetType = targetTypeManagement.get(targetTypeId)
                     .orElseThrow(() -> new EntityNotFoundException(TargetType.class, targetTypeId));
             target.setTargetType(targetType);
         }
@@ -63,5 +61,4 @@ public class JpaTargetCreate extends AbstractTargetUpdateCreate<TargetCreate> im
 
         return target;
     }
-
 }

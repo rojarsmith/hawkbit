@@ -1,24 +1,31 @@
 /**
- * Copyright (c) 2021 Bosch.IO GmbH and others.
+ * Copyright (c) 2021 Bosch.IO GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.exception;
 
+import java.io.Serial;
+
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import org.eclipse.hawkbit.exception.AbstractServerRtException;
 import org.eclipse.hawkbit.exception.SpServerError;
 
 /**
- * Exception being thrown in case of error while generating encryption secrets,
- * encrypting or decrypting artifacts.
+ * Exception being thrown in case of error while generating encryption secrets, encrypting or decrypting artifacts.
  */
+@EqualsAndHashCode(callSuper = true)
 public final class ArtifactEncryptionFailedException extends AbstractServerRtException {
 
+    @Serial
     private static final long serialVersionUID = 1L;
 
+    @Getter
     private final EncryptionOperation encryptionOperation;
 
     public ArtifactEncryptionFailedException(final EncryptionOperation encryptionOperation) {
@@ -29,14 +36,9 @@ public final class ArtifactEncryptionFailedException extends AbstractServerRtExc
         this(encryptionOperation, message, null);
     }
 
-    public ArtifactEncryptionFailedException(final EncryptionOperation encryptionOperation, final String message,
-            final Throwable cause) {
+    public ArtifactEncryptionFailedException(final EncryptionOperation encryptionOperation, final String message, final Throwable cause) {
         super(message, SpServerError.SP_ARTIFACT_ENCRYPTION_FAILED, cause);
         this.encryptionOperation = encryptionOperation;
-    }
-
-    public EncryptionOperation getEncryptionOperation() {
-        return encryptionOperation;
     }
 
     /**
@@ -45,5 +47,4 @@ public final class ArtifactEncryptionFailedException extends AbstractServerRtExc
     public enum EncryptionOperation {
         GENERATE_SECRETS, ENCRYPT, DECRYPT;
     }
-
 }

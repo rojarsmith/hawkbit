@@ -1,13 +1,15 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.autoconfigure.cache;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.eclipse.hawkbit.cache.TenancyCacheManager;
 import org.eclipse.hawkbit.cache.TenantAwareCacheManager;
 import org.eclipse.hawkbit.tenancy.TenantAware;
@@ -21,35 +23,30 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
-import com.github.benmanes.caffeine.cache.Caffeine;
-
 /**
- * A configuration for configuring the spring {@link CacheManager} for specific
- * multi-tenancy caching. The caches between tenants must not interfere each
- * other.
- *
- * This is done by providing a special {@link TenantCacheResolver} which
- * generates a cache name included the current tenant.
+ * A configuration for configuring the spring {@link CacheManager} for specific multi-tenancy caching. The caches between
+ * tenants must not interfere each other.
+ * <p/>
+ * This is done by providing a special {@link TenancyCacheManager} which generates a cache name included the current tenant.
  */
 @Configuration
 @EnableCaching
 public class CacheAutoConfiguration {
 
     /**
-     * @return the default cache manager bean if none other cache manager is
-     *         existing.
+     * @return the default cache manager bean if none other cache manager is existing.
      */
     @Bean
     @ConditionalOnMissingBean
     @Primary
-    TenancyCacheManager cacheManager(@Qualifier("directCacheManager") final CacheManager directCacheManager,
+    TenancyCacheManager cacheManager(
+            @Qualifier("directCacheManager") final CacheManager directCacheManager,
             final TenantAware tenantAware) {
         return new TenantAwareCacheManager(directCacheManager, tenantAware);
     }
 
     /**
-     * A separate configuration of the direct cache manager for the
-     * {@link TenantAwareCacheManager} that it can get overridden by another
+     * A separate configuration of the direct cache manager for the {@link TenantAwareCacheManager} that it can get overridden by another
      * configuration.
      */
     @Configuration
@@ -57,10 +54,8 @@ public class CacheAutoConfiguration {
     static class DirectCacheManagerConfiguration {
 
         /**
-         * @return the direct cache manager to access without tenant aware
-         *         check, cause in sometimes it's necessary to access the cache
-         *         directly without having the current tenant, e.g. initial
-         *         creation of tenant
+         * @return the direct cache manager to access without tenant aware check, cause in sometimes it's necessary to access the cache
+         *         directly without having the current tenant, e.g. initial creation of tenant
          */
         @Bean(name = "directCacheManager")
         @ConditionalOnMissingBean(name = "directCacheManager")
@@ -75,6 +70,5 @@ public class CacheAutoConfiguration {
 
             return cacheManager;
         }
-
     }
 }

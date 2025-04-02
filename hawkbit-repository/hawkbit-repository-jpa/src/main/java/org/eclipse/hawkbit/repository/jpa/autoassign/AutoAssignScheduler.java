@@ -1,50 +1,43 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.jpa.autoassign;
 
 import java.util.concurrent.locks.Lock;
 
+import lombok.extern.slf4j.Slf4j;
 import org.eclipse.hawkbit.repository.SystemManagement;
 import org.eclipse.hawkbit.repository.autoassign.AutoAssignExecutor;
 import org.eclipse.hawkbit.security.SystemSecurityContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.integration.support.locks.LockRegistry;
 import org.springframework.scheduling.annotation.Scheduled;
 
 /**
  * Scheduler to check target filters for auto assignment of distribution sets
  */
+@Slf4j
 public class AutoAssignScheduler {
-    private static final Logger LOGGER = LoggerFactory.getLogger(AutoAssignScheduler.class);
 
     private static final String PROP_SCHEDULER_DELAY_PLACEHOLDER = "${hawkbit.autoassign.scheduler.fixedDelay:2000}";
 
     private final SystemManagement systemManagement;
-
     private final SystemSecurityContext systemSecurityContext;
-
     private final AutoAssignExecutor autoAssignExecutor;
-
     private final LockRegistry lockRegistry;
 
     /**
      * Instantiates a new AutoAssignScheduler
-     * 
-     * @param systemManagement
-     *            to find all tenants
-     * @param systemSecurityContext
-     *            to run as system
-     * @param autoAssignExecutor
-     *            to run a check as tenant
-     * @param lockRegistry
-     *            to acquire a lock per tenant
+     *
+     * @param systemManagement to find all tenants
+     * @param systemSecurityContext to run as system
+     * @param autoAssignExecutor to run a check as tenant
+     * @param lockRegistry to acquire a lock per tenant
      */
     public AutoAssignScheduler(final SystemManagement systemManagement,
             final SystemSecurityContext systemSecurityContext, final AutoAssignExecutor autoAssignExecutor,
@@ -56,10 +49,8 @@ public class AutoAssignScheduler {
     }
 
     /**
-     * Scheduler method called by the spring-async mechanism. Retrieves all
-     * tenants from the {@link SystemManagement#findTenants()} and runs for each
-     * tenant the auto assignments defined in the target filter queries
-     * {@link SystemSecurityContext}.
+     * Scheduler method called by the spring-async mechanism. Retrieves all tenants and runs for each
+     * tenant the auto assignments defined in the target filter queries {@link SystemSecurityContext}.
      */
     @Scheduled(initialDelayString = PROP_SCHEDULER_DELAY_PLACEHOLDER, fixedDelayString = PROP_SCHEDULER_DELAY_PLACEHOLDER)
     public void autoAssignScheduler() {
@@ -82,11 +73,11 @@ public class AutoAssignScheduler {
         }
 
         try {
-            LOGGER.debug("Auto assign scheduled execution has aquired lock and started for each tenant.");
+            log.debug("Auto assign scheduled execution has acquired lock and started for each tenant.");
             systemManagement.forEachTenant(tenant -> autoAssignExecutor.checkAllTargets());
         } finally {
             lock.unlock();
-            LOGGER.debug("Auto assign scheduled execution has released lock and finished.");
+            log.debug("Auto assign scheduled execution has released lock and finished.");
         }
 
         return null;

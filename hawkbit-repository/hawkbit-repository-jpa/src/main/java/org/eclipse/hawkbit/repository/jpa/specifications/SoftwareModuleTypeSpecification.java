@@ -1,10 +1,11 @@
 /**
- * Copyright (c) 2022 Bosch.IO GmbH and others.
+ * Copyright (c) 2022 Bosch.IO GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.jpa.specifications;
 
@@ -24,15 +25,12 @@ public class SoftwareModuleTypeSpecification {
     }
 
     /**
-     * {@link Specification} for retrieving {@link SoftwareModuleType}s by its
-     * DELETED attribute.
-     * 
-     * @param isDeleted
-     *            TRUE/FALSE are compared to the attribute DELETED. If NULL the
-     *            attribute is ignored
+     * {@link Specification} for retrieving {@link SoftwareModuleType}s with
+     * DELETED attribute <code>false</code> - i.e. is not deleted.
+     *
      * @return the {@link SoftwareModuleType} {@link Specification}
      */
-    public static Specification<JpaSoftwareModuleType> isDeleted(final Boolean isDeleted) {
-        return (root, query, cb) -> cb.equal(root.get(JpaSoftwareModuleType_.deleted), isDeleted);
+    public static Specification<JpaSoftwareModuleType> isNotDeleted() {
+        return (root, query, cb) -> cb.equal(root.get(JpaSoftwareModuleType_.deleted), false);
     }
 }

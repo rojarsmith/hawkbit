@@ -1,23 +1,34 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.event.remote;
 
-import org.eclipse.hawkbit.repository.model.TenantAwareBaseEntity;
-
+import java.io.Serial;
 import java.util.Arrays;
+
+import lombok.AccessLevel;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+import org.eclipse.hawkbit.repository.model.TenantAwareBaseEntity;
 
 /**
  * An base definition class for an event which contains an id.
- *
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Getter
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
 public class RemoteIdEvent extends RemoteTenantAwareEvent {
 
+    @Serial
     private static final long serialVersionUID = 1L;
 
     private Long entityId;
@@ -27,23 +38,12 @@ public class RemoteIdEvent extends RemoteTenantAwareEvent {
     private String interfaceClass;
 
     /**
-     * Default constructor.
-     */
-    protected RemoteIdEvent() {
-        // for serialization libs like jackson
-    }
-
-    /**
      * Constructor for json serialization.
-     * 
-     * @param entityId
-     *            the entity Id
-     * @param tenant
-     *            the tenant
-     * @param entityClass
-     *            the entity class
-     * @param applicationId
-     *            the origin application id
+     *
+     * @param entityId the entity Id
+     * @param tenant the tenant
+     * @param entityClass the entity class
+     * @param applicationId the origin application id
      */
     protected RemoteIdEvent(final Long entityId, final String tenant,
             final Class<? extends TenantAwareBaseEntity> entityClass, final String applicationId) {
@@ -58,20 +58,5 @@ public class RemoteIdEvent extends RemoteTenantAwareEvent {
         final Class<?>[] interfaces = baseEntity.getInterfaces();
         return Arrays.stream(interfaces).filter(TenantAwareBaseEntity.class::isAssignableFrom).findFirst()
                 .orElse(baseEntity);
-    }
-
-    /**
-     * @return the entityClass
-     */
-    public String getEntityClass() {
-        return entityClass;
-    }
-
-    public Long getEntityId() {
-        return entityId;
-    }
-
-    public String getInterfaceClass() {
-        return interfaceClass;
     }
 }

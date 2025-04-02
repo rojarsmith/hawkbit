@@ -1,10 +1,11 @@
 /**
- * Copyright (c) 2018 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2018 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.test.util;
 
@@ -26,14 +27,6 @@ public class RolloutTestApprovalStrategy implements RolloutApprovalStrategy {
         return approvalNeeded;
     }
 
-    public void setApprovalNeeded(boolean approvalNeeded) {
-        this.approvalNeeded = approvalNeeded;
-    }
-
-    public void setApproveDecidedBy(final String user) {
-        this.approvalDecidedBy = user;
-    }
-
     @Override
     public void onApprovalRequired(Rollout rollout) {
         // do nothing, as no action is needed when testing
@@ -42,5 +35,13 @@ public class RolloutTestApprovalStrategy implements RolloutApprovalStrategy {
     @Override
     public String getApprovalUser(Rollout rollout) {
         return approvalDecidedBy;
+    }
+
+    public void setApprovalNeeded(boolean approvalNeeded) {
+        this.approvalNeeded = approvalNeeded;
+    }
+
+    public void setApproveDecidedBy(final String user) {
+        this.approvalDecidedBy = user;
     }
 }

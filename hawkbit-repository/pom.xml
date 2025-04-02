@@ -1,30 +1,36 @@
 <!--
 
-    Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+    Copyright (c) 2015 Bosch Software Innovations GmbH and others
 
-    All rights reserved. This program and the accompanying materials
-    are made available under the terms of the Eclipse Public License v1.0
-    which accompanies this distribution, and is available at
-    http://www.eclipse.org/legal/epl-v10.html
+    This program and the accompanying materials are made
+    available under the terms of the Eclipse Public License 2.0
+    which is available at https://www.eclipse.org/legal/epl-2.0/
+
+    SPDX-License-Identifier: EPL-2.0
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-   <modelVersion>4.0.0</modelVersion>
-   <parent>
-      <groupId>org.eclipse.hawkbit</groupId>
-      <version>0.3.0-SNAPSHOT</version>
-      <artifactId>hawkbit-parent</artifactId>
-   </parent>
-   <artifactId>hawkbit-repository</artifactId>
-   <name>hawkBit :: Repository</name>
-   <packaging>pom</packaging>
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.eclipse.hawkbit</groupId>
+        <artifactId>hawkbit-parent</artifactId>
+        <version>${revision}</version>
+    </parent>
 
-   <modules>
-      <module>hawkbit-repository-jpa</module>
-      <module>hawkbit-repository-api</module>
-      <module>hawkbit-repository-test</module>
-      <module>hawkbit-repository-core</module>
-   </modules>
+    <artifactId>hawkbit-repository</artifactId>
+    <name>hawkBit :: Repository :: Parent</name>
+    <packaging>pom</packaging>
 
+    <modules>
+        <module>hawkbit-repository-api</module>
+        <module>hawkbit-repository-core</module>
+        <module>hawkbit-repository-jpa-api</module>
+        <module>hawkbit-repository-jpa-eclipselink</module>
+        <module>hawkbit-repository-jpa-hibernate</module>
+        <module>hawkbit-repository-jpa</module>
+        <module>hawkbit-repository-jpa-flyway</module>
+
+        <module>hawkbit-repository-test</module>
+    </modules>
 </project>

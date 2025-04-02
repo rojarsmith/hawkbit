@@ -1,10 +1,11 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.autoconfigure.scheduling;
 
@@ -12,7 +13,6 @@ import java.util.concurrent.Executor;
 
 import org.springframework.aop.interceptor.AsyncUncaughtExceptionHandler;
 import org.springframework.aop.interceptor.SimpleAsyncUncaughtExceptionHandler;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Configuration;
@@ -20,7 +20,6 @@ import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.annotation.EnableAsync;
 
 /**
- *
  * Auto config fot the exception handler.
  */
 @Configuration
@@ -28,9 +27,11 @@ import org.springframework.scheduling.annotation.EnableAsync;
 @ConditionalOnMissingBean(AsyncConfigurer.class)
 public class AsyncConfigurerAutoConfiguration implements AsyncConfigurer {
 
-    @Autowired
-    @Qualifier("asyncExecutor")
-    private Executor executor;
+    private final Executor executor;
+
+    public AsyncConfigurerAutoConfiguration(@Qualifier("asyncExecutor") final Executor executor) {
+        this.executor = executor;
+    }
 
     @Override
     public Executor getAsyncExecutor() {
@@ -41,5 +42,4 @@ public class AsyncConfigurerAutoConfiguration implements AsyncConfigurer {
     public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler() {
         return new SimpleAsyncUncaughtExceptionHandler();
     }
-
 }

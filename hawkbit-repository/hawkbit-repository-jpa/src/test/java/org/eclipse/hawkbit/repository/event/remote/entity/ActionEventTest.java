@@ -1,15 +1,19 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.event.remote.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.qameta.allure.Description;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.eclipse.hawkbit.repository.jpa.model.JpaAction;
 import org.eclipse.hawkbit.repository.model.Action;
 import org.eclipse.hawkbit.repository.model.Action.ActionType;
@@ -18,26 +22,22 @@ import org.eclipse.hawkbit.repository.model.DistributionSet;
 import org.eclipse.hawkbit.repository.model.Target;
 import org.junit.jupiter.api.Test;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
-
 /**
  * Test the remote entity events.
  */
 @Feature("Component Tests - Repository")
 @Story("Test ActionCreatedEvent and ActionUpdatedEvent")
-public class ActionEventTest extends AbstractRemoteEntityEventTest<Action> {
+class ActionEventTest extends AbstractRemoteEntityEventTest<Action> {
 
     @Test
     @Description("Verifies that the action entity reloading by remote created works")
-    public void testActionCreatedEvent() {
+    void testActionCreatedEvent() {
         assertAndCreateRemoteEvent(ActionCreatedEvent.class);
     }
 
     @Test
     @Description("Verifies that the action entity reloading by remote updated works")
-    public void testActionUpdatedEvent() {
+    void testActionUpdatedEvent() {
         assertAndCreateRemoteEvent(ActionUpdatedEvent.class);
     }
 
@@ -85,6 +85,7 @@ public class ActionEventTest extends AbstractRemoteEntityEventTest<Action> {
         generateAction.setDistributionSet(distributionSet);
         generateAction.setStatus(Status.RUNNING);
         generateAction.setInitiatedBy(tenantAware.getCurrentUsername());
+        generateAction.setWeight(1000);
         return actionRepository.save(generateAction);
     }
 

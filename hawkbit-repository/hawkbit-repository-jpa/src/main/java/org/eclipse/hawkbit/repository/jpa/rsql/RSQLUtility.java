@@ -1,33 +1,22 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.jpa.rsql;
 
+import java.io.Serial;
 import java.util.List;
 import java.util.Set;
 
-import javax.persistence.criteria.CriteriaBuilder;
-import javax.persistence.criteria.CriteriaQuery;
-import javax.persistence.criteria.Predicate;
-import javax.persistence.criteria.Root;
-
-import org.apache.commons.lang3.text.StrLookup;
-import org.eclipse.hawkbit.repository.FieldNameProvider;
-import org.eclipse.hawkbit.repository.exception.RSQLParameterSyntaxException;
-import org.eclipse.hawkbit.repository.exception.RSQLParameterUnsupportedFieldException;
-import org.eclipse.hawkbit.repository.rsql.RsqlVisitorFactoryHolder;
-import org.eclipse.hawkbit.repository.rsql.VirtualPropertyReplacer;
-import org.eclipse.hawkbit.repository.rsql.VirtualPropertyResolver;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.data.jpa.domain.Specification;
-import org.springframework.orm.jpa.vendor.Database;
-import org.springframework.util.CollectionUtils;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 
 import cz.jirutka.rsql.parser.RSQLParser;
 import cz.jirutka.rsql.parser.RSQLParserException;
@@ -35,6 +24,19 @@ import cz.jirutka.rsql.parser.ast.ComparisonOperator;
 import cz.jirutka.rsql.parser.ast.Node;
 import cz.jirutka.rsql.parser.ast.RSQLOperators;
 import cz.jirutka.rsql.parser.ast.RSQLVisitor;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.text.StrLookup;
+import org.eclipse.hawkbit.repository.RsqlQueryField;
+import org.eclipse.hawkbit.repository.exception.RSQLParameterSyntaxException;
+import org.eclipse.hawkbit.repository.exception.RSQLParameterUnsupportedFieldException;
+import org.eclipse.hawkbit.repository.rsql.RsqlConfigHolder;
+import org.eclipse.hawkbit.repository.rsql.VirtualPropertyReplacer;
+import org.eclipse.hawkbit.repository.rsql.VirtualPropertyResolver;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.orm.jpa.vendor.Database;
+import org.springframework.util.CollectionUtils;
 
 /**
  * A utility class which is able to parse RSQL strings into an spring data
@@ -68,87 +70,65 @@ import cz.jirutka.rsql.parser.ast.RSQLVisitor;
  * <em>lastControllerRequestAt=le=${OVERDUE_TS}</em><br>
  * It is possible to escape a macro expression by using a second '$':
  * $${OVERDUE_TS} would prevent the ${OVERDUE_TS} token from being expanded.
- *
  */
+@Slf4j
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class RSQLUtility {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(RSQLUtility.class);
-
-    /**
-     * private constructor due utility class.
-     */
-    private RSQLUtility() {
-
-    }
 
     /**
      * Builds a JPA {@link Specification} which corresponds with the given RSQL
      * query. The specification can be used to filter for JPA entities with the
      * given RSQL query.
      *
-     * @param rsql
-     *            the rsql query to be parsed
-     * @param fieldNameProvider
-     *            the enum class type which implements the
-     *            {@link FieldNameProvider}
-     * @param virtualPropertyReplacer
-     *            holds the logic how the known macros have to be resolved; may
-     *            be <code>null</code>
-     * @param database
-     *            in use
-     *
-     * @return an specification which can be used with JPA
-     * @throws RSQLParameterUnsupportedFieldException
-     *             if a field in the RSQL string is used but not provided by the
-     *             given {@code fieldNameProvider}
-     * @throws RSQLParameterSyntaxException
-     *             if the RSQL syntax is wrong
-     *
+     * @param rsql the rsql query to be parsed
+     * @param fieldNameProvider the enum class type which implements the {@link RsqlQueryField}
+     * @param virtualPropertyReplacer holds the logic how the known macros have to be resolved; may be <code>null</code>
+     * @param database database in use
+     * @return a specification which can be used with JPA
+     * @throws RSQLParameterUnsupportedFieldException if a field in the RSQL string is used but not provided by the
+     *         given {@code fieldNameProvider}
+     * @throws RSQLParameterSyntaxException if the RSQL syntax is wrong
      */
-    public static <A extends Enum<A> & FieldNameProvider, T> Specification<T> buildRsqlSpecification(final String rsql,
-            final Class<A> fieldNameProvider, final VirtualPropertyReplacer virtualPropertyReplacer,
-            final Database database) {
+    public static <A extends Enum<A> & RsqlQueryField, T> Specification<T> buildRsqlSpecification(
+            final String rsql, final Class<A> fieldNameProvider,
+            final VirtualPropertyReplacer virtualPropertyReplacer, final Database database) {
         return new RSQLSpecification<>(rsql, fieldNameProvider, virtualPropertyReplacer, database);
     }
 
     /**
      * Validates the RSQL string
-     * 
-     * @param rsql
-     *            RSQL string to validate
+     *
+     * @param rsql RSQL string to validate
      * @param fieldNameProvider
-     * 
-     * @throws RSQLParserException
-     *             if RSQL syntax is invalid
-     * @throws RSQLParameterUnsupportedFieldException
-     *             if RSQL key is not allowed
+     * @throws RSQLParserException if RSQL syntax is invalid
+     * @throws RSQLParameterUnsupportedFieldException if RSQL key is not allowed
      */
-    public static <A extends Enum<A> & FieldNameProvider> void validateRsqlFor(final String rsql,
-            final Class<A> fieldNameProvider) {
-        final RSQLVisitor<Void, String> visitor = getValidationRsqlVisitor(fieldNameProvider);
+    public static <A extends Enum<A> & RsqlQueryField> void validateRsqlFor(
+            final String rsql, final Class<A> fieldNameProvider) {
+        final RSQLVisitor<Void, String> visitor =
+                RsqlConfigHolder.getInstance().getRsqlVisitorFactory().validationRsqlVisitor(fieldNameProvider);
         final Node rootNode = parseRsql(rsql);
         rootNode.accept(visitor);
     }
 
-    private static <A extends Enum<A> & FieldNameProvider> RSQLVisitor<Void, String> getValidationRsqlVisitor(
-            final Class<A> fieldNameProvider) {
-        return RsqlVisitorFactoryHolder.getInstance().getRsqlVisitorFactory().validationRsqlVisitor(fieldNameProvider);
-    }
-
     private static Node parseRsql(final String rsql) {
+        log.debug("Parsing rsql string {}", rsql);
         try {
-            LOGGER.debug("Parsing rsql string {}", rsql);
             final Set<ComparisonOperator> operators = RSQLOperators.defaultOperators();
-            return new RSQLParser(operators).parse(rsql.toLowerCase());
+            return new RSQLParser(operators).parse(
+                    RsqlConfigHolder.getInstance().isCaseInsensitiveDB() || RsqlConfigHolder.getInstance().isIgnoreCase()
+                            ? rsql.toLowerCase()
+                            : rsql);
         } catch (final IllegalArgumentException e) {
-            throw new RSQLParameterSyntaxException("rsql filter must not be null", e);
+            throw new RSQLParameterSyntaxException("RSQL filter must not be null", e);
         } catch (final RSQLParserException e) {
             throw new RSQLParameterSyntaxException(e);
         }
     }
 
-    private static final class RSQLSpecification<A extends Enum<A> & FieldNameProvider, T> implements Specification<T> {
+    private static final class RSQLSpecification<A extends Enum<A> & RsqlQueryField, T> implements Specification<T> {
 
+        @Serial
         private static final long serialVersionUID = 1L;
 
         private final String rsql;
@@ -169,16 +149,25 @@ public final class RSQLUtility {
             final Node rootNode = parseRsql(rsql);
             query.distinct(true);
 
-            final JpaQueryRsqlVisitor<A, T> jpqQueryRSQLVisitor = new JpaQueryRsqlVisitor<>(root, cb, enumType,
-                    virtualPropertyReplacer, database, query);
-            final List<Predicate> accept = rootNode.<List<Predicate>, String> accept(jpqQueryRSQLVisitor);
+            final RSQLVisitor<List<Predicate>, String> jpqQueryRSQLVisitor =
+                    RsqlConfigHolder.getInstance().isLegacyRsqlVisitor() ?
+                            new JpaQueryRsqlVisitor<>(
+                                    root, cb, enumType,
+                                    virtualPropertyReplacer, database, query,
+                                    !RsqlConfigHolder.getInstance().isCaseInsensitiveDB() && RsqlConfigHolder.getInstance().isIgnoreCase())
+                            :
+                                    new JpaQueryRsqlVisitorG2<>(
+                                            enumType, root, query, cb,
+                                            database, virtualPropertyReplacer,
+                                            !RsqlConfigHolder.getInstance().isCaseInsensitiveDB() && RsqlConfigHolder.getInstance()
+                                                    .isIgnoreCase());
+            final List<Predicate> accept = rootNode.accept(jpqQueryRSQLVisitor);
 
-            if (!CollectionUtils.isEmpty(accept)) {
-                return cb.and(accept.toArray(new Predicate[accept.size()]));
+            if (CollectionUtils.isEmpty(accept)) {
+                return cb.conjunction();
+            } else {
+                return cb.and(accept.toArray(new Predicate[0]));
             }
-            return cb.conjunction();
-
         }
     }
-
 }

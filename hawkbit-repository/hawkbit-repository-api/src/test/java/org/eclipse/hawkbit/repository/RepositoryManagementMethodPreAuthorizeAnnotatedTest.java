@@ -1,57 +1,54 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.net.URISyntaxException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
-import org.junit.jupiter.api.Test;
-import org.springframework.security.access.prepost.PreAuthorize;
-
-import com.google.common.reflect.ClassPath;
-
+import io.github.classgraph.ClassGraph;
+import io.github.classgraph.ClassInfo;
+import io.github.classgraph.ScanResult;
 import io.qameta.allure.Description;
 import io.qameta.allure.Feature;
 import io.qameta.allure.Story;
+import org.junit.jupiter.api.Test;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @Feature("Unit Tests - Repository")
 @Story("Security Test")
-public class RepositoryManagementMethodPreAuthorizeAnnotatedTest {
+class RepositoryManagementMethodPreAuthorizeAnnotatedTest {
 
+    // if some methods are to be excluded
     private static final Set<Method> METHOD_SECURITY_EXCLUSION = new HashSet<>();
 
-    static {
-        METHOD_SECURITY_EXCLUSION.add(getMethod(SystemManagement.class, "currentTenant"));
-    }
-
     @Test
-    @Description("Verfies that repository methods are @PreAuthorize annotated")
-    public void repositoryManagementMethodsArePreAuthorizedAnnotated()
-            throws ClassNotFoundException, URISyntaxException, IOException {
-        final List<Class<?>> findInterfacesInPackage = findInterfacesInPackage(getClass().getPackage(),
-                Pattern.compile(".*Management"));
-
-        assertThat(findInterfacesInPackage).isNotEmpty();
-        for (final Class<?> interfaceToCheck : findInterfacesInPackage) {
-            assertDeclaredMethodsContainsPreAuthorizeAnnotaions(interfaceToCheck);
+    @Description("Verifies that repository methods are @PreAuthorize annotated")
+    void repositoryManagementMethodsArePreAuthorizedAnnotated() {
+        final String packageName = getClass().getPackage().getName();
+        try (final ScanResult scanResult = new ClassGraph().acceptPackages(packageName).scan()) {
+            final List<? extends Class<?>> matchingClasses = scanResult.getAllClasses()
+                    .stream()
+                    .filter(classInPackage -> classInPackage.getSimpleName().endsWith("Management") && classInPackage.isInterface())
+                    .map(ClassInfo::loadClass)
+                    .toList();
+            assertThat(matchingClasses).isNotEmpty();
+            matchingClasses.forEach(
+                    RepositoryManagementMethodPreAuthorizeAnnotatedTest::assertDeclaredMethodsContainsPreAuthorizeAnnotations);
         }
 
-        // all exclusion should be used, otherwise the method exlusion should be
+        // all exclusion should be used, otherwise the method exclusion should be
         // cleaned up again
         assertThat(METHOD_SECURITY_EXCLUSION).isEmpty();
     }
@@ -61,11 +58,10 @@ public class RepositoryManagementMethodPreAuthorizeAnnotatedTest {
      * {@link PreAuthorize} annotation for security. Inherited methods are not
      * checked. The following methods are excluded due inherited from
      * {@link Object}, like equals() or toString().
-     * 
-     * @param clazz
-     *            the class to retrieve the public declared methods
+     *
+     * @param clazz the class to retrieve the declared methods
      */
-    private static void assertDeclaredMethodsContainsPreAuthorizeAnnotaions(final Class<?> clazz) {
+    private static void assertDeclaredMethodsContainsPreAuthorizeAnnotations(final Class<?> clazz) {
         final Method[] declaredMethods = clazz.getDeclaredMethods();
         for (final Method method : declaredMethods) {
             final boolean methodExcluded = METHOD_SECURITY_EXCLUSION.contains(method);
@@ -75,23 +71,10 @@ public class RepositoryManagementMethodPreAuthorizeAnnotatedTest {
                 continue;
             }
             final PreAuthorize annotation = method.getAnnotation(PreAuthorize.class);
-            assertThat(annotation).as("The public method " + method.getName() + " in class " + clazz.getName()
-                    + " is not annotated with @PreAuthorize, security leak?").isNotNull();
-        }
-    }
-
-    private List<Class<?>> findInterfacesInPackage(final Package p, final Pattern includeFilter)
-            throws URISyntaxException, IOException, ClassNotFoundException {
-        return ClassPath.from(Thread.currentThread().getContextClassLoader()).getTopLevelClasses(p.getName()).stream()
-                .filter(clazzInfo -> includeFilter.matcher(clazzInfo.getSimpleName()).matches())
-                .map(clazzInfo -> clazzInfo.load()).filter(clazz -> clazz.isInterface()).collect(Collectors.toList());
-    }
-
-    private static Method getMethod(final Class<?> clazz, final String methodName, final Class<?>... parameterTypes) {
-        try {
-            return clazz.getMethod(methodName, parameterTypes);
-        } catch (NoSuchMethodException | SecurityException e) {
-            throw new RuntimeException(e.getMessage(), e);
+            assertThat(annotation)
+                    .as("The method " + method.getName() + " in class " + clazz.getName() +
+                            " is not annotated with @PreAuthorize, security leak?")
+                    .isNotNull();
         }
     }
 }

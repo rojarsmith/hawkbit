@@ -1,10 +1,11 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.jpa.builder;
 
@@ -18,9 +19,9 @@ import org.eclipse.hawkbit.repository.model.TargetFilterQuery;
 
 /**
  * Builder implementation for {@link TargetFilterQuery}.
- *
  */
 public class JpaTargetFilterQueryBuilder implements TargetFilterQueryBuilder {
+
     private final DistributionSetManagement distributionSetManagement;
 
     public JpaTargetFilterQueryBuilder(final DistributionSetManagement distributionSetManagement) {
@@ -33,13 +34,12 @@ public class JpaTargetFilterQueryBuilder implements TargetFilterQueryBuilder {
     }
 
     @Override
-    public TargetFilterQueryCreate create() {
-        return new JpaTargetFilterQueryCreate(distributionSetManagement);
-    }
-
-    @Override
     public AutoAssignDistributionSetUpdate updateAutoAssign(final long id) {
         return new AutoAssignDistributionSetUpdate(id);
     }
 
+    @Override
+    public TargetFilterQueryCreate create() {
+        return new JpaTargetFilterQueryCreate(distributionSetManagement);
+    }
 }

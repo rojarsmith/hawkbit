@@ -1,10 +1,11 @@
 /**
- * Copyright (c) 2018 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2018 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.jpa.autocleanup;
 
@@ -16,6 +17,9 @@ import static org.eclipse.hawkbit.tenancy.configuration.TenantConfigurationPrope
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
+import io.qameta.allure.Description;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.eclipse.hawkbit.repository.jpa.AbstractJpaIntegrationTest;
 import org.eclipse.hawkbit.repository.model.Action;
 import org.eclipse.hawkbit.repository.model.Action.Status;
@@ -24,25 +28,20 @@ import org.eclipse.hawkbit.repository.model.Target;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
-
 /**
  * Test class for {@link AutoActionCleanup}.
- *
  */
 @Feature("Component Tests - Repository")
 @Story("Action cleanup handler")
-public class AutoActionCleanupTest extends AbstractJpaIntegrationTest {
+@SuppressWarnings("java:S6813") // constructor injects are not possible for test classes
+class AutoActionCleanupTest extends AbstractJpaIntegrationTest {
 
     @Autowired
     private AutoActionCleanup autoActionCleanup;
 
     @Test
     @Description("Verifies that running actions are not cleaned up.")
-    public void runningActionsAreNotCleanedUp() {
-
+    void runningActionsAreNotCleanedUp() {
         // cleanup config for this test case
         setupCleanupConfiguration(true, 0, Action.Status.CANCELED, Action.Status.ERROR);
 
@@ -57,16 +56,15 @@ public class AutoActionCleanupTest extends AbstractJpaIntegrationTest {
 
         assertThat(actionRepository.count()).isEqualTo(2);
 
+        waitNextMillis();
         autoActionCleanup.run();
 
         assertThat(actionRepository.count()).isEqualTo(2);
-
     }
 
     @Test
     @Description("Verifies that nothing is cleaned up if the cleanup is disabled.")
-    public void cleanupDisabled() {
-
+    void cleanupDisabled() {
         // cleanup config for this test case
         setupCleanupConfiguration(false, 0, Action.Status.CANCELED);
 
@@ -83,16 +81,15 @@ public class AutoActionCleanupTest extends AbstractJpaIntegrationTest {
 
         assertThat(actionRepository.count()).isEqualTo(2);
 
+        waitNextMillis();
         autoActionCleanup.run();
 
         assertThat(actionRepository.count()).isEqualTo(2);
-
     }
 
     @Test
     @Description("Verifies that canceled and failed actions are cleaned up.")
-    public void canceledAndFailedActionsAreCleanedUp() {
-
+    void canceledAndFailedActionsAreCleanedUp() {
         // cleanup config for this test case
         setupCleanupConfiguration(true, 0, Action.Status.CANCELED, Action.Status.ERROR);
 
@@ -114,17 +111,16 @@ public class AutoActionCleanupTest extends AbstractJpaIntegrationTest {
 
         assertThat(actionRepository.count()).isEqualTo(3);
 
+        waitNextMillis();
         autoActionCleanup.run();
 
         assertThat(actionRepository.count()).isEqualTo(1);
-        assertThat(actionRepository.getActionById(action3)).isPresent();
-
+        assertThat(actionRepository.findById(action3)).isPresent();
     }
 
     @Test
     @Description("Verifies that canceled actions are cleaned up.")
-    public void canceledActionsAreCleanedUp() {
-
+    void canceledActionsAreCleanedUp() {
         // cleanup config for this test case
         setupCleanupConfiguration(true, 0, Action.Status.CANCELED);
 
@@ -146,19 +142,18 @@ public class AutoActionCleanupTest extends AbstractJpaIntegrationTest {
 
         assertThat(actionRepository.count()).isEqualTo(3);
 
+        waitNextMillis();
         autoActionCleanup.run();
 
         assertThat(actionRepository.count()).isEqualTo(2);
-        assertThat(actionRepository.getActionById(action2)).isPresent();
-        assertThat(actionRepository.getActionById(action3)).isPresent();
-
+        assertThat(actionRepository.findById(action2)).isPresent();
+        assertThat(actionRepository.findById(action3)).isPresent();
     }
 
     @Test
     @Description("Verifies that canceled and failed actions are cleaned up once they expired.")
     @SuppressWarnings("squid:S2925")
-    public void canceledAndFailedActionsAreCleanedUpWhenExpired() throws InterruptedException {
-
+    void canceledAndFailedActionsAreCleanedUpWhenExpired() throws InterruptedException {
         // cleanup config for this test case
         setupCleanupConfiguration(true, 500, Action.Status.CANCELED, Action.Status.ERROR);
 
@@ -178,6 +173,7 @@ public class AutoActionCleanupTest extends AbstractJpaIntegrationTest {
         setActionToCanceled(action1);
         setActionToFailed(action2);
 
+        waitNextMillis();
         autoActionCleanup.run();
 
         // actions have not expired yet
@@ -189,8 +185,7 @@ public class AutoActionCleanupTest extends AbstractJpaIntegrationTest {
         autoActionCleanup.run();
 
         assertThat(actionRepository.count()).isEqualTo(1);
-        assertThat(actionRepository.getActionById(action3)).isPresent();
-
+        assertThat(actionRepository.findById(action3)).isPresent();
     }
 
     private void setActionToCanceled(final Long id) {
@@ -205,8 +200,8 @@ public class AutoActionCleanupTest extends AbstractJpaIntegrationTest {
     private void setupCleanupConfiguration(final boolean cleanupEnabled, final long expiry, final Status... status) {
         tenantConfigurationManagement.addOrUpdateConfiguration(ACTION_CLEANUP_ENABLED, cleanupEnabled);
         tenantConfigurationManagement.addOrUpdateConfiguration(ACTION_CLEANUP_ACTION_EXPIRY, expiry);
-        tenantConfigurationManagement.addOrUpdateConfiguration(ACTION_CLEANUP_ACTION_STATUS,
+        tenantConfigurationManagement.addOrUpdateConfiguration(
+                ACTION_CLEANUP_ACTION_STATUS,
                 Arrays.stream(status).map(Status::toString).collect(Collectors.joining(",")));
     }
-
 }

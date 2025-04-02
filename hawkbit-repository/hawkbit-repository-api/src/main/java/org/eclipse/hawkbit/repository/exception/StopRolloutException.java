@@ -1,12 +1,15 @@
 /**
- * Copyright (c) 2021 Bosch.IO GmbH and others.
+ * Copyright (c) 2021 Bosch.IO GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.exception;
+
+import java.io.Serial;
 
 import org.eclipse.hawkbit.exception.AbstractServerRtException;
 import org.eclipse.hawkbit.exception.SpServerError;
@@ -17,6 +20,8 @@ import org.eclipse.hawkbit.exception.SpServerError;
  * caused by a long ongoing creation of a rollout.
  */
 public class StopRolloutException extends AbstractServerRtException {
+
+    @Serial
     private static final long serialVersionUID = 1L;
 
     /**
@@ -31,8 +36,7 @@ public class StopRolloutException extends AbstractServerRtException {
      * Creates a new StopRolloutException with
      * {@link SpServerError#SP_STOP_ROLLOUT_FAILED} error.
      *
-     * @param cause
-     *            for the exception
+     * @param cause for the exception
      */
     public StopRolloutException(final Throwable cause) {
         super(SpServerError.SP_STOP_ROLLOUT_FAILED, cause);
@@ -42,8 +46,7 @@ public class StopRolloutException extends AbstractServerRtException {
      * Creates a new StopRolloutException with
      * {@link SpServerError#SP_STOP_ROLLOUT_FAILED} error.
      *
-     * @param message
-     *            of the error
+     * @param message of the error
      */
     public StopRolloutException(final String message) {
         super(message, SpServerError.SP_STOP_ROLLOUT_FAILED);

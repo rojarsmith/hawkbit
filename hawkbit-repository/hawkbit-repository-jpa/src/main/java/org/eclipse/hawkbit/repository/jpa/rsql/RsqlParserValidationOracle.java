@@ -1,10 +1,11 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.jpa.rsql;
 
@@ -12,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -20,6 +22,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import cz.jirutka.rsql.parser.ParseException;
+import cz.jirutka.rsql.parser.RSQLParserException;
+import lombok.extern.slf4j.Slf4j;
 import org.eclipse.hawkbit.repository.TargetFields;
 import org.eclipse.hawkbit.repository.exception.RSQLParameterSyntaxException;
 import org.eclipse.hawkbit.repository.exception.RSQLParameterUnsupportedFieldException;
@@ -29,38 +34,27 @@ import org.eclipse.hawkbit.repository.rsql.SuggestToken;
 import org.eclipse.hawkbit.repository.rsql.SuggestionContext;
 import org.eclipse.hawkbit.repository.rsql.SyntaxErrorContext;
 import org.eclipse.hawkbit.repository.rsql.ValidationOracleContext;
-import org.eclipse.persistence.exceptions.ConversionException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.orm.jpa.JpaSystemException;
 import org.springframework.util.CollectionUtils;
-
-import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Multimap;
-
-import cz.jirutka.rsql.parser.ParseException;
-import cz.jirutka.rsql.parser.RSQLParserException;
 
 /**
  * An implementation of {@link RsqlValidationOracle} which retrieves the
  * exception using the {@link ParseException} to retrieve the suggestions.
- * 
+ *
  * The suggestion only works when there are syntax errors existing because the
  * information about current and next tokens in the RSQL syntax are from the
  * {@link ParseException}.
- * 
+ *
  * There is a feature request on the GitHub project
  * <a href="https://github.com/jirutka/rsql-parser/issues/22">https://github.com
  * /jirutka/rsql-parser/issues/22</a>
- * 
  */
+@Slf4j
 public class RsqlParserValidationOracle implements RsqlValidationOracle {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(RsqlParserValidationOracle.class);
-
+    @SuppressWarnings("java:S1872") // intentionally don't use class but name - class could be unavailable
     @Override
     public ValidationOracleContext suggest(final String rsqlQuery, final int cursorPosition) {
-
         final List<SuggestToken> expectedTokens = new ArrayList<>();
         final ValidationOracleContext context = new ValidationOracleContext();
         context.setSyntaxError(true);
@@ -77,12 +71,16 @@ public class RsqlParserValidationOracle implements RsqlValidationOracle {
             setExceptionDetails(rsqlQuery, new Exception(ex.getCause().getCause()), expectedTokens);
             errorContext.setErrorMessage(getCustomMessage(ex.getCause().getMessage(), expectedTokens));
             suggestionContext.setSuggestions(expectedTokens);
-            LOGGER.trace("Syntax exception on parsing :", ex);
+            log.trace("Syntax exception on parsing :", ex);
         } catch (final RSQLParameterUnsupportedFieldException | IllegalArgumentException ex) {
             errorContext.setErrorMessage(getCustomMessage(ex.getMessage(), null));
-            LOGGER.trace("Illegal argument on parsing :", ex);
-        } catch (@SuppressWarnings("squid:S1166") final ConversionException | JpaSystemException e) {
+            log.trace("Illegal argument on parsing :", ex);
+        } catch (final JpaSystemException e) {
             // noop
+        } catch (final RuntimeException e) {
+            if (!"org.eclipse.persistence.exceptions.ConversionException".equals(e.getClass().getName())) {
+                throw e;
+            }
         }
         return context;
     }
@@ -96,8 +94,8 @@ public class RsqlParserValidationOracle implements RsqlValidationOracle {
             final Collection<String> tokenImages = TokenDescription.getTokenImage(TokenDescription.LOGICAL_OP);
             final List<SuggestToken> logicalOps = new ArrayList<>(tokenImages.size());
             for (final String tokenImage : tokenImages) {
-                logicalOps.add(new SuggestToken(currentQueryLength, currentQueryLength + tokenImage.length(), null,
-                        tokenImage));
+                logicalOps.add(
+                        new SuggestToken(currentQueryLength, currentQueryLength + tokenImage.length(), null, tokenImage));
             }
             return logicalOps;
         }
@@ -152,7 +150,7 @@ public class RsqlParserValidationOracle implements RsqlValidationOracle {
             final int currentQueryLength = rsqlQuery.length() - 1;
             final Collection<String> tokenImages = TokenDescription.getTokenImage(TokenDescription.COMPARATOR);
             return tokenImages.stream().map(tokenImage -> new SuggestToken(currentQueryLength,
-                    currentQueryLength + tokenImage.length(), null, tokenImage)).collect(Collectors.toList());
+                    currentQueryLength + tokenImage.length(), null, tokenImage)).toList();
         }
 
         return Collections.emptyList();
@@ -216,8 +214,8 @@ public class RsqlParserValidationOracle implements RsqlValidationOracle {
     }
 
     private static ParseException findParseException(final Throwable e) {
-        if (e instanceof ParseException) {
-            return (ParseException) e;
+        if (e instanceof ParseException parseException) {
+            return parseException;
         } else if (e.getCause() != null) {
             return findParseException(e.getCause());
         }
@@ -231,15 +229,15 @@ public class RsqlParserValidationOracle implements RsqlValidationOracle {
             return builder;
         }
 
-        builder = message.substring(message.indexOf(':') + 1, message.length());
-        if (builder.indexOf("Was expecting") != -1) {
+        builder = message.substring(message.indexOf(':') + 1);
+        if (builder.contains("Was expecting")) {
             builder = builder.substring(0, builder.lastIndexOf("Was expecting"));
         }
 
         if (!CollectionUtils.isEmpty(expectedTokens)) {
             final StringBuilder tokens = new StringBuilder();
-            expectedTokens.stream().forEach(value -> tokens.append(value.getSuggestion() + ","));
-            builder = builder.concat("Was expecting :" + tokens.toString().substring(0, tokens.length() - 1));
+            expectedTokens.stream().forEach(value -> tokens.append(value.getSuggestion()).append(","));
+            builder = builder.concat("Was expecting :" + tokens.substring(0, tokens.length() - 1));
         }
         builder = builder.replace('\r', ' ');
         builder = builder.replace('\n', ' ');
@@ -253,22 +251,14 @@ public class RsqlParserValidationOracle implements RsqlValidationOracle {
     // sensitive help on search query.
     private static final class TokenDescription {
 
-        private static final Multimap<Integer, String> TOKEN_MAP = ArrayListMultimap.create();
+        private static final Map<Integer, List<String>> TOKEN_MAP = new HashMap<>();
 
         private static final int LOGICAL_OP = 8;
         private static final int COMPARATOR = 12;
 
         static {
-            TOKEN_MAP.put(LOGICAL_OP, "and");
-            TOKEN_MAP.put(LOGICAL_OP, "or");
-            TOKEN_MAP.put(COMPARATOR, "==");
-            TOKEN_MAP.put(COMPARATOR, "!=");
-            TOKEN_MAP.put(COMPARATOR, "=ge=");
-            TOKEN_MAP.put(COMPARATOR, "=le=");
-            TOKEN_MAP.put(COMPARATOR, "=gt=");
-            TOKEN_MAP.put(COMPARATOR, "=lt=");
-            TOKEN_MAP.put(COMPARATOR, "=in=");
-            TOKEN_MAP.put(COMPARATOR, "=out=");
+            TOKEN_MAP.put(LOGICAL_OP, List.of("and", "or"));
+            TOKEN_MAP.put(COMPARATOR, List.of("==", "!=", "=ge=", "=le=", "=gt=", "=lt=", "=in=", "=out="));
         }
 
         private TokenDescription() {
@@ -278,7 +268,6 @@ public class RsqlParserValidationOracle implements RsqlValidationOracle {
         private static Collection<String> getTokenImage(final int tokenIndex) {
             return TOKEN_MAP.get(tokenIndex);
         }
-
     }
 
     private static final class FieldNameDescription {
@@ -305,7 +294,7 @@ public class RsqlParserValidationOracle implements RsqlValidationOracle {
             final String finalTmpTokenName = tmpTokenName;
             return Arrays.stream(TargetFields.values())
                     .filter(field -> field.toString().equalsIgnoreCase(finalTmpTokenName))
-                    .map(TargetFields::getSubEntityAttributes).flatMap(List::stream).count() > 0;
+                    .map(TargetFields::getSubEntityAttributes).mapToLong(List::size).sum() > 0;
         }
 
         private static boolean isMap(final String tokenImageName) {
@@ -318,29 +307,27 @@ public class RsqlParserValidationOracle implements RsqlValidationOracle {
                 final String tokenImageName) {
             return FIELD_NAMES.stream()
                     .map(field -> new SuggestToken(beginToken, endToken, tokenImageName, field.toLowerCase()))
-                    .collect(Collectors.toList());
+                    .toList();
         }
 
         private static List<SuggestToken> toSubSuggestToken(final int beginToken, final int endToken,
                 final String topToken, final String tokenImageName) {
             return Arrays.stream(TargetFields.values()).filter(field -> field.toString().equalsIgnoreCase(topToken))
                     .map(TargetFields::getSubEntityAttributes).flatMap(List::stream)
-                    .map(subentity -> new SuggestToken(beginToken, endToken, tokenImageName, subentity))
-                    .collect(Collectors.toList());
+                    .map(subEntity -> new SuggestToken(beginToken, endToken, tokenImageName, subEntity))
+                    .toList();
         }
 
         private static boolean containsValue(final String imageName) {
             if (!imageName.contains(".")) {
-                return FIELD_NAMES.stream().filter(value -> value.equalsIgnoreCase(imageName)).count() > 0;
+                return FIELD_NAMES.stream().anyMatch(value -> value.equalsIgnoreCase(imageName));
             }
             final String[] split = imageName.split("\\.");
             if (split.length > 1 && FIELD_NAMES.contains(split[0].toLowerCase())) {
                 return SUB_NAMES.get(split[0].toLowerCase()).stream()
-                        .filter(subname -> (split[0] + "." + subname).equalsIgnoreCase(imageName)).count() > 0;
+                        .anyMatch(subname -> (split[0] + "." + subname).equalsIgnoreCase(imageName));
             }
-            return FIELD_NAMES.stream().filter(value -> value.equalsIgnoreCase(imageName)).count() > 0;
+            return FIELD_NAMES.stream().anyMatch(value -> value.equalsIgnoreCase(imageName));
         }
-
     }
-
 }

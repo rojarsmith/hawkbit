@@ -1,10 +1,11 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.model;
 
@@ -20,6 +21,7 @@ import java.util.concurrent.TimeUnit;
  * </p>
  */
 public interface Target extends NamedEntity {
+
     /**
      * Maximum length of controllerId.
      */
@@ -51,7 +53,9 @@ public interface Target extends NamedEntity {
     String getControllerId();
 
     /**
-     * @return the securityToken
+     * @return the securityToken if the current security context contains the necessary permission
+     *         {@link org.eclipse.hawkbit.im.authentication.SpPermission#READ_TARGET_SEC_TOKEN}
+     *         or the current context is executed as system code, otherwise {@code null}.
      */
     String getSecurityToken();
 
@@ -68,8 +72,7 @@ public interface Target extends NamedEntity {
     URI getAddress();
 
     /**
-     * @return time in {@link TimeUnit#MILLISECONDS} GMT when the {@link Target}
-     *         polled the server the last time or <code>null</code> if target
+     * @return time in {@link TimeUnit#MILLISECONDS} GMT when the {@link Target} polled the server the last time or <code>null</code> if target
      *         has never queried yet.
      */
     Long getLastTargetQuery();

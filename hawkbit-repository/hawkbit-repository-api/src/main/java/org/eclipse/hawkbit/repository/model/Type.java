@@ -1,18 +1,19 @@
 /**
- * Copyright (c) 2019 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2019 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.model;
 
 /**
- * {@link Type} is an abstract definition for {@link DistributionSetType}s and
- * {@link SoftwareModuleType}s
+ * {@link Type} is an abstract definition for {@link DistributionSetType}s and {@link SoftwareModuleType}s
  */
 public interface Type extends NamedEntity {
+
     /**
      * Maximum length of key.
      */
@@ -29,8 +30,7 @@ public interface Type extends NamedEntity {
     String getKey();
 
     /**
-     * @return <code>true</code> if the type is deleted and only kept for
-     *         history purposes.
+     * @return <code>true</code> if the type is deleted and only kept for history purposes.
      */
     boolean isDeleted();
 
@@ -38,5 +38,4 @@ public interface Type extends NamedEntity {
      * @return get color code to be used in management UI views.
      */
     String getColour();
-
 }

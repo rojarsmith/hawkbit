@@ -1,10 +1,11 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.model;
 
@@ -12,7 +13,6 @@ package org.eclipse.hawkbit.repository.model;
  * The core functionality of a {@link Rollout} is the cascading processing of
  * (sub) deployment groups. The group defines under which conditions the
  * following group is processed.
- *
  */
 public interface RolloutGroup extends NamedEntity {
 
@@ -31,6 +31,11 @@ public interface RolloutGroup extends NamedEntity {
      *         group it does not have a parent and so return {@code null}
      */
     RolloutGroup getParent();
+
+    /**
+     * @return if the group is dynamic
+     */
+    boolean isDynamic();
 
     /**
      * @return the {@link RolloutGroupSuccessCondition} for this group to
@@ -117,7 +122,6 @@ public interface RolloutGroup extends NamedEntity {
 
     /**
      * Rollout group state machine.
-     *
      */
     enum RolloutGroupStatus {
 

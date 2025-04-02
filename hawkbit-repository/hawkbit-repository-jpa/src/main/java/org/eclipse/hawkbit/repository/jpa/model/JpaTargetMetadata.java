@@ -1,34 +1,44 @@
 /**
- * Copyright (c) 2018 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2018 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.jpa.model;
 
-import javax.persistence.ConstraintMode;
-import javax.persistence.Entity;
-import javax.persistence.FetchType;
-import javax.persistence.ForeignKey;
-import javax.persistence.Id;
-import javax.persistence.IdClass;
-import javax.persistence.JoinColumn;
-import javax.persistence.ManyToOne;
-import javax.persistence.Table;
+import java.io.Serial;
 
+import jakarta.persistence.ConstraintMode;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
+import jakarta.persistence.Id;
+import jakarta.persistence.IdClass;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.eclipse.hawkbit.repository.model.Target;
 import org.eclipse.hawkbit.repository.model.TargetMetadata;
 
 /**
  * Meta data for {@link Target}.
- *
  */
+@NoArgsConstructor // Default constructor for JPA
+@Setter
+@Getter
 @IdClass(TargetMetadataCompositeKey.class)
 @Entity
 @Table(name = "sp_target_metadata")
 public class JpaTargetMetadata extends AbstractJpaMetaData implements TargetMetadata {
+
+    @Serial
     private static final long serialVersionUID = 1L;
 
     @Id
@@ -36,17 +46,11 @@ public class JpaTargetMetadata extends AbstractJpaMetaData implements TargetMeta
     @JoinColumn(name = "target_id", nullable = false, updatable = false, foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_metadata_target"))
     private JpaTarget target;
 
-    public JpaTargetMetadata() {
-        // default public constructor for JPA
-    }
-
     /**
      * Creates a single metadata entry with the given key and value.
-     * 
-     * @param key
-     *            of the meta data entry
-     * @param value
-     *            of the meta data entry
+     *
+     * @param key of the meta-data entry
+     * @param value of the meta-data entry
      */
     public JpaTargetMetadata(final String key, final String value) {
         super(key, value);
@@ -55,13 +59,10 @@ public class JpaTargetMetadata extends AbstractJpaMetaData implements TargetMeta
     /**
      * Creates a single metadata entry with the given key and value for the
      * given {@link Target}.
-     * 
-     * @param key
-     *            of the meta data entry
-     * @param value
-     *            of the meta data entry
-     * @param target
-     *            the meta data entry is associated with
+     *
+     * @param key of the meta-data entry
+     * @param value of the meta-data entry
+     * @param target the meta-data entry is associated with
      */
     public JpaTargetMetadata(final String key, final String value, final Target target) {
         super(key, value);
@@ -70,15 +71,6 @@ public class JpaTargetMetadata extends AbstractJpaMetaData implements TargetMeta
 
     public TargetMetadataCompositeKey getId() {
         return new TargetMetadataCompositeKey(target.getId(), getKey());
-    }
-
-    public void setTarget(final Target target) {
-        this.target = (JpaTarget) target;
-    }
-
-    @Override
-    public Target getTarget() {
-        return target;
     }
 
     @Override
@@ -98,12 +90,9 @@ public class JpaTargetMetadata extends AbstractJpaMetaData implements TargetMeta
         }
         final JpaTargetMetadata other = (JpaTargetMetadata) obj;
         if (target == null) {
-            if (other.target != null) {
-                return false;
-            }
-        } else if (!target.equals(other.target)) {
-            return false;
+            return other.target == null;
+        } else {
+            return target.equals(other.target);
         }
-        return true;
     }
 }

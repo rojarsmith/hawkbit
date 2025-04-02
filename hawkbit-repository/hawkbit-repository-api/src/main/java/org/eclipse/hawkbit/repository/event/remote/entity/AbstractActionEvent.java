@@ -1,21 +1,30 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.event.remote.entity;
 
-import java.util.Objects;
+import java.io.Serial;
 
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import org.eclipse.hawkbit.repository.model.Action;
 
 /**
  * Defines the remote event of creating a new {@link Action}.
  */
+@Data
+@EqualsAndHashCode(callSuper = true)
+@ToString
 public abstract class AbstractActionEvent extends RemoteEntityEvent<Action> {
+
+    @Serial
     private static final long serialVersionUID = 1L;
 
     private final Long targetId;
@@ -34,53 +43,19 @@ public abstract class AbstractActionEvent extends RemoteEntityEvent<Action> {
 
     /**
      * Constructor
-     * 
-     * @param action
-     *            the created action
-     * @param targetId
-     *            targetId identifier (optional)
-     * @param rolloutId
-     *            rollout identifier (optional)
-     * @param rolloutGroupId
-     *            rollout group identifier (optional)
-     * @param applicationId
-     *            the origin application id
+     *
+     * @param action the created action
+     * @param targetId targetId identifier (optional)
+     * @param rolloutId rollout identifier (optional)
+     * @param rolloutGroupId rollout group identifier (optional)
+     * @param applicationId the origin application id
      */
-    protected AbstractActionEvent(final Action action, final Long targetId, final Long rolloutId,
+    protected AbstractActionEvent(
+            final Action action, final Long targetId, final Long rolloutId,
             final Long rolloutGroupId, final String applicationId) {
         super(action, applicationId);
         this.targetId = targetId;
         this.rolloutId = rolloutId;
         this.rolloutGroupId = rolloutGroupId;
-    }
-
-    public Long getTargetId() {
-        return targetId;
-    }
-
-    public Long getRolloutId() {
-        return rolloutId;
-    }
-
-    public Long getRolloutGroupId() {
-        return rolloutGroupId;
-    }
-
-    @Override
-    public boolean equals(final Object o) {
-        if (this == o)
-            return true;
-        if (o == null || getClass() != o.getClass())
-            return false;
-        if (!super.equals(o))
-            return false;
-        final AbstractActionEvent that = (AbstractActionEvent) o;
-        return Objects.equals(targetId, that.targetId) && Objects.equals(rolloutId, that.rolloutId)
-                && Objects.equals(rolloutGroupId, that.rolloutGroupId);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(super.hashCode(), targetId, rolloutId, rolloutGroupId);
     }
 }

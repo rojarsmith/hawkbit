@@ -1,49 +1,48 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.jpa.tenancy;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.Callable;
 
+import io.qameta.allure.Description;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.eclipse.hawkbit.repository.exception.EntityNotFoundException;
 import org.eclipse.hawkbit.repository.jpa.AbstractJpaIntegrationTest;
 import org.eclipse.hawkbit.repository.model.DistributionSet;
 import org.eclipse.hawkbit.repository.model.Target;
 import org.eclipse.hawkbit.repository.test.util.DisposableSqlTestDatabaseExtension;
-import org.eclipse.hawkbit.repository.test.util.WithSpringAuthorityRule;
+import org.eclipse.hawkbit.repository.test.util.SecurityContextSwitch;
 import org.eclipse.hawkbit.repository.test.util.WithUser;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.data.domain.Slice;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
-
 /**
  * Multi-Tenancy tests which testing the CRUD operations of entities that all
  * CRUD-Operations are tenant aware and cannot access or delete entities not
  * belonging to the current tenant.
- *
  */
 @Feature("Component Tests - Repository")
 @Story("Multi Tenancy")
 @ExtendWith(DisposableSqlTestDatabaseExtension.class)
-public class MultiTenancyEntityTest extends AbstractJpaIntegrationTest {
+class MultiTenancyEntityTest extends AbstractJpaIntegrationTest {
 
     @Test
     @Description(value = "Ensures that multiple targets with same controller-ID can be created for different tenants.")
-    public void createMultipleTargetsWithSameIdForDifferentTenant() throws Exception {
+    void createMultipleTargetsWithSameIdForDifferentTenant() throws Exception {
         // known controller ID for overall tenants same
         final String knownControllerId = "controllerId";
 
@@ -65,9 +64,9 @@ public class MultiTenancyEntityTest extends AbstractJpaIntegrationTest {
     }
 
     @Test
-    @Description(value = "Ensures that targtes created by a tenant are not visible by another tenant.")
+    @Description(value = "Ensures that targets created by a tenant are not visible by another tenant.")
     @WithUser(tenantId = "mytenant", allSpPermissions = true)
-    public void queryTargetFromDifferentTenantIsNotVisible() throws Exception {
+    void queryTargetFromDifferentTenantIsNotVisible() throws Exception {
         // create target for another tenant
         final String anotherTenant = "anotherTenant";
         final String controllerAnotherTenant = "anotherController";
@@ -76,7 +75,7 @@ public class MultiTenancyEntityTest extends AbstractJpaIntegrationTest {
         // find all targets for current tenant "mytenant"
         final Slice<Target> findTargetsAll = targetManagement.findAll(PAGE);
         // no target has been created for "mytenant"
-        assertThat(findTargetsAll).hasSize(0);
+        assertThat(findTargetsAll).isEmpty();
 
         // find all targets for anotherTenant
         final Slice<Target> findTargetsForTenant = findTargetsForTenant(anotherTenant);
@@ -87,7 +86,7 @@ public class MultiTenancyEntityTest extends AbstractJpaIntegrationTest {
     @Test
     @Description(value = "Ensures that tenant with proper permissions can read and delete other tenants.")
     @WithUser(tenantId = "mytenant", allSpPermissions = true)
-    public void deleteAnotherTenantPossible() throws Exception {
+    void deleteAnotherTenantPossible() throws Exception {
         // create target for another tenant
         final String anotherTenant = "anotherTenant";
         final String controllerAnotherTenant = "anotherController";
@@ -103,34 +102,35 @@ public class MultiTenancyEntityTest extends AbstractJpaIntegrationTest {
     @Test
     @Description(value = "Ensures that tenant metadata is retrieved for the current tenant.")
     @WithUser(tenantId = "mytenant", autoCreateTenant = false, allSpPermissions = true)
-    public void getTenanatMetdata() throws Exception {
+    void getTenanatMetdata() throws Exception {
 
         // logged in tenant mytenant - check if tenant default data is
         // autogenerated
         assertThat(distributionSetTypeManagement.findAll(PAGE)).isEmpty();
-        assertThat(systemManagement.getTenantMetadata().getTenant().toUpperCase()).isEqualTo("mytenant".toUpperCase());
+        SecurityContextSwitch.runAsPrivileged(() ->
+                assertThat(systemManagement.createTenantMetadata("mytenant").getTenant().toUpperCase()).isEqualTo("mytenant".toUpperCase()));
+
         assertThat(distributionSetTypeManagement.findAll(PAGE)).isNotEmpty();
 
-        // check that the cache is not getting in the way, i.e. "bumlux" results
-        // in bumlux and not
-        // mytenant
-        assertThat(WithSpringAuthorityRule.runAs(WithSpringAuthorityRule.withUserAndTenant("user", "bumlux"),
-                () -> systemManagement.getTenantMetadata().getTenant().toUpperCase()))
-                        .isEqualTo("bumlux".toUpperCase());
+        // check that the cache is not getting in the way, i.e. "bumlux" results in bumlux and not mytenant
+        assertThat(SecurityContextSwitch.runAs(
+                SecurityContextSwitch.withUserAndTenantAllSpPermissions("user", "bumlux"),
+                () -> systemManagement.getTenantMetadataWithoutDetails().getTenant().toUpperCase()))
+                .isEqualTo("bumlux".toUpperCase());
     }
 
     @Test
     @Description(value = "Ensures that targets created from a different tenant cannot be deleted from other tenants")
     @WithUser(tenantId = "mytenant", allSpPermissions = true)
-    public void deleteTargetFromOtherTenantIsNotPossible() throws Exception {
+    void deleteTargetFromOtherTenantIsNotPossible() throws Exception {
         // create target for another tenant
         final String anotherTenant = "anotherTenant";
         final String controllerAnotherTenant = "anotherController";
-        final Target createTargetForTenant = createTargetForTenant(controllerAnotherTenant, anotherTenant);
+        final List<Long> createTargetForTenant = List.of(createTargetForTenant(controllerAnotherTenant, anotherTenant).getId());
 
         // ensure target cannot be deleted by 'mytenant'
         try {
-            targetManagement.delete(Arrays.asList(createTargetForTenant.getId()));
+            targetManagement.delete(createTargetForTenant);
             fail("mytenant should not have been able to delete target of anotherTenant");
         } catch (final EntityNotFoundException ex) {
             // ok
@@ -140,14 +140,14 @@ public class MultiTenancyEntityTest extends AbstractJpaIntegrationTest {
         assertThat(targetsForAnotherTenant).hasSize(1);
 
         // ensure another tenant can delete the target
-        deleteTargetsForTenant(anotherTenant, Arrays.asList(createTargetForTenant.getId()));
+        deleteTargetsForTenant(anotherTenant, createTargetForTenant);
         targetsForAnotherTenant = findTargetsForTenant(anotherTenant);
-        assertThat(targetsForAnotherTenant).hasSize(0);
+        assertThat(targetsForAnotherTenant).isEmpty();
     }
 
     @Test
     @Description(value = "Ensures that multiple distribution sets with same name and version can be created for different tenants.")
-    public void createMultipleDistributionSetsWithSameNameForDifferentTenants() throws Exception {
+    void createMultipleDistributionSetsWithSameNameForDifferentTenants() throws Exception {
 
         // known tenant names
         final String tenant = "aTenant";
@@ -168,7 +168,7 @@ public class MultiTenancyEntityTest extends AbstractJpaIntegrationTest {
     }
 
     private <T> T runAsTenant(final String tenant, final Callable<T> callable) throws Exception {
-        return WithSpringAuthorityRule.runAs(WithSpringAuthorityRule.withUserAndTenant("user", tenant), callable);
+        return SecurityContextSwitch.runAs(SecurityContextSwitch.withUserAndTenantAllSpPermissions("user", tenant), callable);
     }
 
     private Target createTargetForTenant(final String controllerId, final String tenant) throws Exception {

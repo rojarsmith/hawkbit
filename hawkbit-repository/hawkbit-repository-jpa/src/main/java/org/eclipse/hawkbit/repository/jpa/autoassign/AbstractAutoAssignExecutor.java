@@ -1,18 +1,19 @@
 /**
- * Copyright (c) 2021 Bosch.IO GmbH and others.
+ * Copyright (c) 2021 Bosch.IO GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.jpa.autoassign;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
+import lombok.extern.slf4j.Slf4j;
+import org.eclipse.hawkbit.ContextAware;
 import org.eclipse.hawkbit.repository.DeploymentManagement;
 import org.eclipse.hawkbit.repository.TargetFilterQueryManagement;
 import org.eclipse.hawkbit.repository.autoassign.AutoAssignExecutor;
@@ -21,8 +22,6 @@ import org.eclipse.hawkbit.repository.model.Action;
 import org.eclipse.hawkbit.repository.model.DeploymentRequest;
 import org.eclipse.hawkbit.repository.model.TargetFilterQuery;
 import org.eclipse.hawkbit.tenancy.TenantAware;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -33,13 +32,12 @@ import org.springframework.util.StringUtils;
 /**
  * Abstract implementation of an AutoAssignExecutor
  */
+@Slf4j
 public abstract class AbstractAutoAssignExecutor implements AutoAssignExecutor {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(AbstractAutoAssignExecutor.class);
-
     /**
-     * The message which is added to the action status when a distribution set
-     * is assigned to an target. First %s is the name of the target filter.
+     * The message which is added to the action status when a distribution set is
+     * assigned to an target. First %s is the name of the target filter.
      */
     private static final String ACTION_MESSAGE = "Auto assignment by target filter: %s";
 
@@ -49,36 +47,31 @@ public abstract class AbstractAutoAssignExecutor implements AutoAssignExecutor {
     private static final int PAGE_SIZE = 1000;
 
     private final TargetFilterQueryManagement targetFilterQueryManagement;
-
     private final DeploymentManagement deploymentManagement;
-
     private final PlatformTransactionManager transactionManager;
-
-    private final TenantAware tenantAware;
+    private final ContextAware contextAware;
 
     /**
      * Constructor
-     * 
-     * @param targetFilterQueryManagement
-     *            to get all target filter queries
-     * @param deploymentManagement
-     *            to assign distribution sets to targets
-     * @param transactionManager
-     *            to run transactions
-     * @param tenantAware
-     *            to handle the tenant context
+     *
+     * @param targetFilterQueryManagement to get all target filter queries
+     * @param deploymentManagement to assign distribution sets to targets
+     * @param transactionManager to run transactions
+     * @param contextAware to handle the context
      */
     protected AbstractAutoAssignExecutor(final TargetFilterQueryManagement targetFilterQueryManagement,
             final DeploymentManagement deploymentManagement, final PlatformTransactionManager transactionManager,
-            final TenantAware tenantAware) {
+            final ContextAware contextAware) {
         this.targetFilterQueryManagement = targetFilterQueryManagement;
         this.deploymentManagement = deploymentManagement;
         this.transactionManager = transactionManager;
-        this.tenantAware = tenantAware;
+        this.contextAware = contextAware;
     }
 
-    protected TargetFilterQueryManagement getTargetFilterQueryManagement() {
-        return targetFilterQueryManagement;
+    protected static String getAutoAssignmentInitiatedBy(final TargetFilterQuery targetFilterQuery) {
+        return StringUtils.hasText(targetFilterQuery.getAutoAssignInitiatedBy())
+                ? targetFilterQuery.getAutoAssignInitiatedBy()
+                : targetFilterQuery.getCreatedBy();
     }
 
     protected DeploymentManagement getDeploymentManagement() {
@@ -89,10 +82,13 @@ public abstract class AbstractAutoAssignExecutor implements AutoAssignExecutor {
         return transactionManager;
     }
 
-    protected TenantAware getTenantAware() {
-        return tenantAware;
+    protected TenantAware getContextAware() {
+        return contextAware;
     }
 
+    // run in the context the auto assignment is made in, i.e. if there is access control context it runs in it
+    // otherwise in the tenant & user context built by createdBy
+    // Note! It must be called in a tenant context, i.e. contextAware.getCurrentTenant() returns the tenant
     protected void forEachFilterWithAutoAssignDS(final Consumer<TargetFilterQuery> consumer) {
         Slice<TargetFilterQuery> filterQueries;
         Pageable query = PageRequest.of(0, PAGE_SIZE);
@@ -102,12 +98,24 @@ public abstract class AbstractAutoAssignExecutor implements AutoAssignExecutor {
 
             filterQueries.forEach(filterQuery -> {
                 try {
-                    runInUserContext(filterQuery, () -> consumer.accept(filterQuery));
+                    filterQuery.getAccessControlContext().ifPresentOrElse(
+                            context -> // has stored context - executes it with it
+                                    contextAware.runInContext(
+                                            context,
+                                            () -> consumer.accept(filterQuery)),
+                            () -> // has no stored context - executes it in the tenant & user scope
+                                    contextAware.runAsTenantAsUser(
+                                            contextAware.getCurrentTenant(),
+                                            getAutoAssignmentInitiatedBy(filterQuery), () -> {
+                                                consumer.accept(filterQuery);
+                                                return null;
+                                            })
+                    );
                 } catch (final RuntimeException ex) {
-                    LOGGER.debug(
+                    log.debug(
                             "Exception on forEachFilterWithAutoAssignDS execution for tenant {} with filter id {}. Continue with next filter query.",
                             filterQuery.getTenant(), filterQuery.getId(), ex);
-                    LOGGER.error(
+                    log.error(
                             "Exception on forEachFilterWithAutoAssignDS execution for tenant {} with filter id {} and error message [{}]. "
                                     + "Continue with next filter query.",
                             filterQuery.getTenant(), filterQuery.getId(), ex.getMessage());
@@ -117,13 +125,11 @@ public abstract class AbstractAutoAssignExecutor implements AutoAssignExecutor {
     }
 
     /**
-     * Runs target assignments within a dedicated transaction for a given list
-     * of controllerIDs
-     * 
-     * @param targetFilterQuery
-     *            the target filter query
-     * @param controllerIds
-     *            the controllerIDs
+     * Runs target assignments within a dedicated transaction for a given list of
+     * controllerIDs
+     *
+     * @param targetFilterQuery the target filter query
+     * @param controllerIds the controllerIDs
      * @return count of targets
      */
     protected int runTransactionalAssignment(final TargetFilterQuery targetFilterQuery,
@@ -146,13 +152,11 @@ public abstract class AbstractAutoAssignExecutor implements AutoAssignExecutor {
     }
 
     /**
-     * Creates a list of {@link DeploymentRequest} for given list of
-     * controllerIds and {@link TargetFilterQuery}
+     * Creates a list of {@link DeploymentRequest} for given list of controllerIds
+     * and {@link TargetFilterQuery}
      *
-     * @param controllerIds
-     *            list of controllerIds
-     * @param filterQuery
-     *            the query the targets have to match
+     * @param controllerIds list of controllerIds
+     * @param filterQuery the query the targets have to match
      * @return list of deployment request
      */
     protected List<DeploymentRequest> mapToDeploymentRequests(final List<String> controllerIds,
@@ -168,16 +172,6 @@ public abstract class AbstractAutoAssignExecutor implements AutoAssignExecutor {
                         .deploymentRequest(controllerId, filterQuery.getAutoAssignDistributionSet().getId())
                         .setActionType(autoAssignActionType).setWeight(filterQuery.getAutoAssignWeight().orElse(null))
                         .setConfirmationRequired(filterQuery.isConfirmationRequired()).build())
-                .collect(Collectors.toList());
-    }
-
-    protected void runInUserContext(final TargetFilterQuery targetFilterQuery, final Runnable handler) {
-        DeploymentHelper.runInNonSystemContext(handler,
-                () -> Objects.requireNonNull(getAutoAssignmentInitiatedBy(targetFilterQuery)), tenantAware);
-    }
-
-    protected static String getAutoAssignmentInitiatedBy(final TargetFilterQuery targetFilterQuery) {
-        return StringUtils.isEmpty(targetFilterQuery.getAutoAssignInitiatedBy()) ? targetFilterQuery.getCreatedBy()
-                : targetFilterQuery.getAutoAssignInitiatedBy();
+                .toList();
     }
 }

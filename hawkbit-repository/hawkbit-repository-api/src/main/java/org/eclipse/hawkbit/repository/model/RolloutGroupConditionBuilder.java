@@ -1,10 +1,11 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.model;
 
@@ -15,9 +16,9 @@ import org.eclipse.hawkbit.repository.model.RolloutGroup.RolloutGroupSuccessCond
 
 /**
  * Builder to build easily the {@link RolloutGroupConditions}.
- *
  */
 public class RolloutGroupConditionBuilder {
+
     private final RolloutGroupConditions conditions = new RolloutGroupConditions();
 
     /**
@@ -30,10 +31,8 @@ public class RolloutGroupConditionBuilder {
     /**
      * Sets the finish condition and expression on the builder.
      *
-     * @param condition
-     *            the finish condition
-     * @param expression
-     *            the finish expression
+     * @param condition the finish condition
+     * @param expression the finish expression
      * @return the builder itself
      */
     public RolloutGroupConditionBuilder successCondition(final RolloutGroupSuccessCondition condition,
@@ -46,10 +45,8 @@ public class RolloutGroupConditionBuilder {
     /**
      * Sets the success action and expression on the builder.
      *
-     * @param action
-     *            the success action
-     * @param expression
-     *            the error expression
+     * @param action the success action
+     * @param expression the error expression
      * @return the builder itself
      */
     public RolloutGroupConditionBuilder successAction(final RolloutGroupSuccessAction action, final String expression) {
@@ -61,10 +58,8 @@ public class RolloutGroupConditionBuilder {
     /**
      * Sets the error condition and expression on the builder.
      *
-     * @param condition
-     *            the error condition
-     * @param expression
-     *            the error expression
+     * @param condition the error condition
+     * @param expression the error expression
      * @return the builder itself
      */
     public RolloutGroupConditionBuilder errorCondition(final RolloutGroupErrorCondition condition,
@@ -77,10 +72,8 @@ public class RolloutGroupConditionBuilder {
     /**
      * Sets the error action and expression on the builder.
      *
-     * @param action
-     *            the error action
-     * @param expression
-     *            the error expression
+     * @param action the error action
+     * @param expression the error expression
      * @return the builder itself
      */
     public RolloutGroupConditionBuilder errorAction(final RolloutGroupErrorAction action, final String expression) {
@@ -91,7 +84,7 @@ public class RolloutGroupConditionBuilder {
 
     /**
      * Sets condition defaults.
-     * 
+     *
      * @return the builder itself
      */
     public RolloutGroupConditionBuilder withDefaults() {

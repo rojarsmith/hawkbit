@@ -1,18 +1,18 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.event.remote.entity;
-
-import org.eclipse.hawkbit.repository.model.DistributionSet;
 
 import io.qameta.allure.Description;
 import io.qameta.allure.Feature;
 import io.qameta.allure.Story;
+import org.eclipse.hawkbit.repository.model.DistributionSet;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -20,11 +20,11 @@ import org.junit.jupiter.api.Test;
  */
 @Feature("Component Tests - Repository")
 @Story("Test DistributionSetCreatedEvent")
-public class DistributionSetCreatedEventTest extends AbstractRemoteEntityEventTest<DistributionSet> {
+class DistributionSetCreatedEventTest extends AbstractRemoteEntityEventTest<DistributionSet> {
 
     @Test
     @Description("Verifies that the distribution set entity reloading by remote created event works")
-    public void testDistributionSetCreatedEvent() {
+    void testDistributionSetCreatedEvent() {
         assertAndCreateRemoteEvent(DistributionSetCreatedEvent.class);
     }
 
@@ -33,5 +33,4 @@ public class DistributionSetCreatedEventTest extends AbstractRemoteEntityEventTe
         return distributionSetManagement.create(entityFactory.distributionSet().create()
                 .name("incomplete").version("2").description("incomplete").type("os"));
     }
-
 }

@@ -1,19 +1,24 @@
 /**
- * Copyright (c) 2022 Bosch.IO GmbH and others.
+ * Copyright (c) 2022 Bosch.IO GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.jpa;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
-import javax.persistence.EntityManager;
+import jakarta.persistence.EntityManager;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.eclipse.hawkbit.repository.jpa.model.AbstractJpaBaseEntity;
+import org.eclipse.hawkbit.repository.jpa.repository.NoCountSliceRepository;
 import org.eclipse.hawkbit.repository.jpa.specifications.SpecificationsBuilder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -23,17 +28,22 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.util.CollectionUtils;
-import org.springframework.util.StringUtils;
+import org.springframework.util.ObjectUtils;
 
 /**
  * A collection of static helper methods for the management classes
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class JpaManagementHelper {
-    private JpaManagementHelper() {
+
+
+    public static <T, J extends T> Optional<J> findOneBySpec(
+            final JpaSpecificationExecutor<J> repository, final List<Specification<J>> specList) {
+        return repository.findOne(combineWithAnd(specList));
     }
 
     public static <T, J extends T> Page<T> findAllWithCountBySpec(final JpaSpecificationExecutor<J> repository,
-            final Pageable pageable, final List<Specification<J>> specList) {
+            final List<Specification<J>> specList, final Pageable pageable) {
         if (CollectionUtils.isEmpty(specList)) {
             return convertPage(repository.findAll(Specification.where(null), pageable), pageable);
         }
@@ -45,7 +55,10 @@ public final class JpaManagementHelper {
         return new PageImpl<>(Collections.unmodifiableList(jpaAll.getContent()), pageable, jpaAll.getTotalElements());
     }
 
-    private static <J> Specification<J> combineWithAnd(final List<Specification<J>> specList) {
+    public static <J> Specification<J> combineWithAnd(final List<Specification<J>> specList) {
+        if (ObjectUtils.isEmpty(specList)) {
+            return Specification.where(null);
+        }
         return specList.size() == 1 ? specList.get(0) : SpecificationsBuilder.combineWithAnd(specList);
     }
 
@@ -71,13 +84,13 @@ public final class JpaManagementHelper {
         return repository.count(combineWithAnd(specList));
     }
 
-    public static <J extends AbstractJpaBaseEntity> J touch(final EntityManager entityManager,
-            final CrudRepository<J, ?> repository, final J entity) {
+    public static <J extends AbstractJpaBaseEntity> J touch(
+            final EntityManager entityManager, final CrudRepository<J, ?> repository, final J entity) {
         // merge base entity so optLockRevision gets updated and audit
         // log written because modifying e.g. metadata is modifying the base
         // entity itself for auditing purposes.
         final J result = entityManager.merge(entity);
-        result.setLastModifiedAt(0L);
+        result.setLastModifiedAt(1);
 
         return repository.save(result);
     }
@@ -92,7 +105,7 @@ public final class JpaManagementHelper {
                 : (filterString + "%");
         final String filterVersion = semicolonIndex != -1 ? (filterString.substring(semicolonIndex + 1) + "%") : "%";
 
-        return new String[] { !StringUtils.isEmpty(filterName) ? filterName : "%", filterVersion };
+        return new String[] { ObjectUtils.isEmpty(filterName) ? "%" : filterName, filterVersion };
     }
 
 }

@@ -1,36 +1,34 @@
 /**
- * Copyright (c) 2021 Bosch.IO GmbH and others.
+ * Copyright (c) 2021 Bosch.IO GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.jpa.rsql;
-
-import org.eclipse.hawkbit.repository.FieldNameProvider;
 
 import cz.jirutka.rsql.parser.ast.AndNode;
 import cz.jirutka.rsql.parser.ast.ComparisonNode;
 import cz.jirutka.rsql.parser.ast.LogicalNode;
 import cz.jirutka.rsql.parser.ast.OrNode;
 import cz.jirutka.rsql.parser.ast.RSQLVisitor;
+import org.eclipse.hawkbit.repository.RsqlQueryField;
 
 /**
  * {@link RSQLVisitor} implementation which validates the nodes (fields) based
- * on a given {@link FieldNameProvider} for a given entity type.
+ * on a given {@link RsqlQueryField} for a given entity type.
  *
- * @param <A>
- *            The type the {@link FieldNameProvider} refers to.
+ * @param <A> The type the {@link RsqlQueryField} refers to.
  */
-public class FieldValidationRsqlVisitor<A extends Enum<A> & FieldNameProvider> extends AbstractFieldNameRSQLVisitor<A>
+public class FieldValidationRsqlVisitor<A extends Enum<A> & RsqlQueryField> extends AbstractRSQLVisitor<A>
         implements RSQLVisitor<Void, String> {
 
     /**
      * Constructs the visitor and initializes it.
-     * 
-     * @param fieldNameProvider
-     *            The {@link FieldNameProvider} to use for validation.
+     *
+     * @param fieldNameProvider The {@link RsqlQueryField} to use for validation.
      */
     public FieldValidationRsqlVisitor(final Class<A> fieldNameProvider) {
         super(fieldNameProvider);
@@ -48,8 +46,8 @@ public class FieldValidationRsqlVisitor<A extends Enum<A> & FieldNameProvider> e
 
     @Override
     public Void visit(final ComparisonNode node, final String param) {
-        final A fieldName = getFieldEnumByName(node);
-        getAndValidatePropertyFieldName(fieldName, node);
+        // get AND validates
+        getQuertPath(node);
         return null;
     }
 
@@ -57,5 +55,4 @@ public class FieldValidationRsqlVisitor<A extends Enum<A> & FieldNameProvider> e
         node.getChildren().forEach(child -> child.accept(this, param));
         return null;
     }
-
 }

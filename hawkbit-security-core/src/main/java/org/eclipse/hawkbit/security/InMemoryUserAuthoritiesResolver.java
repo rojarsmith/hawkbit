@@ -1,10 +1,11 @@
 /**
- * Copyright (c) 2020 Bosch.IO GmbH and others.
- * 
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * Copyright (c) 2020 Bosch.IO GmbH and others
+ *
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.security;
 
@@ -25,9 +26,8 @@ public class InMemoryUserAuthoritiesResolver implements UserAuthoritiesResolver 
 
     /**
      * Constructs the resolver based on the given authority lookup map.
-     * 
-     * @param usernamesToAuthorities
-     *            The authority map to read from. Must not be <code>null</code>.
+     *
+     * @param usernamesToAuthorities The authority map to read from. Must not be <code>null</code>.
      */
     public InMemoryUserAuthoritiesResolver(final Map<String, List<String>> usernamesToAuthorities) {
         this.usernamesToAuthorities = usernamesToAuthorities;
@@ -42,5 +42,4 @@ public class InMemoryUserAuthoritiesResolver implements UserAuthoritiesResolver 
         }
         return authorities;
     }
-
 }

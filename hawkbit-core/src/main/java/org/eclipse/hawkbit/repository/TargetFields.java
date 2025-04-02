@@ -1,129 +1,65 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository;
 
 import java.util.AbstractMap.SimpleImmutableEntry;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Optional;
 
+import lombok.Getter;
+
 /**
  * Describing the fields of the Target model which can be used in the REST API
  * e.g. for sorting etc.
- *
  */
-public enum TargetFields implements FieldNameProvider {
+@Getter
+public enum TargetFields implements RsqlQueryField {
 
-    /**
-     * The controllerId field.
-     */
     ID("controllerId"),
-
-    /**
-     * The name field.
-     */
     NAME("name"),
-    /**
-     * The description field.
-     */
     DESCRIPTION("description"),
-    /**
-     * The createdAt field.
-     */
     CREATEDAT("createdAt"),
-    /**
-     * The createdAt field.
-     */
     LASTMODIFIEDAT("lastModifiedAt"),
-    /**
-     * The controllerId field.
-     */
     CONTROLLERID("controllerId"),
-    /**
-     * The updateStatus field.
-     */
     UPDATESTATUS("updateStatus"),
-
-    /**
-     * The ip-address field.
-     */
     IPADDRESS("address"),
-
-    /**
-     * The attribute map of target info.
-     */
-    ATTRIBUTE("controllerAttributes", true),
-
-    /**
-     * distribution sets which is assigned to the target.
-     */
+    ATTRIBUTE("controllerAttributes"),
     ASSIGNEDDS("assignedDistributionSet", "name", "version"),
-
-    /**
-     * distribution sets which is installed on the target.
-     */
     INSTALLEDDS("installedDistributionSet", "name", "version"),
-
-    /**
-     * The tags field.
-     */
-    TAG("tags.name"),
-
-    /**
-     * Last time the DDI or DMF client polled.
-     */
+    TAG("tags", "name"),
     LASTCONTROLLERREQUESTAT("lastTargetQuery"),
-
-    /**
-     * The metadata.
-     */
     METADATA("metadata", new SimpleImmutableEntry<>("key", "value")),
+    TARGETTYPE("targetType", TargetTypeFields.KEY.getJpaEntityFieldName(), TargetTypeFields.NAME.getJpaEntityFieldName());
 
-    /**
-     * The target type.
-     */
-    TARGETTYPE("targetType", TargetTypeFields.NAME.getFieldName());
+    private final String jpaEntityFieldName;
+    private final List<String> subEntityAttributes;
+    private final Entry<String, String> subEntityMapTuple;
 
-    private final String fieldName;
-    private List<String> subEntityAttribues;
-    private boolean mapField;
-    private Entry<String, String> subEntityMapTuple;
-
-    private TargetFields(final String fieldName) {
-        this(fieldName, false, Collections.emptyList(), null);
+    TargetFields(final String jpaEntityFieldName) {
+        this(jpaEntityFieldName, Collections.emptyList(), null);
     }
 
-    private TargetFields(final String fieldName, final boolean isMapField) {
-        this(fieldName, isMapField, Collections.emptyList(), null);
+    TargetFields(final String jpaEntityFieldName, final String... subEntityAttributes) {
+        this(jpaEntityFieldName, List.of(subEntityAttributes), null);
     }
 
-    private TargetFields(final String fieldName, final String... subEntityAttribues) {
-        this(fieldName, false, Arrays.asList(subEntityAttribues), null);
+    TargetFields(final String jpaEntityFieldName, final Entry<String, String> subEntityMapTuple) {
+        this(jpaEntityFieldName, Collections.emptyList(), subEntityMapTuple);
     }
 
-    private TargetFields(final String fieldName, final Entry<String, String> subEntityMapTuple) {
-        this(fieldName, true, Collections.emptyList(), subEntityMapTuple);
-    }
-
-    private TargetFields(final String fieldName, final boolean mapField, final List<String> subEntityAttribues,
-            final Entry<String, String> subEntityMapTuple) {
-        this.fieldName = fieldName;
-        this.mapField = mapField;
-        this.subEntityAttribues = subEntityAttribues;
+    TargetFields(final String jpaEntityFieldName, final List<String> subEntityAttributes, final Entry<String, String> subEntityMapTuple) {
+        this.jpaEntityFieldName = jpaEntityFieldName;
+        this.subEntityAttributes = subEntityAttributes;
         this.subEntityMapTuple = subEntityMapTuple;
-    }
-
-    @Override
-    public List<String> getSubEntityAttributes() {
-        return subEntityAttribues;
     }
 
     @Override
@@ -133,11 +69,6 @@ public enum TargetFields implements FieldNameProvider {
 
     @Override
     public boolean isMap() {
-        return mapField;
-    }
-
-    @Override
-    public String getFieldName() {
-        return fieldName;
+        return this == ATTRIBUTE || getSubEntityMapTuple().isPresent();
     }
 }

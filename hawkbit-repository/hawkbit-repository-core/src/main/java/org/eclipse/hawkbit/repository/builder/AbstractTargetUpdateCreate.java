@@ -1,44 +1,42 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.builder;
 
 import java.net.URI;
 import java.util.Optional;
+
+import lombok.ToString;
 import org.eclipse.hawkbit.repository.ValidString;
 import org.eclipse.hawkbit.repository.exception.InvalidTargetAddressException;
 import org.eclipse.hawkbit.repository.model.TargetUpdateStatus;
-import org.springframework.util.StringUtils;
 
 /**
  * Create and update builder DTO.
  *
- * @param <T>
- *            update or create builder interface
+ * @param <T> update or create builder interface
  */
 public class AbstractTargetUpdateCreate<T> extends AbstractNamedEntityBuilder<T> {
+
     @ValidString
     protected String controllerId;
-
     protected String address;
-
+    @ToString.Exclude
     @ValidString
     protected String securityToken;
-
     protected Long lastTargetQuery;
     protected TargetUpdateStatus status;
-
-    protected  Boolean requestAttributes;
-
+    protected Boolean requestAttributes;
     protected Long targetTypeId;
 
     protected AbstractTargetUpdateCreate(final String controllerId) {
-        this.controllerId = StringUtils.trimWhitespace(controllerId);
+        this.controllerId = AbstractBaseEntityBuilder.strip(controllerId);
     }
 
     public T status(final TargetUpdateStatus status) {
@@ -50,7 +48,7 @@ public class AbstractTargetUpdateCreate<T> extends AbstractNamedEntityBuilder<T>
         // check if this is a real URI
         if (address != null) {
             try {
-                URI.create(StringUtils.trimWhitespace(address));
+                URI.create(AbstractBaseEntityBuilder.strip(address));
             } catch (final IllegalArgumentException e) {
                 throw new InvalidTargetAddressException(
                         "The given address " + address + " violates the RFC-2396 specification", e);
@@ -61,7 +59,7 @@ public class AbstractTargetUpdateCreate<T> extends AbstractNamedEntityBuilder<T>
     }
 
     public T securityToken(final String securityToken) {
-        this.securityToken = StringUtils.trimWhitespace(securityToken);
+        this.securityToken = AbstractBaseEntityBuilder.strip(securityToken);
         return (T) this;
     }
 
@@ -76,7 +74,7 @@ public class AbstractTargetUpdateCreate<T> extends AbstractNamedEntityBuilder<T>
     }
 
     public TargetCreate controllerId(final String controllerId) {
-        this.controllerId = StringUtils.trimWhitespace(controllerId);
+        this.controllerId = AbstractBaseEntityBuilder.strip(controllerId);
         return (TargetCreate) this;
     }
 

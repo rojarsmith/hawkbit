@@ -1,17 +1,18 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.rsql;
 
-import java.time.Instant;
+import java.io.Serial;
 
-import org.apache.commons.lang3.text.StrLookup;
-import org.apache.commons.lang3.text.StrSubstitutor;
+import org.apache.commons.text.StringSubstitutor;
+import org.apache.commons.text.lookup.StringLookupFactory;
 import org.eclipse.hawkbit.repository.TimestampCalculator;
 
 /**
@@ -40,31 +41,30 @@ import org.eclipse.hawkbit.repository.TimestampCalculator;
  * configuration.</li>
  * </ul>
  */
-public class VirtualPropertyResolver extends StrLookup<String> implements VirtualPropertyReplacer {
+public class VirtualPropertyResolver implements VirtualPropertyReplacer {
 
+    @Serial
     private static final long serialVersionUID = 1L;
 
-    private transient StrSubstitutor substitutor;
-
-    @Override
-    public String lookup(final String rhs) {
-        String resolved = null;
-
-        if ("now_ts".equalsIgnoreCase(rhs)) {
-            resolved = String.valueOf(Instant.now().toEpochMilli());
-        } else if ("overdue_ts".equalsIgnoreCase(rhs)) {
-            resolved = String.valueOf(TimestampCalculator.calculateOverdueTimestamp());
-        }
-        return resolved;
-    }
+    private transient StringSubstitutor substitutor;
 
     @Override
     public String replace(final String input) {
         if (substitutor == null) {
-            substitutor = new StrSubstitutor(this, StrSubstitutor.DEFAULT_PREFIX, StrSubstitutor.DEFAULT_SUFFIX,
-                    StrSubstitutor.DEFAULT_ESCAPE);
+            substitutor = new StringSubstitutor(
+                    StringLookupFactory.builder().get().functionStringLookup(this::lookup),
+                    StringSubstitutor.DEFAULT_PREFIX, StringSubstitutor.DEFAULT_SUFFIX, StringSubstitutor.DEFAULT_ESCAPE);
         }
         return substitutor.replace(input);
     }
 
+    private String lookup(final String rhs) {
+        if ("now_ts".equalsIgnoreCase(rhs)) {
+            return String.valueOf(System.currentTimeMillis());
+        } else if ("overdue_ts".equalsIgnoreCase(rhs)) {
+            return String.valueOf(TimestampCalculator.calculateOverdueTimestamp());
+        } else {
+            return null;
+        }
+    }
 }

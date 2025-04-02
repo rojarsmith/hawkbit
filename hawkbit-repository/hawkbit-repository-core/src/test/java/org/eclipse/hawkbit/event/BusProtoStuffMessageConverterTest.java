@@ -1,10 +1,11 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.event;
 
@@ -14,6 +15,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.HashMap;
 
+import io.qameta.allure.Description;
 import org.eclipse.hawkbit.repository.event.remote.entity.RemoteEntityEvent;
 import org.eclipse.hawkbit.repository.event.remote.entity.TargetCreatedEvent;
 import org.eclipse.hawkbit.repository.model.Target;
@@ -27,10 +29,8 @@ import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageHeaders;
 import org.springframework.messaging.converter.MessageConversionException;
 
-import io.qameta.allure.Description;
-
 @ExtendWith(MockitoExtension.class)
-public class BusProtoStuffMessageConverterTest {
+class BusProtoStuffMessageConverterTest {
 
     private final BusProtoStuffMessageConverter underTest = new BusProtoStuffMessageConverter();
 
@@ -41,13 +41,13 @@ public class BusProtoStuffMessageConverterTest {
     private Message<Object> messageMock;
 
     @BeforeEach
-    public void before() {
+    void before() {
         when(targetMock.getId()).thenReturn(1L);
     }
 
     @Test
     @Description("Verifies that the TargetCreatedEvent can be successfully serialized and deserialized")
-    public void successfullySerializeAndDeserializeEvent() {
+    void successfullySerializeAndDeserializeEvent() {
         final TargetCreatedEvent targetCreatedEvent = new TargetCreatedEvent(targetMock, "1");
         // serialize
         final Object serializedEvent = underTest.convertToInternal(targetCreatedEvent,
@@ -57,13 +57,14 @@ public class BusProtoStuffMessageConverterTest {
         // deserialize
         when(messageMock.getPayload()).thenReturn(serializedEvent);
         final Object deserializedEvent = underTest.convertFromInternal(messageMock, RemoteApplicationEvent.class, null);
-        assertThat(deserializedEvent).isInstanceOf(TargetCreatedEvent.class);
-        assertThat(deserializedEvent).isEqualTo(targetCreatedEvent);
+        assertThat(deserializedEvent)
+                .isInstanceOf(TargetCreatedEvent.class)
+                .isEqualTo(targetCreatedEvent);
     }
 
     @Test
     @Description("Verifies that a MessageConversationException is thrown on missing event-type information encoding")
-    public void missingEventTypeMappingThrowsMessageConversationException() {
+    void missingEventTypeMappingThrowsMessageConversationException() {
         final DummyRemoteEntityEvent dummyEvent = new DummyRemoteEntityEvent(targetMock, "applicationId");
         final MessageHeaders messageHeaders = new MessageHeaders(new HashMap<>());
 

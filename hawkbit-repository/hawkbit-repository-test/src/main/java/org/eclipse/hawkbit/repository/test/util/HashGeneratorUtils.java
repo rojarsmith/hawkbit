@@ -1,37 +1,33 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.test.util;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.google.common.io.BaseEncoding;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Hash digest utility.
  */
+@Slf4j
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class HashGeneratorUtils {
-
-    private static final Logger LOG = LoggerFactory.getLogger(HashGeneratorUtils.class);
-
-    private HashGeneratorUtils() {
-
-    }
 
     /**
      * Generates a MD5 cryptographic string.
-     * 
-     * @param message
-     *            the plain message
+     *
+     * @param message the plain message
      * @return the cryptographic string
      */
     public static String generateMD5(final byte[] message) {
@@ -40,9 +36,8 @@ public final class HashGeneratorUtils {
 
     /**
      * Generates a SHA-1 cryptographic string.
-     * 
-     * @param message
-     *            the plain message
+     *
+     * @param message the plain message
      * @return the cryptographic string
      */
     public static String generateSHA1(final byte[] message) {
@@ -51,9 +46,8 @@ public final class HashGeneratorUtils {
 
     /**
      * Generates a SHA-256 cryptographic string.
-     * 
-     * @param message
-     *            the plain message
+     *
+     * @param message the plain message
      * @return the cryptographic string
      */
     public static String generateSHA256(final byte[] message) {
@@ -65,11 +59,10 @@ public final class HashGeneratorUtils {
         try {
             final MessageDigest digest = MessageDigest.getInstance(algorithm);
             final byte[] hashedBytes = digest.digest(message);
-            return BaseEncoding.base16().lowerCase().encode(hashedBytes);
+            return HexFormat.of().withLowerCase().formatHex(hashedBytes);
         } catch (final NoSuchAlgorithmException e) {
-            LOG.error("Algorithm could not be found", e);
+            log.error("Algorithm could not be found", e);
         }
         return null;
     }
-
 }

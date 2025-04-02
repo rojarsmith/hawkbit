@@ -1,19 +1,25 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.amqp;
 
-import com.google.common.collect.Maps;
-import org.eclipse.hawkbit.api.ArtifactUrlHandler;
-import org.eclipse.hawkbit.api.HostnameResolver;
-import org.eclipse.hawkbit.cache.DownloadIdCache;
+import java.sql.SQLException;
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+
+import lombok.ToString;
+import lombok.extern.slf4j.Slf4j;
+import org.eclipse.hawkbit.artifact.repository.urlhandler.ArtifactUrlHandler;
 import org.eclipse.hawkbit.dmf.amqp.api.AmqpSettings;
-import org.eclipse.hawkbit.repository.ArtifactManagement;
 import org.eclipse.hawkbit.repository.ConfirmationManagement;
 import org.eclipse.hawkbit.repository.ControllerManagement;
 import org.eclipse.hawkbit.repository.DeploymentManagement;
@@ -23,11 +29,7 @@ import org.eclipse.hawkbit.repository.SoftwareModuleManagement;
 import org.eclipse.hawkbit.repository.SystemManagement;
 import org.eclipse.hawkbit.repository.TargetManagement;
 import org.eclipse.hawkbit.repository.TenantConfigurationManagement;
-import org.eclipse.hawkbit.security.DdiSecurityProperties;
 import org.eclipse.hawkbit.security.SystemSecurityContext;
-import org.eclipse.hawkbit.tenancy.TenantAware;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.FanoutExchange;
@@ -37,11 +39,14 @@ import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.listener.ConditionalRejectingErrorHandler;
+import org.springframework.amqp.rabbit.listener.FatalExceptionStrategy;
 import org.springframework.amqp.rabbit.listener.RabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.amqp.SimpleRabbitListenerContainerFactoryConfigurer;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -52,77 +57,50 @@ import org.springframework.retry.backoff.ExponentialBackOffPolicy;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.util.ErrorHandler;
 
-import java.time.Duration;
-import java.util.List;
-import java.util.Map;
-
 /**
- * Spring configuration for AMQP based DMF communication for indirect device
- * integration.
- *
+ * Spring configuration for AMQP based DMF communication for indirect device integration.
  */
+@Slf4j
 @EnableConfigurationProperties({ AmqpProperties.class, AmqpDeadletterProperties.class })
 @ConditionalOnProperty(prefix = "hawkbit.dmf.rabbitmq", name = "enabled", matchIfMissing = true)
 @PropertySource("classpath:/hawkbit-dmf-defaults.properties")
 public class AmqpConfiguration {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(AmqpConfiguration.class);
-
-    @Autowired
-    private AmqpProperties amqpProperties;
-
-    @Autowired
-    private AmqpDeadletterProperties amqpDeadletterProperties;
-
-    @Autowired
-    private ConnectionFactory rabbitConnectionFactory;
-
-    @Autowired(required = false)
+    private final AmqpProperties amqpProperties;
+    private final AmqpDeadletterProperties amqpDeadletterProperties;
+    private final ConnectionFactory rabbitConnectionFactory;
     private ServiceMatcher serviceMatcher;
+
+    public AmqpConfiguration(final AmqpProperties amqpProperties, final AmqpDeadletterProperties amqpDeadletterProperties,
+            final ConnectionFactory rabbitConnectionFactory) {
+        this.amqpProperties = amqpProperties;
+        this.amqpDeadletterProperties = amqpDeadletterProperties;
+        this.rabbitConnectionFactory = rabbitConnectionFactory;
+    }
+
+    @Autowired(required = false) // spring setter injection
+    public void setServiceMatcher(final ServiceMatcher serviceMatcher) {
+        this.serviceMatcher = serviceMatcher;
+    }
+
+    @Bean
+    public FatalExceptionStrategy sqlFatalSQLExceptionStrategy(final AmqpProperties amqpProperties) {
+        return new SqlFatalExceptionStrategy(amqpProperties.getFatalSqlExceptionPolicy());
+    }
 
     /**
      * Creates a custom error handler bean.
      *
-     *  @param handlers
-     *                  list of {@link AmqpErrorHandler} handlers
-
+     * @param fatalExceptionStrategies list of {@link FatalExceptionStrategy} handlers. isFatal will be called for causes,
+     *         up to the first fatal, so the implementation don't need to iterate over the causes.
      * @return the delegating error handler bean
      */
     @Bean
     @ConditionalOnMissingBean
-    public ErrorHandler errorHandler(final List<AmqpErrorHandler> handlers) {
-        return new DelegatingConditionalErrorHandler(handlers, new ConditionalRejectingErrorHandler(
-                new DelayedRequeueExceptionStrategy(amqpProperties.getRequeueDelay())));
-    }
-
-    /**
-     * Error handler bean for all target attributes related fatal errors
-     *
-     * @return the invalid target attribute exception handler bean
-     */
-    @Bean
-    public AmqpErrorHandler invalidTargetAttributeConditionalExceptionHandler() {
-        return new InvalidTargetAttributeExceptionHandler();
-    }
-
-    /**
-     * Error handler bean for entity not found errors
-     *
-     * @return the entity not found exception handler bean
-     */
-    @Bean
-    public AmqpErrorHandler entityNotFoundExceptionHandler() {
-        return new EntityNotFoundExceptionHandler();
-    }
-
-    /**
-     * Error handler bean for amqp message conversion errors
-     *
-     * @return the amqp message conversion exception handler bean
-     */
-    @Bean
-    public AmqpErrorHandler messageConversionExceptionHandler() {
-        return new MessageConversionExceptionHandler();
+    public ErrorHandler errorHandler(
+            final List<FatalExceptionStrategy> fatalExceptionStrategies,
+            @Value("${hawkbit.dmf.rabbitmq.fatalExceptionTypes:}") final List<String> fatalExceptionTypes) {
+        return new ConditionalRejectingErrorHandler(new RequeueExceptionStrategy(fatalExceptionStrategies, fatalExceptionTypes));
     }
 
     /**
@@ -139,8 +117,7 @@ public class AmqpConfiguration {
     }
 
     /**
-     * @return {@link RabbitTemplate} with automatic retry, published confirms and
-     *         {@link Jackson2JsonMessageConverter}.
+     * @return {@link RabbitTemplate} with automatic retry, published confirms and {@link Jackson2JsonMessageConverter}.
      */
     @Bean
     public RabbitTemplate rabbitTemplate() {
@@ -153,9 +130,9 @@ public class AmqpConfiguration {
 
         rabbitTemplate.setConfirmCallback((correlationData, ack, cause) -> {
             if (ack) {
-                LOGGER.debug("Message with {} confirmed by broker.", correlationData);
+                log.debug("Message with {} confirmed by broker.", correlationData);
             } else {
-                LOGGER.error("Broker is unable to handle message with {} : {}", correlationData, cause);
+                log.error("Broker is unable to handle message with {} : {}", correlationData, cause);
             }
         });
 
@@ -169,7 +146,9 @@ public class AmqpConfiguration {
      */
     @Bean
     public Queue dmfReceiverQueue() {
-        return new Queue(amqpProperties.getReceiverQueue(), true, false, false,
+        return new Queue(
+                amqpProperties.getReceiverQueue(),
+                true, false, false,
                 amqpDeadletterProperties.getDeadLetterExchangeArgs(amqpProperties.getDeadLetterExchange()));
     }
 
@@ -181,8 +160,10 @@ public class AmqpConfiguration {
      */
     @Bean
     public Queue authenticationReceiverQueue() {
-        return QueueBuilder.nonDurable(amqpProperties.getAuthenticationReceiverQueue()).autoDelete()
-                .withArguments(getTTLMaxArgsAuthenticationQueue()).build();
+        return QueueBuilder.nonDurable(amqpProperties.getAuthenticationReceiverQueue())
+                .autoDelete()
+                .withArguments(getTTLMaxArgsAuthenticationQueue())
+                .build();
     }
 
     /**
@@ -204,27 +185,6 @@ public class AmqpConfiguration {
     @Bean
     public Binding bindDmfSenderExchangeToDmfQueue() {
         return BindingBuilder.bind(dmfReceiverQueue()).to(dmfSenderExchange());
-    }
-
-    /**
-     * Create authentication exchange.
-     *
-     * @return the fanout exchange
-     */
-    @Bean
-    public FanoutExchange authenticationExchange() {
-        return new FanoutExchange(AmqpSettings.AUTHENTICATION_EXCHANGE, false, true);
-    }
-
-    /**
-     * Create the Binding {@link AmqpConfiguration#authenticationReceiverQueue()} to
-     * {@link AmqpConfiguration#authenticationExchange()}.
-     *
-     * @return the binding and create the queue and exchange
-     */
-    @Bean
-    public Binding bindAuthenticationSenderExchangeToAuthenticationQueue() {
-        return BindingBuilder.bind(authenticationReceiverQueue()).to(authenticationExchange());
     }
 
     /**
@@ -260,40 +220,24 @@ public class AmqpConfiguration {
     /**
      * Create AMQP handler service bean.
      *
-     * @param rabbitTemplate
-     *            for converting messages
-     * @param amqpMessageDispatcherService
-     *            to sending events to DMF client
-     * @param controllerManagement
-     *            for target repo access
-     * @param entityFactory
-     *            to create entities
-     *
+     * @param rabbitTemplate for converting messages
+     * @param amqpMessageDispatcherService to sending events to DMF client
+     * @param controllerManagement for target repo access
+     * @param entityFactory to create entities
      * @return handler service bean
      */
     @Bean
-    public AmqpMessageHandlerService amqpMessageHandlerService(final RabbitTemplate rabbitTemplate,
+    @ConditionalOnMissingBean
+    public AmqpMessageHandlerService amqpMessageHandlerService(
+            final RabbitTemplate rabbitTemplate,
             final AmqpMessageDispatcherService amqpMessageDispatcherService,
             final ControllerManagement controllerManagement, final EntityFactory entityFactory,
             final SystemSecurityContext systemSecurityContext,
             final TenantConfigurationManagement tenantConfigurationManagement,
             final ConfirmationManagement confirmationManagement) {
-        return new AmqpMessageHandlerService(rabbitTemplate, amqpMessageDispatcherService, controllerManagement,
+        return new AmqpMessageHandlerService(
+                rabbitTemplate, amqpMessageDispatcherService, controllerManagement,
                 entityFactory, systemSecurityContext, tenantConfigurationManagement, confirmationManagement);
-    }
-
-    /**
-     * Create AMQP handler service bean for authentication messages.
-     * 
-     * @return handler service bean
-     */
-    @Bean
-    AmqpAuthenticationMessageHandler amqpAuthenticationMessageHandler(final RabbitTemplate rabbitTemplate,
-            final AmqpControllerAuthentication authenticationManager, final ArtifactManagement artifactManagement,
-            final DownloadIdCache downloadIdCache, final HostnameResolver hostnameResolver,
-            final ControllerManagement controllerManagement, final TenantAware tenantAware) {
-        return new AmqpAuthenticationMessageHandler(rabbitTemplate, authenticationManager, artifactManagement,
-                downloadIdCache, hostnameResolver, controllerManagement, tenantAware);
     }
 
     /**
@@ -308,8 +252,7 @@ public class AmqpConfiguration {
     }
 
     /**
-     * Create RabbitListenerContainerFactory bean if no listenerContainerFactory
-     * bean found
+     * Create RabbitListenerContainerFactory bean if no listenerContainerFactory bean found
      *
      * @return RabbitListenerContainerFactory bean
      */
@@ -323,36 +266,10 @@ public class AmqpConfiguration {
         return factory;
     }
 
-    /**
-     * create the authentication bean for controller over amqp.
-     *
-     * @param systemManagement
-     *            the systemManagement
-     * @param controllerManagement
-     *            the controllerManagement
-     * @param tenantConfigurationManagement
-     *            the tenantConfigurationManagement
-     * @param tenantAware
-     *            the tenantAware
-     * @param ddiSecruityProperties
-     *            the ddiSecruityProperties
-     * @param systemSecurityContext
-     *            the systemSecurityContext
-     * @return the bean
-     */
-    @Bean
-    @ConditionalOnMissingBean(AmqpControllerAuthentication.class)
-    public AmqpControllerAuthentication amqpControllerAuthentication(final SystemManagement systemManagement,
-            final ControllerManagement controllerManagement,
-            final TenantConfigurationManagement tenantConfigurationManagement, final TenantAware tenantAware,
-            final DdiSecurityProperties ddiSecruityProperties, final SystemSecurityContext systemSecurityContext) {
-        return new AmqpControllerAuthentication(systemManagement, controllerManagement, tenantConfigurationManagement,
-                tenantAware, ddiSecruityProperties, systemSecurityContext);
-    }
-
     @Bean
     @ConditionalOnMissingBean(AmqpMessageDispatcherService.class)
-    AmqpMessageDispatcherService amqpMessageDispatcherService(final RabbitTemplate rabbitTemplate,
+    AmqpMessageDispatcherService amqpMessageDispatcherService(
+            final RabbitTemplate rabbitTemplate,
             final AmqpMessageSenderService amqpSenderService, final ArtifactUrlHandler artifactUrlHandler,
             final SystemSecurityContext systemSecurityContext, final SystemManagement systemManagement,
             final TargetManagement targetManagement, final DistributionSetManagement distributionSetManagement,
@@ -364,10 +281,44 @@ public class AmqpConfiguration {
     }
 
     private static Map<String, Object> getTTLMaxArgsAuthenticationQueue() {
-        final Map<String, Object> args = Maps.newHashMapWithExpectedSize(2);
+        final Map<String, Object> args = new HashMap<>(2);
         args.put("x-message-ttl", Duration.ofSeconds(30).toMillis());
         args.put("x-max-length", 1_000);
         return args;
     }
 
+    @ToString
+    private static class SqlFatalExceptionStrategy implements FatalExceptionStrategy {
+
+        private final boolean fatalByDefault;
+        private final List<Integer> unlessErrorCodeIn;
+        private final List<String> unlessSqlStateIn;
+        private final List<Pattern> unlessMessageMatches;
+
+        public SqlFatalExceptionStrategy(final AmqpProperties.FatalSqlExceptionPolicy fatalSqlExceptions) {
+            this.fatalByDefault = fatalSqlExceptions.isByDefault();
+            this.unlessErrorCodeIn = fatalSqlExceptions.getUnlessErrorCodeIn();
+            this.unlessSqlStateIn = fatalSqlExceptions.getUnlessSqlStateIn();
+            this.unlessMessageMatches = fatalSqlExceptions.getUnlessMessageMatches();
+        }
+
+        @Override
+        public boolean isFatal(final Throwable t) {
+            if (t instanceof SQLException sqlException) {
+                if (unlessErrorCodeIn.contains(sqlException.getErrorCode())) {
+                    return !fatalByDefault;
+                } else if (unlessSqlStateIn.contains(sqlException.getSQLState())) {
+                    return !fatalByDefault;
+                } else {
+                    for (final Pattern pattern : unlessMessageMatches) {
+                        if (pattern.matcher(sqlException.getMessage()).matches()) {
+                            return !fatalByDefault;
+                        }
+                    }
+                    return fatalByDefault;
+                }
+            }
+            return false;
+        }
+    }
 }

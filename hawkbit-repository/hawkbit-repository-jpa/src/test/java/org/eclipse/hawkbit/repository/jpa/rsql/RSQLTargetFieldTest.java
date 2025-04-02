@@ -1,10 +1,11 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.jpa.rsql;
 
@@ -16,6 +17,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+import io.qameta.allure.Description;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.assertj.core.util.Maps;
 import org.eclipse.hawkbit.repository.TargetFields;
 import org.eclipse.hawkbit.repository.TargetTypeFields;
@@ -30,25 +34,19 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Slice;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
-
 @Feature("Component Tests - Repository")
 @Story("RSQL filter target")
 class RSQLTargetFieldTest extends AbstractJpaIntegrationTest {
 
+    private static final String OR = ",";
+    private static final String AND = ";";
     private Target target;
     private Target target2;
     private TargetType targetType1;
     private TargetType targetType2;
 
-    private static final String OR = ",";
-    private static final String AND = ";";
-
     @BeforeEach
     void setupBeforeTest() {
-
         final DistributionSet ds = testdataFactory.createDistributionSet("AssignedDs");
 
         final Map<String, String> attributes = new HashMap<>();
@@ -89,9 +87,13 @@ class RSQLTargetFieldTest extends AbstractJpaIntegrationTest {
         assignDistributionSet(ds.getId(), target.getControllerId());
 
         targetType1 = targetTypeManagement
-                .create(entityFactory.targetType().create().name("Type1").description("Desc. Type1"));
+                .create(entityFactory.targetType().create()
+                        .name("Type1").description("Desc. Type1")
+                        .key("Type1.key"));
         targetType2 = targetTypeManagement
-                .create(entityFactory.targetType().create().name("Type2").description("Desc. Type2"));
+                .create(entityFactory.targetType().create()
+                        .name("Type2").description("Desc. Type2")
+                        .key("Type2.key"));
 
         targetManagement.assignType(target.getControllerId(), targetType1.getId());
         targetManagement.assignType(target2.getControllerId(), targetType2.getId());
@@ -101,8 +103,6 @@ class RSQLTargetFieldTest extends AbstractJpaIntegrationTest {
     @Description("Test filter target by (controller) id")
     void testFilterByParameterId() {
         assertRSQLQuery(TargetFields.ID.name() + "==targetId123", 1);
-        assertRSQLQuery(TargetFields.ID.name() + "==target*", 5);
-        assertRSQLQuery(TargetFields.ID.name() + "==noExist*", 0);
         assertRSQLQuery(TargetFields.ID.name() + "!=targetId123", 4);
         assertRSQLQuery(TargetFields.ID.name() + "=in=(targetId123,notexist)", 1);
         assertRSQLQuery(TargetFields.ID.name() + "=out=(targetId123,notexist)", 4);
@@ -148,12 +148,10 @@ class RSQLTargetFieldTest extends AbstractJpaIntegrationTest {
     void testFilterByParameterUpdateStatus() {
         assertRSQLQuery(TargetFields.UPDATESTATUS.name() + "==pending", 1);
         assertRSQLQuery(TargetFields.UPDATESTATUS.name() + "!=pending", 4);
-        try {
-            assertRSQLQuery(TargetFields.UPDATESTATUS.name() + "==noExist*", 0);
-            fail("RSQLParameterUnsupportedFieldException was expected since update status unknown");
-        } catch (final RSQLParameterUnsupportedFieldException e) {
-            // test ok - exception was excepted
-        }
+        final String rsqlNoExistStar = TargetFields.UPDATESTATUS.name() + "==noExist*";
+        assertThatExceptionOfType(RSQLParameterUnsupportedFieldException.class)
+                .as("update status unknown")
+                .isThrownBy(() -> assertRSQLQuery(rsqlNoExistStar, 0));
         assertRSQLQuery(TargetFields.UPDATESTATUS.name() + "=in=(pending,error)", 1);
         assertRSQLQuery(TargetFields.UPDATESTATUS.name() + "=out=(pending,error)", 4);
     }
@@ -305,13 +303,26 @@ class RSQLTargetFieldTest extends AbstractJpaIntegrationTest {
     }
 
     @Test
-    @Description("Test filter by target type")
-    void shouldFilterTargetsByTypeIdNameAndDescription() {
+    @Description("Test filter by target type key")
+    void shouldFilterTargetsByTypeKey() {
+        assertRSQLQuery("targettype." + TargetTypeFields.KEY.name() + "==" + targetType1.getKey(), 1);
+        assertRSQLQuery("targettype." + TargetTypeFields.KEY.name() + "==*1.key", 1);
+        assertRSQLQuery("targettype." + TargetTypeFields.KEY.name() + "!=" + targetType2.getKey(), 4);
+        assertRSQLQuery("targettype." + TargetTypeFields.KEY.name() + "==noExist*", 0);
+    }
+
+    @Test
+    @Description("Test filter by target type name")
+    void shouldFilterTargetsByTypeName() {
         assertRSQLQuery("targettype." + TargetTypeFields.NAME.name() + "==" + targetType1.getName(), 1);
         assertRSQLQuery("targettype." + TargetTypeFields.NAME.name() + "==*1", 1);
         assertRSQLQuery("targettype." + TargetTypeFields.NAME.name() + "!=" + targetType2.getName(), 4);
         assertRSQLQuery("targettype." + TargetTypeFields.NAME.name() + "==noExist*", 0);
+    }
 
+    @Test
+    @Description("Test filter by target type ID and description")
+    void shouldFilterTargetsByTypeIdAndDescription() {
         assertThatExceptionOfType(RSQLParameterUnsupportedFieldException.class)
                 .isThrownBy(() -> assertRSQLQuery("targettype.ID==1", 0));
         assertThatExceptionOfType(RSQLParameterUnsupportedFieldException.class)
@@ -320,9 +331,9 @@ class RSQLTargetFieldTest extends AbstractJpaIntegrationTest {
 
     private void assertRSQLQuery(final String rsqlParam, final long expectedTargets) {
         final Slice<Target> findTargetPage = targetManagement.findByRsql(PAGE, rsqlParam);
-        final long countTargetsAll = targetManagement.countByRsql(rsqlParam);
         assertThat(findTargetPage).isNotNull();
-        assertThat(findTargetPage.getNumberOfElements()).isEqualTo(countTargetsAll).isEqualTo(expectedTargets);
+        assertThat(findTargetPage.getNumberOfElements()).isEqualTo(expectedTargets);
+        assertThat(targetManagement.countByRsql(rsqlParam)).isEqualTo(expectedTargets);
     }
 
     private void assertRSQLQueryThrowsException(final String rsqlParam) {

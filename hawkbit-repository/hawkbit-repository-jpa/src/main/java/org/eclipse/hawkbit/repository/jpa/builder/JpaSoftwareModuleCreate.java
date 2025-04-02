@@ -1,14 +1,15 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.jpa.builder;
 
-import javax.validation.ValidationException;
+import jakarta.validation.ValidationException;
 
 import org.eclipse.hawkbit.repository.SoftwareModuleTypeManagement;
 import org.eclipse.hawkbit.repository.builder.AbstractSoftwareModuleUpdateCreate;
@@ -19,13 +20,10 @@ import org.eclipse.hawkbit.repository.model.SoftwareModuleType;
 
 /**
  * Create/build implementation.
- *
  */
-public class JpaSoftwareModuleCreate extends AbstractSoftwareModuleUpdateCreate<SoftwareModuleCreate>
-        implements SoftwareModuleCreate {
+public class JpaSoftwareModuleCreate extends AbstractSoftwareModuleUpdateCreate<SoftwareModuleCreate> implements SoftwareModuleCreate {
 
     private final SoftwareModuleTypeManagement softwareModuleTypeManagement;
-
     private boolean encrypted;
 
     JpaSoftwareModuleCreate(final SoftwareModuleTypeManagement softwareModuleTypeManagement) {
@@ -38,14 +36,14 @@ public class JpaSoftwareModuleCreate extends AbstractSoftwareModuleUpdateCreate<
         return this;
     }
 
-    public boolean isEncrypted() {
-        return encrypted;
-    }
-
     @Override
     public JpaSoftwareModule build() {
         return new JpaSoftwareModule(getSoftwareModuleTypeFromKeyString(type), name, version, description, vendor,
                 encrypted);
+    }
+
+    public boolean isEncrypted() {
+        return encrypted;
     }
 
     private SoftwareModuleType getSoftwareModuleTypeFromKeyString(final String type) {
@@ -53,7 +51,7 @@ public class JpaSoftwareModuleCreate extends AbstractSoftwareModuleUpdateCreate<
             throw new ValidationException("type cannot be null");
         }
 
-        return softwareModuleTypeManagement.getByKey(type.trim())
+        return softwareModuleTypeManagement.findByKey(type.trim())
                 .orElseThrow(() -> new EntityNotFoundException(SoftwareModuleType.class, type.trim()));
     }
 }

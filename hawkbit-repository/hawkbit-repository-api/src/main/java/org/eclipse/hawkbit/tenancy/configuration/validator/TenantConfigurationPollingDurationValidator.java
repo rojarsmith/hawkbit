@@ -1,38 +1,36 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.tenancy.configuration.validator;
 
 import java.time.Duration;
 import java.time.format.DateTimeParseException;
 
-import org.eclipse.hawkbit.ControllerPollProperties;
+import org.eclipse.hawkbit.repository.exception.TenantConfigurationValidatorException;
+import org.eclipse.hawkbit.tenancy.configuration.ControllerPollProperties;
 import org.eclipse.hawkbit.tenancy.configuration.DurationHelper;
-import org.springframework.beans.factory.annotation.Autowired;
 
 /**
- * This class is used to validate, that the property is a String and that it is
- * in the correct duration format.
- *
+ * This class is used to validate, that the property is a String and that it is in the correct duration format.
  */
 public class TenantConfigurationPollingDurationValidator implements TenantConfigurationValidator {
 
     private final Duration minDuration;
-
     private final Duration maxDuration;
 
     /**
-     * Constructor.
-     * 
-     * @param properties
-     *            property accessor for poll configuration
+     * This constructor is called by {@link org.eclipse.hawkbit.tenancy.configuration.TenantConfigurationProperties} using
+     * ApplicationContext.getAutowireCapableBeanFactory().createBean(Class) to validate the polling duration configuration.
+     * This insures the wiring of the properties is done correctly.
+     *
+     * @param properties property accessor for poll configuration
      */
-    @Autowired
     public TenantConfigurationPollingDurationValidator(final ControllerPollProperties properties) {
         minDuration = DurationHelper.formattedStringToDuration(properties.getMinPollingTime());
         maxDuration = DurationHelper.formattedStringToDuration(properties.getMaxPollingTime());

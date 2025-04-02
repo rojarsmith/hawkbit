@@ -1,10 +1,11 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository;
 
@@ -42,7 +43,7 @@ public class RegexCharacterCollection {
     public enum RegexChar {
         WHITESPACE("\\s", "character.whitespace"), DIGITS("0-9", "character.digits"), QUOTATION_MARKS("'\"",
                 "character.quotationMarks"), SLASHES("\\/\\\\", "character.slashes"), GREATER_THAN(
-                        ">"), LESS_THAN("<"), EQUALS_SYMBOL("="), EXCLAMATION_MARK("!"), QUESTION_MARK("?"), COLON(":");
+                ">"), LESS_THAN("<"), EQUALS_SYMBOL("="), EXCLAMATION_MARK("!"), QUESTION_MARK("?"), COLON(":");
 
         private final String regExp;
         private final String l18nReferenceDescription;
@@ -50,7 +51,7 @@ public class RegexCharacterCollection {
         RegexChar(final String character) {
             this(character, null);
         }
-    
+
         RegexChar(final String regExp, final String l18nReferenceDescription) {
             this.regExp = regExp;
             this.l18nReferenceDescription = l18nReferenceDescription;

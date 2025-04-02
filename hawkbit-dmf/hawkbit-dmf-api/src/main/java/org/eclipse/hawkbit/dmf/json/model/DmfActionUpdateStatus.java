@@ -1,73 +1,57 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.dmf.json.model;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.Data;
 
 /**
  * JSON representation of action update status.
  */
+@Data
 @JsonInclude(Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class DmfActionUpdateStatus {
 
     private final Long actionId;
     private final DmfActionStatus actionStatus;
+    private final long timestamp;
+    private final Long softwareModuleId;
+    private final List<String> message;
+    private final Integer code;
 
-    @JsonProperty
-    private Long softwareModuleId;
-
-    @JsonProperty
-    private List<String> message;
-
-    @JsonProperty
-    private Integer code;
-
-    public DmfActionUpdateStatus(@JsonProperty(value = "actionId", required = true) final Long actionId,
-            @JsonProperty(value = "actionStatus", required = true) final DmfActionStatus actionStatus) {
+    @JsonCreator
+    public DmfActionUpdateStatus(
+            @JsonProperty(value = "actionId", required = true) final Long actionId,
+            @JsonProperty(value = "actionStatus", required = true) final DmfActionStatus actionStatus,
+            @JsonProperty(value = "timestamp") final Long timestamp,
+            @JsonProperty("softwareModuleId") final Long softwareModuleId,
+            @JsonProperty("message") final List<String> message,
+            @JsonProperty("code") final Integer code) {
         this.actionId = actionId;
         this.actionStatus = actionStatus;
-    }
-
-    public Long getActionId() {
-        return actionId;
-    }
-
-    public Long getSoftwareModuleId() {
-        return softwareModuleId;
-    }
-
-    public void setSoftwareModuleId(final Long softwareModuleId) {
+        this.timestamp = timestamp != null ? timestamp : System.currentTimeMillis();
         this.softwareModuleId = softwareModuleId;
-    }
-
-    public DmfActionStatus getActionStatus() {
-        return actionStatus;
-    }
-
-    @JsonIgnore
-    public Optional<Integer> getCode() {
-        return Optional.ofNullable(code);
-    }
-
-    public void setCode(final Integer code) {
+        this.message = message;
         this.code = code;
+    }
+
+    public DmfActionUpdateStatus(final Long actionId, final DmfActionStatus actionStatus) {
+        this(actionId, actionStatus, null, null, null, null);
     }
 
     public List<String> getMessage() {
@@ -77,30 +61,4 @@ public class DmfActionUpdateStatus {
 
         return message;
     }
-
-    public boolean addMessage(final String message) {
-        if (this.message == null) {
-            this.message = new ArrayList<>();
-        }
-
-        return this.message.add(message);
-    }
-
-    public boolean addMessage(final Collection<String> messages) {
-        if (messages == null || messages.isEmpty()) {
-            return false;
-        }
-
-        if (message == null) {
-            message = new ArrayList<>(messages);
-            return true;
-        }
-
-        return message.addAll(messages);
-    }
-
-    public void setCode(final int code) {
-        this.code = code;
-    }
-
 }

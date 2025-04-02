@@ -1,84 +1,49 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.dmf.json.model;
 
 import java.util.Collections;
 import java.util.Map;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.Data;
 
 /**
  * JSON representation of artifact.
  */
+@Data
 @JsonInclude(Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class DmfArtifact {
-    @JsonProperty
-    private String filename;
 
-    @JsonProperty
-    private DmfArtifactHash hashes;
+    private final String filename;
+    private final DmfArtifactHash hashes;
+    private final long size;
+    private final long lastModified;
+    private final Map<String, String> urls;
 
-    @JsonProperty
-    private long size;
-
-    @JsonProperty
-    private long lastModified;
-
-    @JsonProperty
-    private Map<String, String> urls;
-
-    public Map<String, String> getUrls() {
-        if (urls == null) {
-            return Collections.emptyMap();
-        }
-
-        return Collections.unmodifiableMap(urls);
-    }
-
-    public long getLastModified() {
-        return lastModified;
-    }
-
-    public void setLastModified(final long lastModified) {
-        this.lastModified = lastModified;
-    }
-
-    public void setUrls(final Map<String, String> urls) {
-        this.urls = urls;
-    }
-
-    public String getFilename() {
-        return filename;
-    }
-
-    public void setFilename(final String filename) {
+    @JsonCreator
+    public DmfArtifact(
+            @JsonProperty("filename") final String filename,
+            @JsonProperty("hashes") final DmfArtifactHash hashes,
+            @JsonProperty("size") final long size,
+            @JsonProperty("lastModified") final long lastModified,
+            @JsonProperty("urls") final Map<String, String> urls) {
         this.filename = filename;
-    }
-
-    public DmfArtifactHash getHashes() {
-        return hashes;
-    }
-
-    public void setHashes(final DmfArtifactHash hashes) {
         this.hashes = hashes;
-    }
-
-    public long getSize() {
-        return size;
-    }
-
-    public void setSize(final long size) {
         this.size = size;
+        this.lastModified = lastModified;
+        this.urls = urls == null ? Collections.emptyMap() : Collections.unmodifiableMap(urls);
     }
-
 }

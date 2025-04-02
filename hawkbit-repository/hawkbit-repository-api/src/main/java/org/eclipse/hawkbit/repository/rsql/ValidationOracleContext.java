@@ -1,10 +1,11 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.rsql;
 
@@ -24,20 +25,20 @@ public class ValidationOracleContext {
         return syntaxError;
     }
 
-    public SuggestionContext getSuggestionContext() {
-        return suggestionContext;
-    }
-
-    public SyntaxErrorContext getSyntaxErrorContext() {
-        return syntaxErrorContext;
-    }
-
     public void setSyntaxError(final boolean syntaxError) {
         this.syntaxError = syntaxError;
     }
 
+    public SuggestionContext getSuggestionContext() {
+        return suggestionContext;
+    }
+
     public void setSuggestionContext(final SuggestionContext suggestionContext) {
         this.suggestionContext = suggestionContext;
+    }
+
+    public SyntaxErrorContext getSyntaxErrorContext() {
+        return syntaxErrorContext;
     }
 
     public void setSyntaxErrorContext(final SyntaxErrorContext syntaxErrorContext) {

@@ -1,40 +1,30 @@
 /**
- * Copyright (c) 2021 Bosch.IO GmbH and others.
+ * Copyright (c) 2021 Bosch.IO GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository;
 
+import lombok.Getter;
+
 /**
- * Describing the fields of the TargetType model which can be used in
- * the REST API
+ * Describing the fields of the TargetType model which can be used in the REST API
  */
-public enum TargetTypeFields implements FieldNameProvider {
-    /**
-     * The name field.
-     */
+@Getter
+public enum TargetTypeFields implements RsqlQueryField {
+
+    ID("id"),
+    KEY("key"),
     NAME("name"),
-    /**
-     * The description field.
-     */
-    DESCRIPTION("description"),
+    DESCRIPTION("description");
 
-    /**
-     * The id field.
-     */
-    ID("id");
+    private final String jpaEntityFieldName;
 
-    private final String fieldName;
-
-    TargetTypeFields(final String fieldName) {
-        this.fieldName = fieldName;
-    }
-
-    @Override
-    public String getFieldName() {
-        return fieldName;
+    TargetTypeFields(final String jpaEntityFieldName) {
+        this.jpaEntityFieldName = jpaEntityFieldName;
     }
 }

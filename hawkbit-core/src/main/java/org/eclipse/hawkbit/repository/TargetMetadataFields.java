@@ -1,41 +1,33 @@
 /**
- * Copyright (c) 2018 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2018 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository;
 
+import lombok.Getter;
+
 /**
  * Sort fields for TargetMetadata.
- *
  */
-public enum TargetMetadataFields implements FieldNameProvider {
+@Getter
+public enum TargetMetadataFields implements RsqlQueryField {
 
-    /**
-     * The value field.
-     */
-    VALUE("value"),
-    /**
-     * The key field.
-     */
-    KEY("key");
+    KEY("key"),
+    VALUE("value");
 
-    private final String fieldName;
+    private final String jpaEntityFieldName;
 
-    private TargetMetadataFields(final String fieldName) {
-        this.fieldName = fieldName;
-    }
-
-    @Override
-    public String getFieldName() {
-        return fieldName;
+    TargetMetadataFields(final String jpaEntityFieldName) {
+        this.jpaEntityFieldName = jpaEntityFieldName;
     }
 
     @Override
     public String identifierFieldName() {
-        return KEY.getFieldName();
+        return KEY.getJpaEntityFieldName();
     }
 }

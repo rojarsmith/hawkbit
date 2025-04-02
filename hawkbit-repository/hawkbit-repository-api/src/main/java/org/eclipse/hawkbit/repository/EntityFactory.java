@@ -1,15 +1,16 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.Size;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import org.eclipse.hawkbit.repository.builder.ActionStatusBuilder;
 import org.eclipse.hawkbit.repository.builder.DistributionSetBuilder;
@@ -29,7 +30,6 @@ import org.eclipse.hawkbit.repository.model.MetaData;
 /**
  * central {@link BaseEntity} generation service. Objects are created but not
  * persisted.
- *
  */
 public interface EntityFactory {
 
@@ -46,12 +46,9 @@ public interface EntityFactory {
     /**
      * Generates an {@link MetaData} element for distribution set without
      * persisting it.
-     * 
-     * @param key
-     *            {@link MetaData#getKey()}
-     * @param value
-     *            {@link MetaData#getValue()}
-     * 
+     *
+     * @param key {@link MetaData#getKey()}
+     * @param value {@link MetaData#getValue()}
      * @return {@link MetaData} object
      */
     MetaData generateDsMetadata(@Size(min = 1, max = MetaData.KEY_MAX_SIZE) @NotNull String key,
@@ -59,12 +56,9 @@ public interface EntityFactory {
 
     /**
      * Generates an {@link MetaData} element for target without persisting it.
-     * 
-     * @param key
-     *            {@link MetaData#getKey()}
-     * @param value
-     *            {@link MetaData#getValue()}
-     * 
+     *
+     * @param key {@link MetaData#getKey()}
+     * @param value {@link MetaData#getValue()}
      * @return {@link MetaData} object
      */
     MetaData generateTargetMetadata(@Size(min = 1, max = MetaData.KEY_MAX_SIZE) @NotNull String key,
@@ -119,5 +113,4 @@ public interface EntityFactory {
      * @return {@link TargetFilterQueryBuilder} object
      */
     TargetFilterQueryBuilder targetFilterQuery();
-
 }

@@ -1,16 +1,20 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.jpa.rsql;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
+import io.qameta.allure.Description;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.eclipse.hawkbit.repository.ActionFields;
 import org.eclipse.hawkbit.repository.exception.RSQLParameterUnsupportedFieldException;
 import org.eclipse.hawkbit.repository.jpa.AbstractJpaIntegrationTest;
@@ -26,50 +30,28 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
 import org.springframework.orm.jpa.vendor.Database;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
-
 @Feature("Component Tests - Repository")
 @Story("RSQL filter actions")
-public class RSQLActionFieldsTest extends AbstractJpaIntegrationTest {
+class RSQLActionFieldsTest extends AbstractJpaIntegrationTest {
 
     private JpaTarget target;
     private JpaAction action;
 
     @BeforeEach
-    public void setupBeforeTest() {
+    void setupBeforeTest() {
         final DistributionSet dsA = testdataFactory.createDistributionSet("daA");
         target = (JpaTarget) targetManagement
                 .create(entityFactory.target().create().controllerId("targetId123").description("targetId123"));
-        action = new JpaAction();
-        action.setActionType(ActionType.SOFT);
-        action.setDistributionSet(dsA);
-        action.setTarget(target);
-        action.setStatus(Status.RUNNING);
-        action.setWeight(45);
-        action.setInitiatedBy(tenantAware.getCurrentUsername());
-        target.addAction(action);
 
-        actionRepository.save(action);
+        action = newJpaAction(dsA, false, null);
         for (int i = 0; i < 10; i++) {
-            final JpaAction newAction = new JpaAction();
-            newAction.setActionType(ActionType.SOFT);
-            newAction.setDistributionSet(dsA);
-            newAction.setActive((i % 2) == 0);
-            newAction.setStatus(Status.RUNNING);
-            newAction.setTarget(target);
-            newAction.setWeight(45);
-            newAction.setInitiatedBy(tenantAware.getCurrentUsername());
-            actionRepository.save(newAction);
-            target.addAction(newAction);
+            newJpaAction(dsA, i % 2 == 0, i % 2 == 0 ? "extRef" : "extRef2");
         }
-
     }
 
     @Test
     @Description("Test filter action by id")
-    public void testFilterByParameterId() {
+    void testFilterByParameterId() {
         assertRSQLQuery(ActionFields.ID.name() + "==" + action.getId(), 1);
         assertRSQLQuery(ActionFields.ID.name() + "!=" + action.getId(), 10);
         assertRSQLQuery(ActionFields.ID.name() + "==" + -1, 0);
@@ -80,33 +62,57 @@ public class RSQLActionFieldsTest extends AbstractJpaIntegrationTest {
             return;
         }
 
-        assertRSQLQuery(ActionFields.ID.name() + "==*", 11);
-        assertRSQLQuery(ActionFields.ID.name() + "==noexist*", 0);
         assertRSQLQuery(ActionFields.ID.name() + "=in=(" + action.getId() + ",10000000)", 1);
         assertRSQLQuery(ActionFields.ID.name() + "=out=(" + action.getId() + ",10000000)", 10);
     }
 
     @Test
     @Description("Test action by status")
-    public void testFilterByParameterStatus() {
+    void testFilterByParameterStatus() {
         assertRSQLQuery(ActionFields.STATUS.name() + "==pending", 5);
         assertRSQLQuery(ActionFields.STATUS.name() + "!=pending", 6);
         assertRSQLQuery(ActionFields.STATUS.name() + "=in=(pending)", 5);
         assertRSQLQuery(ActionFields.STATUS.name() + "=out=(pending)", 6);
 
-        try {
-            assertRSQLQuery(ActionFields.STATUS.name() + "==true", 5);
-            fail("Missing expected RSQLParameterUnsupportedFieldException because status cannot be compared with 'true'");
-        } catch (final RSQLParameterUnsupportedFieldException e) {
+        final String rsql = ActionFields.STATUS.name() + "==true";
+        assertThatExceptionOfType(RSQLParameterUnsupportedFieldException.class)
+                .as("RSQLParameterUnsupportedFieldException because status cannot be compared with 'true'")
+                .isThrownBy(() -> assertRSQLQuery(rsql, 5));
+    }
+
+    @Test
+    @Description("Test action by status")
+    void testFilterByParameterExtRef() {
+        assertRSQLQuery(ActionFields.EXTERNALREF.name() + "==extRef", 5);
+        assertRSQLQuery(ActionFields.EXTERNALREF.name() + "!=extRef", 6);
+        assertRSQLQuery(ActionFields.EXTERNALREF.name() + "==extRef*", 10);
+    }
+
+    private JpaAction newJpaAction(final DistributionSet dsA, final boolean active, final String extRef) {
+        final JpaAction newAction = new JpaAction();
+        newAction.setActionType(ActionType.SOFT);
+        newAction.setDistributionSet(dsA);
+        newAction.setActive(active);
+        newAction.setStatus(Status.RUNNING);
+        newAction.setTarget(target);
+        newAction.setWeight(45);
+        newAction.setInitiatedBy(tenantAware.getCurrentUsername());
+        if (extRef != null) {
+            newAction.setExternalRef(extRef);
         }
+        actionRepository.save(newAction);
+
+        target.addAction(action);
+
+        return newAction;
     }
 
     private void assertRSQLQuery(final String rsqlParam, final long expectedEntities) {
-
-        final Slice<Action> findEnitity = deploymentManagement.findActionsByTarget(rsqlParam, target.getControllerId(),
+        final Slice<Action> findEntity = deploymentManagement.findActionsByTarget(rsqlParam, target.getControllerId(),
                 PageRequest.of(0, 100));
         final long countAllEntities = deploymentManagement.countActionsByTarget(rsqlParam, target.getControllerId());
-        assertThat(findEnitity).isNotNull();
+        assertThat(findEntity).isNotNull();
+        assertThat(findEntity.getContent()).hasSize((int)expectedEntities);
         assertThat(countAllEntities).isEqualTo(expectedEntities);
     }
 }

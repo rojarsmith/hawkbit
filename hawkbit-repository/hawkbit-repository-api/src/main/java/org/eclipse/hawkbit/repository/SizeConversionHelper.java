@@ -1,10 +1,11 @@
 /**
- * Copyright (c) 2019 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2019 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository;
 
@@ -24,8 +25,7 @@ public final class SizeConversionHelper {
     /**
      * Convert byte values to human readable strings with units
      *
-     * @param byteValue
-     *            Value to convert in bytes
+     * @param byteValue Value to convert in bytes
      */
     public static String byteValueToReadableString(final long byteValue) {
         double outputValue = byteValue / 1024.0;

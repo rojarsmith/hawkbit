@@ -1,10 +1,11 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.event.remote;
 
@@ -17,10 +18,8 @@ import java.util.Arrays;
 import io.qameta.allure.Description;
 import io.qameta.allure.Feature;
 import io.qameta.allure.Story;
-
 import org.eclipse.hawkbit.repository.jpa.model.JpaAction;
 import org.eclipse.hawkbit.repository.model.TenantAwareBaseEntity;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -28,35 +27,30 @@ import org.junit.jupiter.api.Test;
  */
 @Feature("Component Tests - Repository")
 @Story("Entity Id Events")
-public class RemoteIdEventTest extends AbstractRemoteEventTest {
+class RemoteIdEventTest extends AbstractRemoteEventTest {
 
     private static final long ENTITY_ID = 1L;
-
-    private static String TENANT = "tenant";
-
-    private static Class<? extends TenantAwareBaseEntity> ENTITY_CLASS = JpaAction.class;
-
-    private static String NODE = "Node";
-
-    private static String CONTROLLER_ID = "controller911";
-
-    private static String ADDRESS = "amqp://anyhost";
+    private static final String TENANT = "tenant";
+    private static final Class<? extends TenantAwareBaseEntity> ENTITY_CLASS = JpaAction.class;
+    private static final String NODE = "Node";
+    private static final String CONTROLLER_ID = "controller911";
+    private static final String ADDRESS = "amqp://anyhost";
 
     @Test
     @Description("Verifies that the ds id is correct reloaded")
-    public void testDistributionSetDeletedEvent() {
+    void testDistributionSetDeletedEvent() {
         assertAndCreateRemoteEvent(DistributionSetDeletedEvent.class);
     }
 
     @Test
     @Description("Verifies that the ds tag id is correct reloaded")
-    public void testDistributionSetTagDeletedEvent() {
+    void testDistributionSetTagDeletedEvent() {
         assertAndCreateRemoteEvent(DistributionSetTagDeletedEvent.class);
     }
 
     @Test
     @Description("Verifies that the target id is correct reloaded")
-    public void testTargetDeletedEvent() {
+    void testTargetDeletedEvent() {
         final TargetDeletedEvent deletedEvent = new TargetDeletedEvent(TENANT, ENTITY_ID, CONTROLLER_ID, ADDRESS,
                 ENTITY_CLASS, NODE);
         assertEntity(deletedEvent);
@@ -64,19 +58,19 @@ public class RemoteIdEventTest extends AbstractRemoteEventTest {
 
     @Test
     @Description("Verifies that the target tag id is correct reloaded")
-    public void testTargetTagDeletedEvent() {
+    void testTargetTagDeletedEvent() {
         assertAndCreateRemoteEvent(TargetTagDeletedEvent.class);
     }
 
     @Test
     @Description("Verifies that the software module id is correct reloaded")
-    public void testSoftwareModuleDeletedEvent() {
+    void testSoftwareModuleDeletedEvent() {
         assertAndCreateRemoteEvent(SoftwareModuleDeletedEvent.class);
     }
 
     @Test
     @Description("Verifies that the rollout id is correct reloaded")
-    public void testRolloutDeletedEvent() {
+    void testRolloutDeletedEvent() {
         assertAndCreateRemoteEvent(RolloutDeletedEvent.class);
     }
 
@@ -106,6 +100,6 @@ public class RemoteIdEventTest extends AbstractRemoteEventTest {
 
     private void assertDeserializeEvent(final RemoteIdEvent underTestCreatedEvent, final RemoteIdEvent event) {
         // gets added because events inherit from of java.util.EventObject
-        assertThat(underTestCreatedEvent).isEqualToIgnoringGivenFields(event, "source");
+        assertThat(underTestCreatedEvent).usingRecursiveComparison().ignoringFields("source").isEqualTo(event);
     }
 }

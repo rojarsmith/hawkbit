@@ -1,67 +1,43 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import lombok.Getter;
+
 /**
- * Describing the fields of the Rollout model which can be used in the REST API
- * e.g. for sorting etc.
- *
+ * Describing the fields of the Rollout model which can be used in the REST API e.g. for sorting etc.
  */
-public enum RolloutFields implements FieldNameProvider {
-    /**
-     * The name field.
-     */
-    NAME("name"),
-    /**
-     * The description field.
-     */
-    DESCRIPTION("description"),
-    /**
-     * The id field.
-     */
+@Getter
+public enum RolloutFields implements RsqlQueryField {
+
     ID("id"),
-    /**
-     * The status field.
-     */
+    NAME("name"),
+    DESCRIPTION("description"),
     STATUS("status"),
-    /**
-     * The Distribution set field.
-     */
-    DISTRIBUTIONSET("distributionSet", DistributionSetFields.ID.getFieldName(),
-            DistributionSetFields.NAME.getFieldName(), DistributionSetFields.VERSION.getFieldName(),
-            DistributionSetFields.TYPE.getFieldName());
+    DISTRIBUTIONSET("distributionSet", DistributionSetFields.ID.getJpaEntityFieldName(),
+            DistributionSetFields.NAME.getJpaEntityFieldName(), DistributionSetFields.VERSION.getJpaEntityFieldName(),
+            DistributionSetFields.TYPE.getJpaEntityFieldName());
 
-    private final String fieldName;
-
+    private final String jpaEntityFieldName;
     private final List<String> subEntityAttributes;
 
-    private RolloutFields(final String fieldName) {
-        this.fieldName = fieldName;
+    RolloutFields(final String jpaEntityFieldName) {
+        this.jpaEntityFieldName = jpaEntityFieldName;
         this.subEntityAttributes = Collections.emptyList();
     }
 
-    private RolloutFields(final String fieldName, final String... subEntityAttributes) {
-        this.fieldName = fieldName;
-        this.subEntityAttributes = Arrays.asList(subEntityAttributes);
-    }
-
-    @Override
-    public List<String> getSubEntityAttributes() {
-        return Collections.unmodifiableList(subEntityAttributes);
-    }
-
-    @Override
-    public String getFieldName() {
-        return fieldName;
+    RolloutFields(final String jpaEntityFieldName, final String... subEntityAttributes) {
+        this.jpaEntityFieldName = jpaEntityFieldName;
+        this.subEntityAttributes = List.of(subEntityAttributes);
     }
 }

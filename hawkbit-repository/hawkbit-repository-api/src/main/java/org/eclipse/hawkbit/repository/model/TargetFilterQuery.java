@@ -1,10 +1,11 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.model;
 
@@ -17,7 +18,7 @@ import org.eclipse.hawkbit.repository.model.Action.ActionType;
 
 /**
  * Managed filter entity.
- * 
+ *
  * Supported operators.
  * <ul>
  * <li>{@code Equal to : ==}</li>
@@ -37,9 +38,9 @@ import org.eclipse.hawkbit.repository.model.Action.ActionType;
  * <li>{@code name==targetId1,description==plugAndPlay,updateStatus==UNKNOWN}</li>
  * <li>{@code name==targetId1 or description==plugAndPlay or updateStatus==UNKNOWN}</li>
  * </ul>
- *
  */
 public interface TargetFilterQuery extends TenantAwareBaseEntity {
+
     /**
      * Maximum length of query filter string.
      */
@@ -72,8 +73,7 @@ public interface TargetFilterQuery extends TenantAwareBaseEntity {
     ActionType getAutoAssignActionType();
 
     /**
-     * @return the weight of the {@link Action}s created during an auto
-     *         assignment.
+     * @return the weight of the {@link Action}s created during an auto assignment.
      */
     Optional<Integer> getAutoAssignWeight();
 
@@ -87,4 +87,10 @@ public interface TargetFilterQuery extends TenantAwareBaseEntity {
      *         (considered with confirmation flow active)
      */
     boolean isConfirmationRequired();
+
+    /**
+     * Defining a serialized access control context which needs to be set when
+     * performing the auto-assignment by the scheduler
+     */
+    Optional<String> getAccessControlContext();
 }

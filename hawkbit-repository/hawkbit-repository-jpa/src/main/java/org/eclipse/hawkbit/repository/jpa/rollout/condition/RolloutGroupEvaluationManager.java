@@ -1,18 +1,18 @@
 /**
- * Copyright (c) 2023 Bosch.IO GmbH and others.
+ * Copyright (c) 2023 Bosch.IO GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.jpa.rollout.condition;
 
 import java.util.List;
 
+import lombok.extern.slf4j.Slf4j;
 import org.eclipse.hawkbit.repository.model.RolloutGroup;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Manager class to collect all instances of
@@ -20,9 +20,8 @@ import org.slf4j.LoggerFactory;
  * {@link RolloutGroupActionEvaluator} for specific conditions and actions. The
  * corresponding instance can be fetched by providing the action/condition.
  */
+@Slf4j
 public class RolloutGroupEvaluationManager {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(RolloutGroupEvaluationManager.class);
 
     private final List<RolloutGroupConditionEvaluator<RolloutGroup.RolloutGroupErrorCondition>> errorConditionEvaluators;
     private final List<RolloutGroupConditionEvaluator<RolloutGroup.RolloutGroupSuccessCondition>> successConditionEvaluators;
@@ -32,18 +31,14 @@ public class RolloutGroupEvaluationManager {
     /**
      * Constructor
      *
-     * @param errorConditionEvaluators
-     *            evaluators for instances of {@link RolloutGroupConditionEvaluator}
-     *            handling the {@link RolloutGroup.RolloutGroupErrorCondition}
-     * @param successConditionEvaluators
-     *            evaluators for instances of {@link RolloutGroupConditionEvaluator}
-     *            handling the {@link RolloutGroup.RolloutGroupSuccessCondition}
-     * @param errorActionEvaluators
-     *            evaluators for instances of {@link RolloutGroupActionEvaluator}
-     *            handling the {@link RolloutGroup.RolloutGroupErrorAction}
-     * @param successActionEvaluators
-     *            evaluators for instances of {@link RolloutGroupActionEvaluator}
-     *            handling the {@link RolloutGroup.RolloutGroupSuccessAction}
+     * @param errorConditionEvaluators evaluators for instances of {@link RolloutGroupConditionEvaluator}
+     *         handling the {@link RolloutGroup.RolloutGroupErrorCondition}
+     * @param successConditionEvaluators evaluators for instances of {@link RolloutGroupConditionEvaluator}
+     *         handling the {@link RolloutGroup.RolloutGroupSuccessCondition}
+     * @param errorActionEvaluators evaluators for instances of {@link RolloutGroupActionEvaluator}
+     *         handling the {@link RolloutGroup.RolloutGroupErrorAction}
+     * @param successActionEvaluators evaluators for instances of {@link RolloutGroupActionEvaluator}
+     *         handling the {@link RolloutGroup.RolloutGroupSuccessAction}
      */
     public RolloutGroupEvaluationManager(
             final List<RolloutGroupConditionEvaluator<RolloutGroup.RolloutGroupErrorCondition>> errorConditionEvaluators,
@@ -63,7 +58,7 @@ public class RolloutGroupEvaluationManager {
     }
 
     public RolloutGroupActionEvaluator<RolloutGroup.RolloutGroupSuccessAction> getSuccessActionEvaluator(
-          final RolloutGroup.RolloutGroupSuccessAction successAction) {
+            final RolloutGroup.RolloutGroupSuccessAction successAction) {
         return findFirstActionEvaluator(successActionEvaluators, successAction);
     }
 
@@ -81,8 +76,8 @@ public class RolloutGroupEvaluationManager {
     private static <T extends Enum<T>> RolloutGroupActionEvaluator<T> findFirstActionEvaluator(
             final List<RolloutGroupActionEvaluator<T>> evaluators, final T action) {
         return evaluators.stream().filter(evaluator -> evaluator.getAction() == action).findFirst().orElseThrow(() -> {
-            LOGGER.warn("Could not find suitable evaluator for the '{}' action.", action.name());
-            throw new EvaluatorNotConfiguredException(action.name());
+            log.warn("Could not find suitable evaluator for the '{}' action.", action.name());
+            return new EvaluatorNotConfiguredException(action.name());
         });
     }
 
@@ -90,9 +85,8 @@ public class RolloutGroupEvaluationManager {
             final List<RolloutGroupConditionEvaluator<T>> evaluators, final T condition) {
         return evaluators.stream().filter(evaluator -> evaluator.getCondition() == condition).findFirst()
                 .orElseThrow(() -> {
-                    LOGGER.warn("Could not find suitable evaluator for the '{}' condition.", condition.name());
-                    throw new EvaluatorNotConfiguredException(condition.name());
+                    log.warn("Could not find suitable evaluator for the '{}' condition.", condition.name());
+                    return new EvaluatorNotConfiguredException(condition.name());
                 });
     }
-
 }

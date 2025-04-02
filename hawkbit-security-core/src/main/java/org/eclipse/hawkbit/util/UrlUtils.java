@@ -1,25 +1,24 @@
 /**
- * Copyright (c) 2023 Bosch.IO GmbH and others.
+ * Copyright (c) 2023 Bosch.IO GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.util;
 
-import org.springframework.web.util.UriUtils;
-
 import java.nio.charset.StandardCharsets;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+import org.springframework.web.util.UriUtils;
+
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class UrlUtils {
 
-  private UrlUtils() {
-    // Util classes should not have public constructors
-  }
-
-  public static String decodeUriValue(String value) {
-    return UriUtils.decode(value, StandardCharsets.UTF_8);
-  }
-
+    public static String decodeUriValue(String value) {
+        return UriUtils.decode(value, StandardCharsets.UTF_8);
+    }
 }

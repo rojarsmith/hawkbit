@@ -1,16 +1,19 @@
 /**
- * Copyright (c) 2021 Bosch.IO GmbH and others.
+ * Copyright (c) 2021 Bosch.IO GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.exception;
 
+import java.io.Serial;
 import java.util.Collection;
 import java.util.Collections;
 
+import lombok.EqualsAndHashCode;
 import org.eclipse.hawkbit.exception.AbstractServerRtException;
 import org.eclipse.hawkbit.exception.SpServerError;
 import org.eclipse.hawkbit.repository.model.DistributionSet;
@@ -18,23 +21,23 @@ import org.eclipse.hawkbit.repository.model.Target;
 import org.eclipse.hawkbit.repository.model.TargetType;
 
 /**
- * Thrown if user tries to assign a {@link DistributionSet} to a {@link Target}
- * that has an incompatible {@link TargetType}
+ * Thrown if user tries to assign a {@link DistributionSet} to a {@link Target} that has an incompatible {@link TargetType}
  */
+@EqualsAndHashCode(callSuper = true)
 public class IncompatibleTargetTypeException extends AbstractServerRtException {
 
+    @Serial
     private static final long serialVersionUID = 1L;
+
     private final Collection<String> targetTypeNames;
     private final Collection<String> distributionSetTypeNames;
 
     /**
      * Creates a new IncompatibleTargetTypeException with
      * {@link SpServerError#SP_TARGET_TYPE_INCOMPATIBLE} error.
-     * 
-     * @param targetTypeName
-     *            Name of the target type
-     * @param distributionSetTypeNames
-     *            Names of the distribution set types
+     *
+     * @param targetTypeName Name of the target type
+     * @param distributionSetTypeNames Names of the distribution set types
      */
     public IncompatibleTargetTypeException(final String targetTypeName,
             final Collection<String> distributionSetTypeNames) {
@@ -48,10 +51,8 @@ public class IncompatibleTargetTypeException extends AbstractServerRtException {
      * Creates a new IncompatibleTargetTypeException with
      * {@link SpServerError#SP_TARGET_TYPE_INCOMPATIBLE} error.
      *
-     * @param targetTypeNames
-     *            Name of the target types
-     * @param distributionSetTypeName
-     *            Name of the distribution set type
+     * @param targetTypeNames Name of the target types
+     * @param distributionSetTypeName Name of the distribution set type
      */
     public IncompatibleTargetTypeException(final Collection<String> targetTypeNames,
             final String distributionSetTypeName) {

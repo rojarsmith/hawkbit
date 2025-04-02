@@ -1,17 +1,18 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.builder;
 
 import java.util.Optional;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.Size;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import org.eclipse.hawkbit.repository.model.Action.ActionType;
 import org.eclipse.hawkbit.repository.model.BaseEntity;
@@ -24,52 +25,47 @@ import org.eclipse.hawkbit.repository.model.TargetFilterQuery;
  * Builder to create a new {@link Rollout} entry. Defines all fields that can be
  * set at creation time. Other fields are set by the repository automatically,
  * e.g. {@link BaseEntity#getCreatedAt()}.
- *
  */
 public interface RolloutCreate {
+
     /**
      * Set name
-     * 
-     * @param name
-     *            for {@link Rollout#getName()}
+     *
+     * @param name for {@link Rollout#getName()}
      * @return updated builder instance
      */
     RolloutCreate name(@Size(min = 1, max = NamedEntity.NAME_MAX_SIZE) @NotNull String name);
 
     /**
      * Set description
-     * 
-     * @param description
-     *            for {@link Rollout#getDescription()}
+     *
+     * @param description for {@link Rollout#getDescription()}
      * @return updated builder instance
      */
     RolloutCreate description(@Size(max = NamedEntity.DESCRIPTION_MAX_SIZE) String description);
 
     /**
      * Set the {@link DistributionSet}
-     * 
-     * @param set
-     *            for {@link Rollout#getDistributionSet()}
+     *
+     * @param set for {@link Rollout#getDistributionSet()}
      * @return updated builder instance
      */
-    default RolloutCreate set(final DistributionSet set) {
-        return set(Optional.ofNullable(set).map(DistributionSet::getId).orElse(null));
+    default RolloutCreate distributionSetId(final DistributionSet set) {
+        return distributionSetId(Optional.ofNullable(set).map(DistributionSet::getId).orElse(null));
     }
 
     /**
      * Set the id of the {@link DistributionSet}
-     * 
-     * @param setId
-     *            for {@link Rollout#getDistributionSet()}
+     *
+     * @param distributionSetId for {@link Rollout#getDistributionSet()}
      * @return updated builder instance
      */
-    RolloutCreate set(long setId);
+    RolloutCreate distributionSetId(long distributionSetId);
 
     /**
      * Set the {@link TargetFilterQuery}
-     * 
-     * @param targetFilterQuery
-     *            for {@link Rollout#getTargetFilterQuery()}
+     *
+     * @param targetFilterQuery for {@link Rollout#getTargetFilterQuery()}
      * @return updated builder instance
      */
     RolloutCreate targetFilterQuery(
@@ -77,36 +73,40 @@ public interface RolloutCreate {
 
     /**
      * Set the {@link ActionType}
-     * 
-     * @param actionType
-     *            for {@link Rollout#getActionType()}
+     *
+     * @param actionType for {@link Rollout#getActionType()}
      * @return updated builder instance
      */
     RolloutCreate actionType(@NotNull ActionType actionType);
 
     /**
-     * Set the forcedTime of the resulting {@link Actions}
-     * 
-     * @param forcedTime
-     *            for {@link Rollout#getForcedTime()}
+     * Set the forcedTime of the resulting {@link org.eclipse.hawkbit.repository.model.Action}s
+     *
+     * @param forcedTime for {@link Rollout#getForcedTime()}
      * @return updated builder instance
      */
     RolloutCreate forcedTime(Long forcedTime);
 
     /**
-     * Set the weight of the resulting {@link Actions}
-     * 
-     * @param weight
-     *            for {@link Rollout#getWeight()}
+     * Set the weight of the resulting {@link org.eclipse.hawkbit.repository.model.Action}s
+     *
+     * @param weight for {@link Rollout#getWeight()}
      * @return updated builder instance
      */
     RolloutCreate weight(Integer weight);
 
     /**
-     * set start
-     * 
-     * @param startAt
-     *            for {@link Rollout#getStartAt()}
+     * Set if the rollout shall be dynamic
+     *
+     * @param dynamic for {@link Rollout#isDynamic()}
+     * @return updated builder instance
+     */
+    RolloutCreate dynamic(boolean dynamic);
+
+    /**
+     * Set start at
+     *
+     * @param startAt for {@link Rollout#getStartAt()}
      * @return updated builder instance
      */
     RolloutCreate startAt(Long startAt);
@@ -115,5 +115,4 @@ public interface RolloutCreate {
      * @return peek on current state of {@link Rollout} in the builder
      */
     Rollout build();
-
 }

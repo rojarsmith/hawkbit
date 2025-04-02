@@ -1,10 +1,11 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.model;
 
@@ -22,7 +23,6 @@ import org.eclipse.hawkbit.repository.model.TotalTargetCountStatus.Status;
  * time. Monitoring of the rollout progress. Emergency rollout shutdown in case
  * of problems on to many devices and reporting capabilities for a complete
  * understanding of the rollout progress at each point in time.
- *
  */
 public interface Rollout extends NamedEntity {
 
@@ -108,9 +108,17 @@ public interface Rollout extends NamedEntity {
     Optional<Integer> getWeight();
 
     /**
-     *
+     * @return if the {@link Rollout} is dynamic.
+     */
+    boolean isDynamic();
+
+    /**
+     * @return the stored access control context (if present)
+     */
+    Optional<String> getAccessControlContext();
+
+    /**
      * State machine for rollout.
-     *
      */
     enum RolloutStatus {
 
@@ -174,25 +182,7 @@ public interface Rollout extends NamedEntity {
          * soft-deletion of the rollout which keeps references, in case of an
          * hard-deletion of a rollout the rollout-entry itself is deleted.
          */
-        DELETED,
-
-        /**
-         * Rollout could not be created due to errors, might be a database
-         * problem during asynchronous creating.
-         *
-         * @deprecated legacy status is not used anymore
-         */
-        @Deprecated
-        ERROR_CREATING,
-
-        /**
-         * Rollout could not be started due to errors, might be database problem
-         * during asynchronous starting.
-         *
-         * @deprecated legacy status is not used anymore
-         */
-        @Deprecated
-        ERROR_STARTING
+        DELETED
     }
 
     /**

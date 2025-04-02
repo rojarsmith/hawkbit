@@ -1,10 +1,11 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository;
 
@@ -14,15 +15,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * {@link QuotaManagement} implementation based on spring boot
  * {@link ConfigurationProperties}.
- *
  */
 public class PropertiesQuotaManagement implements QuotaManagement {
 
     private final HawkbitSecurityProperties securityProperties;
 
     /**
-     * @param securityProperties
-     *            that holds the quota definitions
+     * @param securityProperties that holds the quota definitions
      */
     public PropertiesQuotaManagement(final HawkbitSecurityProperties securityProperties) {
         this.securityProperties = securityProperties;
@@ -84,11 +83,6 @@ public class PropertiesQuotaManagement implements QuotaManagement {
     }
 
     @Override
-    public int getMaxActionsPerTarget() {
-        return securityProperties.getDos().getMaxActionsPerTarget();
-    }
-
-    @Override
     public int getMaxTargetDistributionSetAssignmentsPerManualAssignment() {
         return securityProperties.getDos().getMaxTargetDistributionSetAssignmentsPerManualAssignment();
     }
@@ -96,6 +90,11 @@ public class PropertiesQuotaManagement implements QuotaManagement {
     @Override
     public int getMaxTargetsPerAutoAssignment() {
         return securityProperties.getDos().getMaxTargetsPerAutoAssignment();
+    }
+
+    @Override
+    public int getMaxActionsPerTarget() {
+        return securityProperties.getDos().getMaxActionsPerTarget();
     }
 
     @Override

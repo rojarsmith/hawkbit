@@ -1,21 +1,25 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.model;
 
 import java.util.List;
 
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
+
+import lombok.Data;
 
 /**
  * Represents information to validate the correct distribution of targets to
  * rollout groups.
  */
+@Data
 public class RolloutGroupsValidation {
 
     /**
@@ -30,24 +34,14 @@ public class RolloutGroupsValidation {
 
     /**
      * Instantiates a new validation result
-     * 
-     * @param totalTargets
-     *            The total amount of targets in a {@link Rollout}
-     * @param targetsPerGroup
-     *            A list containing the count of targets for each
-     *            {@link RolloutGroup}
+     *
+     * @param totalTargets The total amount of targets in a {@link Rollout}
+     * @param targetsPerGroup A list containing the count of targets for each
+     *         {@link RolloutGroup}
      */
     public RolloutGroupsValidation(final long totalTargets, @NotNull final List<Long> targetsPerGroup) {
         this.totalTargets = totalTargets;
         this.targetsPerGroup = targetsPerGroup;
-    }
-
-    public long getTotalTargets() {
-        return totalTargets;
-    }
-
-    public List<Long> getTargetsPerGroup() {
-        return targetsPerGroup;
     }
 
     /**

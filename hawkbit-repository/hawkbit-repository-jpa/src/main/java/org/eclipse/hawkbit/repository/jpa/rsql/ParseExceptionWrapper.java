@@ -1,19 +1,19 @@
 /**
- * Copyright (c) 2015 Bosch Software Innovations GmbH and others.
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
  *
- * All rights reserved. This program and the accompanying materials
- * are made available under the terms of the Eclipse Public License v1.0
- * which accompanies this distribution, and is available at
- * http://www.eclipse.org/legal/epl-v10.html
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
  */
 package org.eclipse.hawkbit.repository.jpa.rsql;
 
 import java.lang.reflect.Field;
 import java.util.Arrays;
 
-import org.springframework.util.ReflectionUtils;
-
 import cz.jirutka.rsql.parser.ParseException;
+import org.springframework.util.ReflectionUtils;
 
 /**
  * A {@link ParseException} wrapper which allows to access the parsing
@@ -28,10 +28,9 @@ public class ParseExceptionWrapper {
 
     /**
      * Constructor.
-     * 
-     * @param parseException
-     *            the original parsing exception object to access its field
-     *            using reflection
+     *
+     * @param parseException the original parsing exception object to access its field
+     *         using reflection
      */
     public ParseExceptionWrapper(final ParseException parseException) {
         this.parseException = parseException;
@@ -60,7 +59,6 @@ public class ParseExceptionWrapper {
         return "ParseExceptionWrapper [getExpectedTokenSequence()=" + Arrays.toString(getExpectedTokenSequence())
                 + ", getCurrentToken()=" + getCurrentToken() + "]";
     }
-
 
     /**
      * A {@link TokenWrapper} which wraps the
@@ -150,6 +148,13 @@ public class ParseExceptionWrapper {
             return (int) getValue(endColumnTokenField);
         }
 
+        @Override
+        public String toString() {
+            return "TokenWrapper [tokenInstance=" + tokenInstance + ", getNext()=" + getNext() + ", getKind()="
+                    + getKind() + ", getImage()=" + getImage() + ", getBeginColumn()=" + getBeginColumn()
+                    + ", getEndColumn()=" + getEndColumn() + "]";
+        }
+
         private Field getAccessibleField(final String field) throws NoSuchFieldException {
             final Field declaredField = tokenInstance.getClass().getDeclaredField(field);
             ReflectionUtils.makeAccessible(declaredField);
@@ -163,16 +168,10 @@ public class ParseExceptionWrapper {
                 throw new IllegalFieldAccessExeption(e);
             }
         }
-
-        @Override
-        public String toString() {
-            return "TokenWrapper [tokenInstance=" + tokenInstance + ", getNext()=" + getNext() + ", getKind()="
-                    + getKind() + ", getImage()=" + getImage() + ", getBeginColumn()=" + getBeginColumn()
-                    + ", getEndColumn()=" + getEndColumn() + "]";
-        }
     }
 
     static class IllegalFieldAccessExeption extends RuntimeException {
+
         public IllegalFieldAccessExeption(Throwable e) {
             super(e);
         }
