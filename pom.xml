@@ -53,7 +53,7 @@
 
         <!-- Eclipselink - START -->
         <!-- 4.0.4 doesn't work because of https://github.com/eclipse-ee4j/eclipselink/issues/2219 -->
-        <eclipselink.version>4.0.5</eclipselink.version>
+        <eclipselink.version>4.0.6</eclipselink.version>
         <eclipselink.maven.plugin.version>3.0.2</eclipselink.maven.plugin.version>
         <!-- Eclipselink - END -->
 
@@ -62,9 +62,9 @@
         <jsoup.version>1.19.1</jsoup.version>
         <javax.el-api.version>3.0.0</javax.el-api.version>
         <rsql-parser.version>2.1.0</rsql-parser.version>
-        <commons-io.version>2.18.0</commons-io.version>
-        <commons-collections4.version>4.4</commons-collections4.version>
-        <commons-text.version>1.13.0</commons-text.version>
+        <commons-io.version>2.19.0</commons-io.version>
+        <commons-collections4.version>4.5.0</commons-collections4.version>
+        <commons-text.version>1.13.1</commons-text.version>
         <io-protostuff.version>1.8.0</io-protostuff.version>
         <!-- test -->
         <rabbitmq.http-client.version>5.3.0</rabbitmq.http-client.version>
@@ -423,6 +423,7 @@
                                     <exclude>**/helm/**</exclude>
                                     <exclude>**/README</exclude>
                                     <exclude>**/.git*</exclude>
+                                    <exclude>**/robots.txt</exclude>
                                     <exclude>**/*.sql</exclude>
                                     <exclude>**/docker/**</exclude>
                                     <exclude>**/frontend/**</exclude>

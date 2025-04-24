@@ -18,6 +18,7 @@ import javax.sql.DataSource;
 import jakarta.persistence.EntityManager;
 import jakarta.validation.Validation;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import org.eclipse.hawkbit.ContextAware;
 import org.eclipse.hawkbit.artifact.repository.ArtifactRepository;
 import org.eclipse.hawkbit.cache.TenancyCacheManager;
@@ -193,6 +194,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.integration.jdbc.lock.DefaultLockRepository;
 import org.springframework.integration.jdbc.lock.JdbcLockRegistry;
 import org.springframework.integration.jdbc.lock.LockRepository;
+import org.springframework.integration.support.locks.DefaultLockRegistry;
 import org.springframework.integration.support.locks.LockRegistry;
 import org.springframework.lang.NonNull;
 import org.springframework.retry.annotation.EnableRetry;
@@ -273,9 +275,9 @@ public class RepositoryApplicationConfiguration {
     }
 
     @Bean
+    @ConditionalOnProperty(name = "hawkbit.lock", havingValue = "distributed", matchIfMissing = true)
     @ConditionalOnMissingBean
-    LockRepository lockRepository(
-            final DataSource dataSource, final LockProperties lockProperties, final PlatformTransactionManager txManager) {
+    LockRepository lockRepository(final DataSource dataSource, final LockProperties lockProperties, final PlatformTransactionManager txManager) {
         final DefaultLockRepository repository = new DistributedLockRepository(dataSource, lockProperties, txManager);
         repository.setPrefix("SP_");
         return repository;
@@ -283,14 +285,15 @@ public class RepositoryApplicationConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public LockRegistry lockRegistry(final LockRepository lockRepository) {
-        return new JdbcLockRegistry(lockRepository);
+    public LockRegistry lockRegistry(final Optional<LockRepository> lockRepository) {
+        return lockRepository.<LockRegistry>map(JdbcLockRegistry::new).orElseGet(DefaultLockRegistry::new);
     }
 
     @Bean
     @ConditionalOnMissingBean
-    PauseRolloutGroupAction pauseRolloutGroupAction(final RolloutManagement rolloutManagement,
-            final RolloutGroupRepository rolloutGroupRepository, final SystemSecurityContext systemSecurityContext) {
+    PauseRolloutGroupAction pauseRolloutGroupAction(
+            final RolloutManagement rolloutManagement, final RolloutGroupRepository rolloutGroupRepository,
+            final SystemSecurityContext systemSecurityContext) {
         return new PauseRolloutGroupAction(rolloutManagement, rolloutGroupRepository, systemSecurityContext);
     }
 
@@ -299,8 +302,7 @@ public class RepositoryApplicationConfiguration {
     StartNextGroupRolloutGroupSuccessAction startNextRolloutGroupAction(
             final RolloutGroupRepository rolloutGroupRepository, final DeploymentManagement deploymentManagement,
             final SystemSecurityContext systemSecurityContext) {
-        return new StartNextGroupRolloutGroupSuccessAction(rolloutGroupRepository, deploymentManagement,
-                systemSecurityContext);
+        return new StartNextGroupRolloutGroupSuccessAction(rolloutGroupRepository, deploymentManagement, systemSecurityContext);
     }
 
     @Bean
@@ -739,8 +741,8 @@ public class RepositoryApplicationConfiguration {
     @ConditionalOnMissingBean
     RolloutHandler rolloutHandler(final TenantAware tenantAware, final RolloutManagement rolloutManagement,
             final RolloutExecutor rolloutExecutor, final LockRegistry lockRegistry,
-            final PlatformTransactionManager txManager, final ContextAware contextAware) {
-        return new JpaRolloutHandler(tenantAware, rolloutManagement, rolloutExecutor, lockRegistry, txManager, contextAware);
+            final PlatformTransactionManager txManager, final ContextAware contextAware, final Optional<MeterRegistry> meterRegistry) {
+        return new JpaRolloutHandler(tenantAware, rolloutManagement, rolloutExecutor, lockRegistry, txManager, contextAware, meterRegistry);
     }
 
     @Bean
@@ -963,8 +965,8 @@ public class RepositoryApplicationConfiguration {
     @ConditionalOnProperty(prefix = "hawkbit.autoassign.scheduler", name = "enabled", matchIfMissing = true)
     AutoAssignScheduler autoAssignScheduler(final SystemManagement systemManagement,
             final SystemSecurityContext systemSecurityContext, final AutoAssignExecutor autoAssignExecutor,
-            final LockRegistry lockRegistry) {
-        return new AutoAssignScheduler(systemManagement, systemSecurityContext, autoAssignExecutor, lockRegistry);
+            final LockRegistry lockRegistry, final Optional<MeterRegistry> meterRegistry) {
+        return new AutoAssignScheduler(systemManagement, systemSecurityContext, autoAssignExecutor, lockRegistry, meterRegistry);
     }
 
     /**
@@ -1014,9 +1016,10 @@ public class RepositoryApplicationConfiguration {
     @ConditionalOnMissingBean
     @Profile("!test")
     @ConditionalOnProperty(prefix = "hawkbit.rollout.scheduler", name = "enabled", matchIfMissing = true)
-    RolloutScheduler rolloutScheduler(final SystemManagement systemManagement,
-                                      final RolloutHandler rolloutHandler, final SystemSecurityContext systemSecurityContext, @Value("${hawkbit.rollout.executor.thread-pool.size:1}") final int threadPoolSize) {
-        return new RolloutScheduler(rolloutHandler, systemManagement, systemSecurityContext,  threadPoolSize);
+    RolloutScheduler rolloutScheduler(
+            final SystemManagement systemManagement, final RolloutHandler rolloutHandler, final SystemSecurityContext systemSecurityContext,
+            @Value("${hawkbit.rollout.executor.thread-pool.size:1}") final int threadPoolSize, final Optional<MeterRegistry> meterRegistry) {
+        return new RolloutScheduler(rolloutHandler, systemManagement, systemSecurityContext,  threadPoolSize, meterRegistry);
     }
 
     /**
