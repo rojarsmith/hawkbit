@@ -48,7 +48,10 @@ import com.vaadin.flow.router.Route;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.hawkbit.mgmt.json.model.PagedList;
 import org.eclipse.hawkbit.mgmt.json.model.artifact.MgmtArtifact;
+import org.eclipse.hawkbit.mgmt.json.model.distributionset.MgmtDistributionSetRequestBodyPost;
+import org.eclipse.hawkbit.mgmt.json.model.distributionsettype.MgmtDistributionSetType;
 import org.eclipse.hawkbit.mgmt.json.model.softwaremodule.MgmtSoftwareModule;
+import org.eclipse.hawkbit.mgmt.json.model.softwaremodule.MgmtSoftwareModuleAssignment;
 import org.eclipse.hawkbit.mgmt.json.model.softwaremodule.MgmtSoftwareModuleRequestBodyPost;
 import org.eclipse.hawkbit.mgmt.json.model.softwaremoduletype.MgmtSoftwareModuleType;
 import org.eclipse.hawkbit.ui.simple.HawkbitMgmtClient;
@@ -87,17 +90,14 @@ public class SoftwareModuleView extends TableView<MgmtSoftwareModule, Long> {
                         grid.addColumn(MgmtSoftwareModule::getTypeName).setHeader(Constants.TYPE).setAutoWidth(true);
                         grid.addColumn(MgmtSoftwareModule::getVendor).setHeader(Constants.VENDOR).setAutoWidth(true);
 
-                        grid.setItemDetailsRenderer(new ComponentRenderer<>(
-                                () -> details, SoftwareModuleDetails::setItem));
-
+                        grid.setItemDetailsRenderer(new ComponentRenderer<>(() -> details, SoftwareModuleDetails::setItem));
                     }
                 },
                 (query, rsqlFilter) -> Optional.ofNullable(
                                 hawkbitClient.getSoftwareModuleRestApi()
-                                        .getSoftwareModules(
-                                                query.getOffset(), query.getPageSize(), Constants.NAME_ASC, rsqlFilter)
+                                        .getSoftwareModules(query.getOffset(), query.getPageSize(), Constants.NAME_ASC, rsqlFilter)
                                         .getBody())
-                        .stream().flatMap(body -> body.getContent().stream()),
+                        .stream().map(PagedList::getContent).flatMap(List::stream),
                 isParent ? v -> new CreateDialog(hawkbitClient).result() : null,
                 isParent ? selectionGrid -> {
                     selectionGrid.getSelectedItems().forEach(
@@ -135,7 +135,8 @@ public class SoftwareModuleView extends TableView<MgmtSoftwareModule, Long> {
             type.setItems(Optional.ofNullable(
                             hawkbitClient.getSoftwareModuleTypeRestApi()
                                     .getTypes(0, 20, Constants.NAME_ASC, null)
-                                    .getBody()).map(PagedList::getContent)
+                                    .getBody())
+                    .map(PagedList::getContent)
                     .orElseGet(Collections::emptyList));
         }
 
@@ -149,8 +150,7 @@ public class SoftwareModuleView extends TableView<MgmtSoftwareModule, Long> {
             return Filter.filter(
                     Map.of(
                             "name", name.getOptionalValue(),
-                            "type", type.getSelectedItems().stream().map(MgmtSoftwareModuleType::getKey)
-                                    .toList()
+                            "type", type.getSelectedItems().stream().map(MgmtSoftwareModuleType::getKey).toList()
                     ));
         }
     }
@@ -171,14 +171,10 @@ public class SoftwareModuleView extends TableView<MgmtSoftwareModule, Long> {
 
             description.setMinLength(2);
             artifactGrid = createArtifactGrid();
-            Stream.of(
-                            description,
-                            createdBy, createdAt,
-                            lastModifiedBy, lastModifiedAt)
-                    .forEach(field -> {
-                        field.setReadOnly(true);
-                        add(field);
-                    });
+            Stream.of(description, createdBy, createdAt, lastModifiedBy, lastModifiedAt).forEach(field -> {
+                field.setReadOnly(true);
+                add(field);
+            });
             add(artifactGrid);
 
             setResponsiveSteps(new ResponsiveStep("0", 2));
@@ -195,10 +191,10 @@ public class SoftwareModuleView extends TableView<MgmtSoftwareModule, Long> {
 
             artifactGrid.setItems(query -> Optional.ofNullable(
                             hawkbitClient.getSoftwareModuleRestApi()
-                                    .getArtifacts(
-                                            softwareModule.getId(), null, null)
+                                    .getArtifacts(softwareModule.getId(), null, null)
                                     .getBody())
-                    .stream().flatMap(Collection::stream)
+                    .stream()
+                    .flatMap(Collection::stream)
                     .skip(query.getOffset())
                     .limit(query.getPageSize()));
             artifactGrid.setSelectionMode(Grid.SelectionMode.NONE);
@@ -213,6 +209,9 @@ public class SoftwareModuleView extends TableView<MgmtSoftwareModule, Long> {
         private final TextField vendor;
         private final TextArea description;
         private final Checkbox enableArtifactEncryption;
+        private final Checkbox createDistributionSet;
+        private final Select<MgmtDistributionSetType> distType;
+        private final Checkbox distRequiredMigrationStep;
         private final Button create;
 
         private CreateDialog(final HawkbitMgmtClient hawkbitClient) {
@@ -224,12 +223,14 @@ public class SoftwareModuleView extends TableView<MgmtSoftwareModule, Long> {
                     Optional.ofNullable(
                                     hawkbitClient.getSoftwareModuleTypeRestApi()
                                             .getTypes(0, 30, Constants.NAME_ASC, null)
-                                            .getBody()).map(body -> body.getContent().toArray(new MgmtSoftwareModuleType[0]))
+                                            .getBody())
+                            .map(body -> body.getContent().toArray(new MgmtSoftwareModuleType[0]))
                             .orElseGet(() -> new MgmtSoftwareModuleType[0]));
             type.setWidthFull();
             type.setRequiredIndicatorVisible(true);
             type.setItemLabelGenerator(MgmtSoftwareModuleType::getName);
             type.focus();
+
             name = Utils.textField(Constants.NAME, this::readyToCreate);
             version = Utils.textField(Constants.VERSION, this::readyToCreate);
             vendor = Utils.textField(Constants.VENDOR);
@@ -237,6 +238,32 @@ public class SoftwareModuleView extends TableView<MgmtSoftwareModule, Long> {
             description.setWidthFull();
             description.setMinLength(2);
             enableArtifactEncryption = new Checkbox("Enable artifact encryption");
+
+            distType = new Select<>("Distribution Set Type", this::readyToCreate);
+            distType.setWidthFull();
+            distType.setRequiredIndicatorVisible(true);
+            distType.setItemLabelGenerator(MgmtDistributionSetType::getName);
+            distType.setVisible(false);
+
+            distRequiredMigrationStep = new Checkbox("Required Migration Step");
+            distRequiredMigrationStep.setVisible(false);
+
+            createDistributionSet = new Checkbox("Create single software module distribution set");
+            createDistributionSet.setHelperText("Create single software module distribution set with this software module");
+            createDistributionSet.addValueChangeListener(e -> {
+                if (Boolean.TRUE.equals(createDistributionSet.getValue()) && distType.isEmpty()) {
+                    distType.setItems(
+                            Optional.ofNullable(
+                                            hawkbitClient.getDistributionSetTypeRestApi()
+                                                    .getDistributionSetTypes(0, 30, Constants.NAME_ASC, null)
+                                                    .getBody())
+                                    .map(body -> body.getContent().toArray(new MgmtDistributionSetType[0]))
+                                    .orElseGet(() -> new MgmtDistributionSetType[0]));
+                }
+                distType.setVisible(createDistributionSet.getValue());
+                distRequiredMigrationStep.setVisible(createDistributionSet.getValue());
+                readyToCreate(e);
+            });
 
             create = Utils.tooltip(new Button("Create"), "Create (Enter)");
             create.setEnabled(false);
@@ -252,13 +279,17 @@ public class SoftwareModuleView extends TableView<MgmtSoftwareModule, Long> {
             final VerticalLayout layout = new VerticalLayout();
             layout.setSizeFull();
             layout.setSpacing(false);
-            layout.add(type, name, version, vendor, description, enableArtifactEncryption, actions);
+            layout.add(
+                    type, name, version, vendor, description, enableArtifactEncryption,
+                    createDistributionSet, distType, distRequiredMigrationStep,
+                    actions);
             add(layout);
             open();
         }
 
         private void readyToCreate(final Object v) {
-            final boolean createEnabled = !type.isEmpty() && !name.isEmpty() && !version.isEmpty();
+            final boolean createEnabled = !type.isEmpty() && !name.isEmpty() && !version.isEmpty() &&
+                    (!createDistributionSet.getValue() || !distType.isEmpty());
             if (create.isEnabled() != createEnabled) {
                 create.setEnabled(createEnabled);
             }
@@ -281,6 +312,26 @@ public class SoftwareModuleView extends TableView<MgmtSoftwareModule, Long> {
                         .findFirst()
                         .orElseThrow()
                         .getId();
+                if (Boolean.TRUE.equals(createDistributionSet.getValue())) {
+                    final long distributionSetId = Optional.ofNullable(
+                                    hawkbitClient.getDistributionSetRestApi()
+                                            .createDistributionSets(
+                                                    List.of((MgmtDistributionSetRequestBodyPost) new MgmtDistributionSetRequestBodyPost()
+                                                            .setType(distType.getValue().getKey())
+                                                            .setName(name.getValue())
+                                                            .setVersion(version.getValue())
+                                                            .setDescription(description.getValue())
+                                                            .setRequiredMigrationStep(distRequiredMigrationStep.getValue())))
+                                            .getBody())
+                            .stream()
+                            .flatMap(Collection::stream)
+                            .findFirst()
+                            .orElseThrow()
+                            .getId();
+                    hawkbitClient.getDistributionSetRestApi().assignSoftwareModules(
+                            distributionSetId, List.of((MgmtSoftwareModuleAssignment) new MgmtSoftwareModuleAssignment()
+                                    .setId(softwareModuleId))).getBody();
+                }
                 new AddArtifactsDialog(softwareModuleId, hawkbitClient).open();
             });
         }
