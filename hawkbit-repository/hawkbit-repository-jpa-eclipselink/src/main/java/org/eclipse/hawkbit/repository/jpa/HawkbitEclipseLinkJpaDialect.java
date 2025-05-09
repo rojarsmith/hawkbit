@@ -14,9 +14,8 @@ import java.sql.SQLException;
 
 import jakarta.persistence.PersistenceException;
 
+import org.eclipse.hawkbit.repository.jpa.utils.JpaExceptionTranslator;
 import org.springframework.dao.DataAccessException;
-import org.springframework.jdbc.support.SQLErrorCodeSQLExceptionTranslator;
-import org.springframework.jdbc.support.SQLErrorCodes;
 import org.springframework.jdbc.support.SQLStateSQLExceptionTranslator;
 import org.springframework.lang.NonNull;
 import org.springframework.orm.jpa.JpaSystemException;
@@ -56,21 +55,6 @@ class HawkbitEclipseLinkJpaDialect extends EclipseLinkJpaDialect {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    private static final SQLErrorCodeSQLExceptionTranslator SQL_EXCEPTION_TRANSLATOR;
-
-    // providing list/set of codes which are not handled from the sql translator properly
-    private static final String[] DATA_INTEGRITY_VIOLATION_CODES = new String[] {
-            "1366"
-    };
-
-    static {
-        SQL_EXCEPTION_TRANSLATOR = new SQLErrorCodeSQLExceptionTranslator();
-        SQLErrorCodes codes = new SQLErrorCodes();
-
-        codes.setDataIntegrityViolationCodes(DATA_INTEGRITY_VIOLATION_CODES);
-        SQL_EXCEPTION_TRANSLATOR.setSqlErrorCodes(codes);
-    }
-
     @Override
     public DataAccessException translateExceptionIfPossible(@NonNull final RuntimeException ex) {
         final DataAccessException dataAccessException = super.translateExceptionIfPossible(ex);
@@ -100,7 +84,7 @@ class HawkbitEclipseLinkJpaDialect extends EclipseLinkJpaDialect {
             return null;
         }
 
-        return SQL_EXCEPTION_TRANSLATOR.translate("", null, sqlException);
+        return JpaExceptionTranslator.getTranslator().translate("", null, sqlException);
     }
 
     private static SQLException findSqlException(final RuntimeException jpaSystemException) {
