@@ -9,10 +9,7 @@
  */
 package org.eclipse.hawkbit.repository;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.Map.Entry;
-import java.util.Optional;
 
 import lombok.Getter;
 
@@ -45,25 +42,10 @@ public enum TargetFields implements RsqlQueryField {
 
     private final String jpaEntityFieldName;
     private final List<String> subEntityAttributes;
-    private final Entry<String, String> subEntityMapTuple;
-
-    TargetFields(final String jpaEntityFieldName) {
-        this(jpaEntityFieldName, Collections.emptyList(), null);
-    }
 
     TargetFields(final String jpaEntityFieldName, final String... subEntityAttributes) {
-        this(jpaEntityFieldName, List.of(subEntityAttributes), null);
-    }
-
-    TargetFields(final String jpaEntityFieldName, final List<String> subEntityAttributes, final Entry<String, String> subEntityMapTuple) {
         this.jpaEntityFieldName = jpaEntityFieldName;
-        this.subEntityAttributes = subEntityAttributes;
-        this.subEntityMapTuple = subEntityMapTuple;
-    }
-
-    @Override
-    public Optional<Entry<String, String>> getSubEntityMapTuple() {
-        return Optional.ofNullable(subEntityMapTuple);
+        this.subEntityAttributes = List.of(subEntityAttributes);
     }
 
     @Override
