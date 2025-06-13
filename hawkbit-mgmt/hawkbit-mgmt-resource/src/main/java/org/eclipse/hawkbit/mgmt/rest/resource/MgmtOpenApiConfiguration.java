@@ -9,36 +9,54 @@
  */
 package org.eclipse.hawkbit.mgmt.rest.resource;
 
+import java.util.List;
+
+import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
-import org.eclipse.hawkbit.rest.OpenApiConfiguration;
+import io.swagger.v3.oas.models.servers.Server;
+import io.swagger.v3.oas.models.servers.ServerVariable;
+import io.swagger.v3.oas.models.servers.ServerVariables;
+import org.eclipse.hawkbit.rest.OpenApi;
 import org.springdoc.core.models.GroupedOpenApi;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@ConditionalOnProperty(
-        value = "hawkbit.server.swagger.enabled",
-        havingValue = "true",
-        matchIfMissing = true)
+@ConditionalOnProperty(value = OpenApi.HAWKBIT_SERVER_OPENAPI_ENABLED, havingValue = "true", matchIfMissing = true)
 public class MgmtOpenApiConfiguration {
 
-    private static final String BASIC_AUTH_SEC_SCHEME_NAME = "Basic Authentication";
-    private static final String BEARER_AUTH_SEC_SCHEME_NAME = "Bearer Authentication";
+    private static final String BASIC_AUTH_SEC_SCHEME_NAME = "Basic";
+    private static final String BEARER_AUTH_SEC_SCHEME_NAME = "Bearer";
 
     @Bean
     @ConditionalOnProperty(
-            value = OpenApiConfiguration.HAWKBIT_SERVER_SWAGGER_ENABLED,
+            value = "hawkbit.server.openapi.mgmt.enabled",
             havingValue = "true",
             matchIfMissing = true)
-    public GroupedOpenApi mgmtApi() {
+    public GroupedOpenApi mgmtApi(@Value("${hawkbit.server.openapi.mgmt.tenant-endpoint.enabled:false}") final boolean tenantEndpointEnabled) {
         return GroupedOpenApi
                 .builder()
                 .group("Management API")
-                .pathsToMatch("/rest/v*/**")
+                .pathsToMatch(tenantEndpointEnabled ? new String[] { "/rest/v*/**", "/{tenant}/rest/v*/**" } : new String[] { "/rest/v*/**" })
                 .addOpenApiCustomizer(openApi ->
                         openApi
+                                .info(new Info()
+                                        .title("Management API")
+                                        .version("v1")
+                                        .description("""
+                                                The Management API provides access to the management features of the hawkBit.
+                                                It allows for managing devices, deployments, and other.
+                                                """))
+                                .servers(tenantEndpointEnabled
+                                        ? List.of(
+                                            new Server()
+                                                    .url("/{tenant}/")
+                                                    .variables(new ServerVariables().addServerVariable("tenant", tenantSeverVariable())),
+                                            new Server().url("/"))
+                                        : List.of(new Server().url("/")))
                                 .addSecurityItem(new SecurityRequirement()
                                         .addList(BASIC_AUTH_SEC_SCHEME_NAME)
                                         .addList(BEARER_AUTH_SEC_SCHEME_NAME))
@@ -47,18 +65,23 @@ public class MgmtOpenApiConfiguration {
                                                 .getComponents()
                                                 .addSecuritySchemes(BASIC_AUTH_SEC_SCHEME_NAME,
                                                         new SecurityScheme()
-                                                                .name(BASIC_AUTH_SEC_SCHEME_NAME)
+                                                                .description(BASIC_AUTH_SEC_SCHEME_NAME + " Authentication")
                                                                 .type(SecurityScheme.Type.HTTP)
-                                                                .in(SecurityScheme.In.HEADER)
                                                                 .scheme("basic"))
                                                 .addSecuritySchemes(BEARER_AUTH_SEC_SCHEME_NAME,
                                                         new SecurityScheme()
-                                                                .name(BEARER_AUTH_SEC_SCHEME_NAME)
+                                                                .description(BEARER_AUTH_SEC_SCHEME_NAME + " Authentication")
                                                                 .type(SecurityScheme.Type.HTTP)
-                                                                .in(SecurityScheme.In.HEADER)
                                                                 .bearerFormat("JWT")
                                                                 .scheme("bearer")))
-                                .tags(OpenApiConfiguration.sort(openApi.getTags())))
+                                .tags(OpenApi.sort(openApi.getTags())))
                 .build();
+    }
+
+    private static ServerVariable tenantSeverVariable() {
+        final ServerVariable tenantServerVariable = new ServerVariable();
+        tenantServerVariable.setDescription("Tenant identifier");
+        tenantServerVariable.setDefault("DEFAULT");
+        return tenantServerVariable;
     }
 }

@@ -9,7 +9,11 @@
  */
 package org.eclipse.hawkbit.mgmt.rest.api;
 
+import static org.eclipse.hawkbit.mgmt.rest.api.MgmtRestConstants.ACTION_ORDER;
+
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.extensions.Extension;
+import io.swagger.v3.oas.annotations.extensions.ExtensionProperty;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -17,6 +21,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.eclipse.hawkbit.mgmt.json.model.PagedList;
 import org.eclipse.hawkbit.mgmt.json.model.action.MgmtAction;
+import org.eclipse.hawkbit.rest.OpenApi;
 import org.eclipse.hawkbit.rest.json.model.ExceptionInfo;
 import org.springframework.hateoas.MediaTypes;
 import org.springframework.http.MediaType;
@@ -29,17 +34,19 @@ import org.springframework.web.bind.annotation.RequestParam;
  * REST API providing (read-only) access to actions.
  */
 // no request mapping specified here to avoid CVE-2021-22044 in Feign client
-@Tag(name = "Actions", description = "REST API providing (read-only) access to actions.")
+@Tag(
+        name = "Actions", description = "REST API providing (read-only) access to actions.",
+        extensions = @Extension(name = OpenApi.X_HAWKBIT, properties = @ExtensionProperty(name = "order", value = ACTION_ORDER)))
 public interface MgmtActionRestApi {
 
     /**
      * Handles the GET request of retrieving all actions.
      *
+     * @param rsqlParam the search parameter in the request URL, syntax {@code q=distributionSet.id==1}
      * @param pagingOffsetParam the offset of list of actions for pagination, might not be present in the rest request then default value will
      *         be applied
      * @param pagingLimitParam the limit of the paged request, might not be present in the rest request then default value will be applied
      * @param sortParam the sorting parameter in the request URL, syntax {@code field:direction, field:direction}
-     * @param rsqlParam the search parameter in the request URL, syntax {@code q=distributionSet.id==1}
      * @param representationModeParam the representation mode parameter specifying whether a compact or a full representation shall be returned
      * @return a list of all actions for a defined or default page request with status OK. The response is always paged. In any failure the
      *         JsonResponseExceptionHandler is handling the response.
@@ -64,7 +71,11 @@ public interface MgmtActionRestApi {
     })
     @GetMapping(value = MgmtRestConstants.ACTION_V1_REQUEST_MAPPING, produces = { MediaTypes.HAL_JSON_VALUE, MediaType.APPLICATION_JSON_VALUE })
     ResponseEntity<PagedList<MgmtAction>> getActions(
-            @RequestParam(
+            @RequestParam(value = MgmtRestConstants.REQUEST_PARAMETER_SEARCH, required = false)
+            @Schema(description = """
+                    Query fields based on the Feed Item Query Language (FIQL). See Entity Definitions for
+                    available fields.""")
+            String rsqlParam, @RequestParam(
                     value = MgmtRestConstants.REQUEST_PARAMETER_PAGING_OFFSET,
                     defaultValue = MgmtRestConstants.REQUEST_PARAMETER_PAGING_DEFAULT_OFFSET)
             @Schema(description = "The paging offset (default is 0)")
@@ -81,11 +92,6 @@ public interface MgmtActionRestApi {
                     The sequence of the sort criteria (multiple can be used) defines the sort order of the entities
                     in the result.""")
             String sortParam,
-            @RequestParam(value = MgmtRestConstants.REQUEST_PARAMETER_SEARCH, required = false)
-            @Schema(description = """
-                    Query fields based on the Feed Item Query Language (FIQL). See Entity Definitions for
-                    available fields.""")
-            String rsqlParam,
             @RequestParam(
                     value = MgmtRestConstants.REQUEST_PARAMETER_REPRESENTATION_MODE,
                     defaultValue = MgmtRestConstants.REQUEST_PARAMETER_REPRESENTATION_MODE_DEFAULT)

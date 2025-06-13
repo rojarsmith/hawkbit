@@ -16,6 +16,7 @@ import org.eclipse.hawkbit.repository.ActionFields;
 import org.eclipse.hawkbit.repository.ActionStatusFields;
 import org.eclipse.hawkbit.repository.DistributionSetFields;
 import org.eclipse.hawkbit.repository.DistributionSetTypeFields;
+import org.eclipse.hawkbit.repository.OffsetBasedPageRequest;
 import org.eclipse.hawkbit.repository.RolloutFields;
 import org.eclipse.hawkbit.repository.RolloutGroupFields;
 import org.eclipse.hawkbit.repository.SoftwareModuleFields;
@@ -24,6 +25,7 @@ import org.eclipse.hawkbit.repository.TagFields;
 import org.eclipse.hawkbit.repository.TargetFields;
 import org.eclipse.hawkbit.repository.TargetFilterQueryFields;
 import org.eclipse.hawkbit.repository.TargetTypeFields;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.domain.Sort.Direction;
 
@@ -32,22 +34,6 @@ import org.springframework.data.domain.Sort.Direction;
  */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class PagingUtility {
-
-    public static int sanitizeOffsetParam(final int offset) {
-        if (offset < 0) {
-            return MgmtRestConstants.REQUEST_PARAMETER_PAGING_DEFAULT_OFFSET_VALUE;
-        }
-        return offset;
-    }
-
-    public static int sanitizePageLimitParam(final int pageLimit) {
-        if (pageLimit < 1) {
-            return MgmtRestConstants.REQUEST_PARAMETER_PAGING_DEFAULT_LIMIT_VALUE;
-        } else if (pageLimit > MgmtRestConstants.REQUEST_PARAMETER_PAGING_MAX_LIMIT) {
-            return MgmtRestConstants.REQUEST_PARAMETER_PAGING_MAX_LIMIT;
-        }
-        return pageLimit;
-    }
 
     public static Sort sanitizeTargetSortParam(final String sortParam) {
         if (sortParam == null) {
@@ -145,5 +131,27 @@ public final class PagingUtility {
             return Sort.by(Direction.ASC, RolloutGroupFields.ID.getJpaEntityFieldName());
         }
         return Sort.by(SortUtility.parse(RolloutGroupFields.class, sortParam));
+    }
+
+    public static Pageable toPageable(final int pagingOffsetParam, final int pagingLimitParam, final Sort sort) {
+        final int sanitizedOffsetParam = sanitizeOffsetParam(pagingOffsetParam);
+        final int sanitizedLimitParam = sanitizePageLimitParam(pagingLimitParam);
+        return new OffsetBasedPageRequest(sanitizedOffsetParam, sanitizedLimitParam, sort);
+    }
+
+    private static int sanitizeOffsetParam(final int offset) {
+        if (offset < 0) {
+            return MgmtRestConstants.REQUEST_PARAMETER_PAGING_DEFAULT_OFFSET_VALUE;
+        }
+        return offset;
+    }
+
+    private static int sanitizePageLimitParam(final int pageLimit) {
+        if (pageLimit < 1) {
+            return MgmtRestConstants.REQUEST_PARAMETER_PAGING_DEFAULT_LIMIT_VALUE;
+        } else if (pageLimit > MgmtRestConstants.REQUEST_PARAMETER_PAGING_MAX_LIMIT) {
+            return MgmtRestConstants.REQUEST_PARAMETER_PAGING_MAX_LIMIT;
+        }
+        return pageLimit;
     }
 }

@@ -81,7 +81,7 @@ public class DistributionSetView extends TableView<MgmtDistributionSet, Long> {
                 },
                 (query, rsqlFilter) -> Optional.ofNullable(
                                 hawkbitClient.getDistributionSetRestApi()
-                                        .getDistributionSets(query.getOffset(), query.getPageSize(), Constants.NAME_ASC, rsqlFilter)
+                                        .getDistributionSets(rsqlFilter, query.getOffset(), query.getPageSize(), Constants.NAME_ASC)
                                         .getBody())
                         .stream().flatMap(body -> body.getContent().stream()),
                 e -> new CreateDialog(hawkbitClient).result(),
@@ -120,14 +120,14 @@ public class DistributionSetView extends TableView<MgmtDistributionSet, Long> {
             type.setItemLabelGenerator(MgmtDistributionSetType::getName);
             type.setItems(Optional.ofNullable(
                             hawkbitClient.getDistributionSetTypeRestApi()
-                                    .getDistributionSetTypes(0, 20, Constants.NAME_ASC, null)
+                                    .getDistributionSetTypes(null, 0, 20, Constants.NAME_ASC)
                                     .getBody())
                     .map(PagedList::getContent)
                     .orElseGet(Collections::emptyList));
             tag.setItemLabelGenerator(MgmtTag::getName);
             tag.setItems(Optional.ofNullable(
                             hawkbitClient.getDistributionSetTagRestApi()
-                                    .getDistributionSetTags(0, 20, Constants.NAME_ASC, null)
+                                    .getDistributionSetTags(null, 0, 20, Constants.NAME_ASC)
                                     .getBody())
                     .map(PagedList::getContent)
                     .orElseGet(Collections::emptyList));
@@ -215,7 +215,7 @@ public class DistributionSetView extends TableView<MgmtDistributionSet, Long> {
                     this::readyToCreate,
                     Optional.ofNullable(
                                     hawkbitClient.getDistributionSetTypeRestApi()
-                                            .getDistributionSetTypes(0, 30, Constants.NAME_ASC, null)
+                                            .getDistributionSetTypes(null, 0, 30, Constants.NAME_ASC)
                                             .getBody())
                             .map(body -> body.getContent().toArray(new MgmtDistributionSetType[0]))
                             .orElseGet(() -> new MgmtDistributionSetType[0]));
@@ -235,7 +235,7 @@ public class DistributionSetView extends TableView<MgmtDistributionSet, Long> {
             create.setEnabled(false);
             addCreateClickListener();
             create.addClickShortcut(Key.ENTER);
-            final Button cancel = Utils.tooltip(new Button("Cancel"), "Cancel (Esc)");
+            final Button cancel = Utils.tooltip(new Button(CANCEL), CANCEL_ESC);
             cancel.addClickListener(e -> close());
             create.addClickShortcut(Key.ESCAPE);
             create.addThemeVariants(ButtonVariant.LUMO_PRIMARY);

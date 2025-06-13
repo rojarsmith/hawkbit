@@ -9,9 +9,13 @@
  */
 package org.eclipse.hawkbit.mgmt.rest.api;
 
+import static org.eclipse.hawkbit.mgmt.rest.api.MgmtRestConstants.SOFTWARE_MODULE_TYPE_ORDER;
+
 import java.util.List;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.extensions.Extension;
+import io.swagger.v3.oas.annotations.extensions.ExtensionProperty;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -21,6 +25,7 @@ import org.eclipse.hawkbit.mgmt.json.model.PagedList;
 import org.eclipse.hawkbit.mgmt.json.model.softwaremoduletype.MgmtSoftwareModuleType;
 import org.eclipse.hawkbit.mgmt.json.model.softwaremoduletype.MgmtSoftwareModuleTypeRequestBodyPost;
 import org.eclipse.hawkbit.mgmt.json.model.softwaremoduletype.MgmtSoftwareModuleTypeRequestBodyPut;
+import org.eclipse.hawkbit.rest.OpenApi;
 import org.eclipse.hawkbit.rest.json.model.ExceptionInfo;
 import org.springframework.hateoas.MediaTypes;
 import org.springframework.http.MediaType;
@@ -38,17 +43,19 @@ import org.springframework.web.bind.annotation.RequestParam;
  * operations.
  */
 // no request mapping specified here to avoid CVE-2021-22044 in Feign client
-@Tag(name = "Software Module Types", description = "REST API for SoftwareModuleTypes CRUD operations.")
+@Tag(
+        name = "Software Module Types", description = "REST API for SoftwareModuleTypes CRUD operations.",
+        extensions = @Extension(name = OpenApi.X_HAWKBIT, properties = @ExtensionProperty(name = "order", value = SOFTWARE_MODULE_TYPE_ORDER)))
 public interface MgmtSoftwareModuleTypeRestApi {
 
     /**
      * Handles the GET request of retrieving all SoftwareModuleTypes .
      *
+     * @param rsqlParam the search parameter in the request URL, syntax {@code q=name==abc}
      * @param pagingOffsetParam the offset of list of modules for pagination, might not be present in the rest request then default value will
      *         be applied
      * @param pagingLimitParam the limit of the paged request, might not be present in the rest request then default value will be applied
      * @param sortParam the sorting parameter in the request URL, syntax {@code field:direction, field:direction}
-     * @param rsqlParam the search parameter in the request URL, syntax {@code q=name==abc}
      * @return a list of all module type for a defined or default page request with status OK. The response is always paged. In any failure the
      *         JsonResponseExceptionHandler is handling the response.
      */
@@ -75,7 +82,11 @@ public interface MgmtSoftwareModuleTypeRestApi {
     @GetMapping(value = MgmtRestConstants.SOFTWAREMODULETYPE_V1_REQUEST_MAPPING,
             produces = { MediaTypes.HAL_JSON_VALUE, MediaType.APPLICATION_JSON_VALUE })
     ResponseEntity<PagedList<MgmtSoftwareModuleType>> getTypes(
-            @RequestParam(
+            @RequestParam(value = MgmtRestConstants.REQUEST_PARAMETER_SEARCH, required = false)
+            @Schema(description = """
+                    Query fields based on the Feed Item Query Language (FIQL). See Entity Definitions for
+                    available fields.""")
+            String rsqlParam, @RequestParam(
                     value = MgmtRestConstants.REQUEST_PARAMETER_PAGING_OFFSET,
                     defaultValue = MgmtRestConstants.REQUEST_PARAMETER_PAGING_DEFAULT_OFFSET)
             @Schema(description = "The paging offset (default is 0)")
@@ -91,12 +102,7 @@ public interface MgmtSoftwareModuleTypeRestApi {
                     consists of the name of a field and the sort direction (ASC for ascending and DESC descending).
                     The sequence of the sort criteria (multiple can be used) defines the sort order of the entities
                     in the result.""")
-            String sortParam,
-            @RequestParam(value = MgmtRestConstants.REQUEST_PARAMETER_SEARCH, required = false)
-            @Schema(description = """
-                    Query fields based on the Feed Item Query Language (FIQL). See Entity Definitions for
-                    available fields.""")
-            String rsqlParam);
+            String sortParam);
 
     /**
      * Handles the GET request of retrieving a single software module type .

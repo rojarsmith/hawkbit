@@ -253,15 +253,15 @@ public class JpaSoftwareModuleManagement implements SoftwareModuleManagement {
 
     @Override
     public Slice<SoftwareModule> findAll(final Pageable pageable) {
-        return JpaManagementHelper.findAllWithoutCountBySpec(softwareModuleRepository, pageable, List.of(
+        return JpaManagementHelper.findAllWithoutCountBySpec(softwareModuleRepository, List.of(
                 SoftwareModuleSpecification.isNotDeleted(),
-                SoftwareModuleSpecification.fetchType()));
+                SoftwareModuleSpecification.fetchType()), pageable);
     }
 
     @Override
-    public Page<SoftwareModule> findByRsql(final String rsqlParam, final Pageable pageable) {
+    public Page<SoftwareModule> findByRsql(final String rsql, final Pageable pageable) {
         return JpaManagementHelper.findAllWithCountBySpec(softwareModuleRepository, List.of(
-                RSQLUtility.buildRsqlSpecification(rsqlParam, SoftwareModuleFields.class, virtualPropertyReplacer,
+                RSQLUtility.buildRsqlSpecification(rsql, SoftwareModuleFields.class, virtualPropertyReplacer,
                         database),
                 SoftwareModuleSpecification.isNotDeleted()), pageable);
     }
@@ -303,7 +303,7 @@ public class JpaSoftwareModuleManagement implements SoftwareModuleManagement {
     }
 
     @Override
-    public Page<SoftwareModuleMetadata> findMetaDataBySoftwareModuleIdAndTargetVisible(final Pageable pageable, final long id) {
+    public Page<SoftwareModuleMetadata> findMetaDataBySoftwareModuleIdAndTargetVisible(final long id, final Pageable pageable) {
         assertSoftwareModuleExists(id);
 
         return JpaManagementHelper.convertPage(softwareModuleMetadataRepository.findBySoftwareModuleIdAndTargetVisible(
@@ -412,7 +412,7 @@ public class JpaSoftwareModuleManagement implements SoftwareModuleManagement {
 
         specList.add(SoftwareModuleSpecification.fetchType());
 
-        return JpaManagementHelper.findAllWithoutCountBySpec(softwareModuleRepository, pageable, specList);
+        return JpaManagementHelper.findAllWithoutCountBySpec(softwareModuleRepository, specList, pageable);
     }
 
     @Override
@@ -436,10 +436,10 @@ public class JpaSoftwareModuleManagement implements SoftwareModuleManagement {
 
         return JpaManagementHelper.findAllWithoutCountBySpec(
                 softwareModuleRepository,
-                pageable,
                 List.of(
                         SoftwareModuleSpecification.equalType(typeId),
-                        SoftwareModuleSpecification.isNotDeleted()));
+                        SoftwareModuleSpecification.isNotDeleted()), pageable
+        );
     }
 
     @Override

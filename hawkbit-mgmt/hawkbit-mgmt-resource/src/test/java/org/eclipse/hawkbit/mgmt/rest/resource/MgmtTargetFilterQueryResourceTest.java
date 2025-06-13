@@ -33,6 +33,7 @@ import io.qameta.allure.Story;
 import org.eclipse.hawkbit.exception.SpServerError;
 import org.eclipse.hawkbit.mgmt.json.model.distributionset.MgmtActionType;
 import org.eclipse.hawkbit.mgmt.rest.api.MgmtRestConstants;
+import org.eclipse.hawkbit.mgmt.rest.resource.mapper.MgmtRestModelMapper;
 import org.eclipse.hawkbit.mgmt.rest.resource.util.ResourceUtility;
 import org.eclipse.hawkbit.repository.exception.AssignmentQuotaExceededException;
 import org.eclipse.hawkbit.repository.exception.DeletedException;
@@ -274,8 +275,7 @@ public class MgmtTargetFilterQueryResourceTest extends AbstractManagementApiInte
                 + filterQuery.getId();
         final String distributionsetHrefPrefix = "http://localhost" + MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING;
 
-        final String dsQuery = "?offset=0&limit=50&q=name==" + set.getName() + ";" + "version==" + set.getVersion();
-
+        final String dsQuery = "?q=name==" + set.getName() + ";" + "version==" + set.getVersion() + "&offset=0&limit=50";
         mvc.perform(
                         post(MgmtRestConstants.TARGET_FILTER_V1_REQUEST_MAPPING + "/" + filterQuery.getId() + "/autoAssignDS")
                                 .content("{\"id\":" + set.getId() + "}").contentType(MediaType.APPLICATION_JSON))

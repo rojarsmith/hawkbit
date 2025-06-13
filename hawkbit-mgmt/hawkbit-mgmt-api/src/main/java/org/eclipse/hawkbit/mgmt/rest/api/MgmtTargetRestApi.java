@@ -9,11 +9,15 @@
  */
 package org.eclipse.hawkbit.mgmt.rest.api;
 
+import static org.eclipse.hawkbit.mgmt.rest.api.MgmtRestConstants.TARGET_ORDER;
+
 import java.util.List;
 
 import jakarta.validation.Valid;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.extensions.Extension;
+import io.swagger.v3.oas.annotations.extensions.ExtensionProperty;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -36,6 +40,7 @@ import org.eclipse.hawkbit.mgmt.json.model.target.MgmtTargetAttributes;
 import org.eclipse.hawkbit.mgmt.json.model.target.MgmtTargetAutoConfirm;
 import org.eclipse.hawkbit.mgmt.json.model.target.MgmtTargetAutoConfirmUpdate;
 import org.eclipse.hawkbit.mgmt.json.model.target.MgmtTargetRequestBody;
+import org.eclipse.hawkbit.rest.OpenApi;
 import org.eclipse.hawkbit.rest.json.model.ExceptionInfo;
 import org.springframework.hateoas.MediaTypes;
 import org.springframework.http.HttpStatus;
@@ -54,7 +59,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
  * API for handling target operations.
  */
 // no request mapping specified here to avoid CVE-2021-22044 in Feign client
-@Tag(name = "Targets", description = "REST API for Target CRUD operations.")
+@Tag(
+        name = "Targets", description = "REST API for Target CRUD operations.",
+        extensions = @Extension(name = OpenApi.X_HAWKBIT, properties = @ExtensionProperty(name = "order", value = TARGET_ORDER)))
 public interface MgmtTargetRestApi {
 
     /**
@@ -92,11 +99,11 @@ public interface MgmtTargetRestApi {
     /**
      * Handles the GET request of retrieving all targets.
      *
+     * @param rsqlParam the search parameter in the request URL, syntax {@code q=name==abc}
      * @param pagingOffsetParam the offset of list of targets for pagination, might not be present in the rest request then default value will
      *         be applied
      * @param pagingLimitParam the limit of the paged request, might not be present in the rest request then default value will be applied
      * @param sortParam the sorting parameter in the request URL, syntax {@code field:direction, field:direction}
-     * @param rsqlParam the search parameter in the request URL, syntax {@code q=name==abc}
      * @return a list of all targets for a defined or default page request with status OK. The response is always paged. In any failure the
      *         JsonResponseExceptionHandler is handling the response.
      */
@@ -122,7 +129,11 @@ public interface MgmtTargetRestApi {
     @GetMapping(value = MgmtRestConstants.TARGET_V1_REQUEST_MAPPING,
             produces = { MediaTypes.HAL_JSON_VALUE, MediaType.APPLICATION_JSON_VALUE })
     ResponseEntity<PagedList<MgmtTarget>> getTargets(
-            @RequestParam(
+            @RequestParam(value = MgmtRestConstants.REQUEST_PARAMETER_SEARCH, required = false)
+            @Schema(description = """
+                    Query fields based on the Feed Item Query Language (FIQL). See Entity Definitions for
+                    available fields.""")
+            String rsqlParam, @RequestParam(
                     value = MgmtRestConstants.REQUEST_PARAMETER_PAGING_OFFSET,
                     defaultValue = MgmtRestConstants.REQUEST_PARAMETER_PAGING_DEFAULT_OFFSET)
             @Schema(description = "The paging offset (default is 0)")
@@ -138,12 +149,7 @@ public interface MgmtTargetRestApi {
                     consists of the name of a field and the sort direction (ASC for ascending and DESC descending).
                     The sequence of the sort criteria (multiple can be used) defines the sort order of the entities
                     in the result.""")
-            String sortParam,
-            @RequestParam(value = MgmtRestConstants.REQUEST_PARAMETER_SEARCH, required = false)
-            @Schema(description = """
-                    Query fields based on the Feed Item Query Language (FIQL). See Entity Definitions for
-                    available fields.""")
-            String rsqlParam);
+            String sortParam);
 
     /**
      * Handles the POST request of creating new targets. The request body must always be a list of targets.
@@ -343,11 +349,11 @@ public interface MgmtTargetRestApi {
      * Handles the GET request of retrieving the Actions of a specific target.
      *
      * @param targetId to load actions for
+     * @param rsqlParam the search parameter in the request URL, syntax {@code q=status==pending}
      * @param pagingOffsetParam the offset of list of targets for pagination, might not be present in the rest request then default value will
      *         be applied
      * @param pagingLimitParam the limit of the paged request, might not be present in the rest request then default value will be applied
      * @param sortParam the sorting parameter in the request URL, syntax {@code field:direction, field:direction}
-     * @param rsqlParam the search parameter in the request URL, syntax {@code q=status==pending}
      * @return a list of all Actions for a defined or default page request with status OK. The response is always paged. In any failure the
      *         JsonResponseExceptionHandler is handling the response.
      */
@@ -375,7 +381,11 @@ public interface MgmtTargetRestApi {
             produces = { MediaTypes.HAL_JSON_VALUE, MediaType.APPLICATION_JSON_VALUE })
     ResponseEntity<PagedList<MgmtAction>> getActionHistory(
             @PathVariable("targetId") String targetId,
-            @RequestParam(
+            @RequestParam(value = MgmtRestConstants.REQUEST_PARAMETER_SEARCH, required = false)
+            @Schema(description = """
+                    Query fields based on the Feed Item Query Language (FIQL). See Entity Definitions for
+                    available fields.""")
+            String rsqlParam, @RequestParam(
                     value = MgmtRestConstants.REQUEST_PARAMETER_PAGING_OFFSET,
                     defaultValue = MgmtRestConstants.REQUEST_PARAMETER_PAGING_DEFAULT_OFFSET)
             @Schema(description = "The paging offset (default is 0)")
@@ -391,12 +401,7 @@ public interface MgmtTargetRestApi {
                     consists of the name of a field and the sort direction (ASC for ascending and DESC descending).
                     The sequence of the sort criteria (multiple can be used) defines the sort order of the entities
                     in the result.""")
-            String sortParam,
-            @RequestParam(value = MgmtRestConstants.REQUEST_PARAMETER_SEARCH, required = false)
-            @Schema(description = """
-                    Query fields based on the Feed Item Query Language (FIQL). See Entity Definitions for
-                    available fields.""")
-            String rsqlParam);
+            String sortParam);
 
     /**
      * Handles the GET request of retrieving a specific Actions of a specific Target.

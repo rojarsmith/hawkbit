@@ -191,14 +191,14 @@ public class JpaDistributionSetTypeManagement implements DistributionSetTypeMana
 
     @Override
     public Slice<DistributionSetType> findAll(final Pageable pageable) {
-        return JpaManagementHelper.findAllWithoutCountBySpec(distributionSetTypeRepository, pageable, List.of(
-                DistributionSetTypeSpecification.isNotDeleted()));
+        return JpaManagementHelper.findAllWithoutCountBySpec(distributionSetTypeRepository, List.of(
+                DistributionSetTypeSpecification.isNotDeleted()), pageable);
     }
 
     @Override
-    public Page<DistributionSetType> findByRsql(final String rsqlParam, final Pageable pageable) {
+    public Page<DistributionSetType> findByRsql(final String rsql, final Pageable pageable) {
         return JpaManagementHelper.findAllWithCountBySpec(distributionSetTypeRepository, List.of(
-                RSQLUtility.buildRsqlSpecification(rsqlParam, DistributionSetTypeFields.class, virtualPropertyReplacer, database),
+                RSQLUtility.buildRsqlSpecification(rsql, DistributionSetTypeFields.class, virtualPropertyReplacer, database),
                 DistributionSetTypeSpecification.isNotDeleted()), pageable);
     }
 

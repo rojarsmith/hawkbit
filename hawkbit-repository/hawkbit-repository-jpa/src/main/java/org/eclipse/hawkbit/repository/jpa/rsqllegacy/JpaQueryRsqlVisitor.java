@@ -7,7 +7,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.eclipse.hawkbit.repository.jpa.rsql;
+package org.eclipse.hawkbit.repository.jpa.rsqllegacy;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -563,7 +563,11 @@ public class JpaQueryRsqlVisitor<A extends Enum<A> & RsqlQueryField, T> extends 
     }
 
     private Expression<String> caseWise(final CriteriaBuilder cb, final Expression<String> expression) {
-        return ensureIgnoreCase ? cb.upper(expression) : expression;
+        if (expression instanceof Path<String> path && path.getJavaType() != String.class) {
+            return expression; // non string values doesn't support uppercase
+        } else {
+            return ensureIgnoreCase ? cb.upper(expression) : expression;
+        }
     }
 
     private String caseWise(final String str) {
