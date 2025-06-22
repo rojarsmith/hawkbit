@@ -18,22 +18,22 @@ import java.io.IOException;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.junit.jupiter.api.Test;
 
 /**
  * Test serializability of DDI api model 'DdiResult'
+  * <p/>
+ * Feature: Unit Tests - Direct Device Integration API<br/>
+ * Story: Serializability of DDI api Models
  */
-@Feature("Unit Tests - Direct Device Integration API")
-@Story("Serializability of DDI api Models")
 class DdiResultTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+    /**
+     * Verify the correct serialization and deserialization of the model
+     */
     @Test
-    @Description("Verify the correct serialization and deserialization of the model")
     void shouldSerializeAndDeserializeObject() throws IOException {
         // Setup
         final DdiProgress ddiProgress = new DdiProgress(30, 100);
@@ -48,8 +48,10 @@ class DdiResultTest {
         assertThat(deserializedDdiResult.getProgress().getOf()).isEqualTo(ddiProgress.getOf());
     }
 
+    /**
+     * Verify the correct deserialization of a model with a additional unknown property
+     */
     @Test
-    @Description("Verify the correct deserialization of a model with a additional unknown property")
     void shouldDeserializeObjectWithUnknownProperty() throws IOException {
         // Setup
         final String serializedDdiResult = "{\"finished\":\"none\",\"progress\":{\"cnt\":30,\"of\":100},\"unknownProperty\":\"test\"}";
@@ -61,8 +63,10 @@ class DdiResultTest {
         assertThat(ddiResult.getProgress().getOf()).isEqualTo(100);
     }
 
+    /**
+     * Verify that deserialization fails for known properties with a wrong datatype
+     */
     @Test
-    @Description("Verify that deserialization fails for known properties with a wrong datatype")
     void shouldFailForObjectWithWrongDataTypes() {
         // Setup
         final String serializedDdiResult = "{\"finished\":[\"none\"],\"progress\":{\"cnt\":30,\"of\":100}}";

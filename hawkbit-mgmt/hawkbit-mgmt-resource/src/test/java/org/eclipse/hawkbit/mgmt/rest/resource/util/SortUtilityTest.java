@@ -14,9 +14,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.List;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.eclipse.hawkbit.mgmt.rest.resource.exception.SortParameterSyntaxErrorException;
 import org.eclipse.hawkbit.mgmt.rest.resource.exception.SortParameterUnsupportedDirectionException;
 import org.eclipse.hawkbit.mgmt.rest.resource.exception.SortParameterUnsupportedFieldException;
@@ -24,8 +21,10 @@ import org.eclipse.hawkbit.repository.TargetFields;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Sort.Order;
 
-@Feature("Component Tests - Management API")
-@Story("Sorting parameter")
+/**
+ * Feature: Component Tests - Management API<br/>
+ * Story: Sorting parameter
+ */
 class SortUtilityTest {
 
     private static final String SORT_PARAM_1 = "NAME:ASC";
@@ -36,44 +35,56 @@ class SortUtilityTest {
     private static final String CASE_INSENSITIVE_DIRECTION_PARAM_1 = "name:ASC";
     private static final String WRONG_FIELD_PARAM = "ASDF:ASC";
 
+    /**
+     * Ascending sorting based on name.
+     */
     @Test
-    @Description("Ascending sorting based on name.")
     void parseSortParam1() {
         final List<Order> parse = SortUtility.parse(TargetFields.class, SORT_PARAM_1);
         assertThat(parse).as("Count of parsing parameter").hasSize(1);
     }
 
+    /**
+     * Ascending sorting based on name and descending sorting based on description.
+     */
     @Test
-    @Description("Ascending sorting based on name and descending sorting based on description.")
     void parseSortParam2() {
         final List<Order> parse = SortUtility.parse(TargetFields.class, SORT_PARAM_2);
         assertThat(parse).as("Count of parsing parameter").hasSize(2);
     }
 
+    /**
+     * Sorting with wrong syntax leads to SortParameterSyntaxErrorException.
+     */
     @Test
-    @Description("Sorting with wrong syntax leads to SortParameterSyntaxErrorException.")
     void parseWrongSyntaxParam() {
         assertThrows(SortParameterSyntaxErrorException.class,
                 () -> SortUtility.parse(TargetFields.class, SYNTAX_FAILURE_SORT_PARAM));
     }
 
+    /**
+     * Sorting based on name with case sensitive is possible.
+     */
     @Test
-    @Description("Sorting based on name with case sensitive is possible.")
     @SuppressWarnings("squid:S2699") // assert no error
     void parsingIsNotCaseSensitive() {
         SortUtility.parse(TargetFields.class, CASE_INSENSITIVE_DIRECTION_PARAM);
         SortUtility.parse(TargetFields.class, CASE_INSENSITIVE_DIRECTION_PARAM_1);
     }
 
+    /**
+     * Sorting with unknown direction order leads to SortParameterUnsupportedDirectionException.
+     */
     @Test
-    @Description("Sorting with unknown direction order leads to SortParameterUnsupportedDirectionException.")
     void parseWrongDirectionParam() {
         assertThrows(SortParameterUnsupportedDirectionException.class,
                 () -> SortUtility.parse(TargetFields.class, WRONG_DIRECTION_PARAM));
     }
 
+    /**
+     * Sorting with unknown field leads to SortParameterUnsupportedFieldException.
+     */
     @Test
-    @Description("Sorting with unknown field leads to SortParameterUnsupportedFieldException.")
     void parseWrongFieldParam() {
         assertThrows(SortParameterUnsupportedFieldException.class,
                 () -> SortUtility.parse(TargetFields.class, WRONG_FIELD_PARAM));

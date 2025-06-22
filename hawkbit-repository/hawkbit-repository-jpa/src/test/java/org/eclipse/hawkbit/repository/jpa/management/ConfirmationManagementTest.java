@@ -18,9 +18,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Stream;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.eclipse.hawkbit.repository.exception.AutoConfirmationAlreadyActiveException;
 import org.eclipse.hawkbit.repository.exception.InvalidConfirmationFeedbackException;
 import org.eclipse.hawkbit.repository.jpa.AbstractJpaIntegrationTest;
@@ -38,13 +35,16 @@ import org.junit.jupiter.params.provider.MethodSource;
 /**
  * Test class testing the functionality of triggering a deployment of
  * {@link DistributionSet}s to {@link Target}s with AutoConfirmation active.
+  * <p/>
+ * Feature: Component Tests - Repository<br/>
+ * Story: Confirmation Management
  */
-@Feature("Component Tests - Repository")
-@Story("Confirmation Management")
 class ConfirmationManagementTest extends AbstractJpaIntegrationTest {
 
+    /**
+     * Verify 'findActiveActionsWaitingConfirmation' method is filtering like expected
+     */
     @Test
-    @Description("Verify 'findActiveActionsWaitingConfirmation' method is filtering like expected")
     void retrieveActionsWithConfirmationState() {
         enableConfirmationFlow();
 
@@ -65,8 +65,10 @@ class ConfirmationManagementTest extends AbstractJpaIntegrationTest {
                 .allMatch(action -> action.getStatus() == Status.WAIT_FOR_CONFIRMATION);
     }
 
+    /**
+     * Verify 'findActiveActionsWaitingConfirmation' method is filtering like expected with multi assignment active
+     */
     @Test
-    @Description("Verify 'findActiveActionsWaitingConfirmation' method is filtering like expected with multi assignment active")
     void retrieveActionsWithConfirmationStateInMultiAssignment() {
         enableMultiAssignments();
         enableConfirmationFlow();
@@ -94,8 +96,10 @@ class ConfirmationManagementTest extends AbstractJpaIntegrationTest {
 
     }
 
+    /**
+     * Verify confirming an action will put it to the running state
+     */
     @Test
-    @Description("Verify confirming an action will put it to the running state")
     void confirmedActionWillSwitchToRunningState() {
         enableConfirmationFlow();
 
@@ -122,8 +126,10 @@ class ConfirmationManagementTest extends AbstractJpaIntegrationTest {
                 .anyMatch(status -> status.getStatus() == Status.RUNNING);
     }
 
+    /**
+     * Verify confirming an confirmed action will lead to a specific failure
+     */
     @Test
-    @Description("Verify confirming an confirmed action will lead to a specific failure")
     void confirmedActionCannotBeConfirmedAgain() {
         enableConfirmationFlow();
 
@@ -143,8 +149,10 @@ class ConfirmationManagementTest extends AbstractJpaIntegrationTest {
                         .getReason() == InvalidConfirmationFeedbackException.Reason.NOT_AWAITING_CONFIRMATION);
     }
 
+    /**
+     * Verify confirming a closed action will lead to a specific failure
+     */
     @Test
-    @Description("Verify confirming a closed action will lead to a specific failure")
     void confirmedActionCannotBeGivenOnFinishedAction() {
         enableConfirmationFlow();
         final Long actionId = prepareFinishedUpdate().getId();
@@ -154,8 +162,10 @@ class ConfirmationManagementTest extends AbstractJpaIntegrationTest {
                         .getReason() == InvalidConfirmationFeedbackException.Reason.ACTION_CLOSED);
     }
 
+    /**
+     * Verify denying an action will leave it in WFC state
+     */
     @Test
-    @Description("Verify denying an action will leave it in WFC state")
     void deniedActionWillStayInWfcState() {
         enableConfirmationFlow();
 
@@ -182,8 +192,10 @@ class ConfirmationManagementTest extends AbstractJpaIntegrationTest {
                 .noneMatch(status -> status.getStatus() == Status.RUNNING);
     }
 
+    /**
+     * Verify multiple actions in WFC state will be transferred in RUNNING state in case auto-confirmation is activated.
+     */
     @Test
-    @Description("Verify multiple actions in WFC state will be transferred in RUNNING state in case auto-confirmation is activated.")
     void activateAutoConfirmationInMultiAssignment() {
         enableMultiAssignments();
         enableConfirmationFlow();
@@ -208,8 +220,10 @@ class ConfirmationManagementTest extends AbstractJpaIntegrationTest {
                 .allMatch(action -> action.getStatus() == Status.RUNNING);
     }
 
+    /**
+     * Verify action in WFC state will be transferred in RUNNING state in case auto-confirmation is activated.
+     */
     @Test
-    @Description("Verify action in WFC state will be transferred in RUNNING state in case auto-confirmation is activated.")
     void activateAutoConfirmationOnActiveAction() {
         enableConfirmationFlow();
 
@@ -230,8 +244,10 @@ class ConfirmationManagementTest extends AbstractJpaIntegrationTest {
                 .allMatch(action -> action.getStatus() == Status.RUNNING);
     }
 
+    /**
+     * Verify created action after activating auto confirmation is directly in running state.
+     */
     @Test
-    @Description("Verify created action after activating auto confirmation is directly in running state.")
     void activateAutoConfirmationAndCreateAction() {
         enableConfirmationFlow();
 
@@ -251,9 +267,11 @@ class ConfirmationManagementTest extends AbstractJpaIntegrationTest {
                 .allMatch(action -> action.getStatus() == Status.RUNNING);
     }
 
+    /**
+     * Verify activating auto confirmation with different parameters
+     */
     @ParameterizedTest
     @MethodSource("getAutoConfirmationArguments")
-    @Description("Verify activating auto confirmation with different parameters")
     void verifyAutoConfirmationActivationValues(final String initiator, final String remark) {
         final String controllerId = testdataFactory.createTarget().getControllerId();
         confirmationManagement.activateAutoConfirmation(controllerId, initiator, remark);
@@ -272,8 +290,10 @@ class ConfirmationManagementTest extends AbstractJpaIntegrationTest {
         verifyAutoConfirmationIsDisabled(controllerId);
     }
 
+    /**
+     * Verify activating already active auto confirmation will throw exception.
+     */
     @Test
-    @Description("Verify activating already active auto confirmation will throw exception.")
     void verifyActivateAlreadyActiveAutoConfirmationThrowException() {
         final String controllerId = testdataFactory.createTarget().getControllerId();
 
@@ -285,8 +305,10 @@ class ConfirmationManagementTest extends AbstractJpaIntegrationTest {
                 .hasMessage("Auto confirmation is already active for device " + controllerId);
     }
 
+    /**
+     * Verify disabling already disabled auto confirmation will not have any affect.
+     */
     @Test
-    @Description("Verify disabling already disabled auto confirmation will not have any affect.")
     void disableAlreadyDisabledAutoConfirmationHaveNoAffect() {
         final String controllerId = testdataFactory.createTarget().getControllerId();
 

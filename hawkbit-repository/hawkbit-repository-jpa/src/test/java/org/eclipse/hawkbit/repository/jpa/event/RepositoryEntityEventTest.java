@@ -15,9 +15,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.assertj.core.api.Assertions;
 import org.eclipse.hawkbit.repository.event.TenantAwareEvent;
 import org.eclipse.hawkbit.repository.event.remote.DistributionSetDeletedEvent;
@@ -47,8 +44,10 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.event.EventListener;
 
-@Feature("Component Tests - Repository")
-@Story("Entity Events")
+/**
+ * Feature: Component Tests - Repository<br/>
+ * Story: Entity Events
+ */
 @SpringBootTest(classes = { RepositoryTestConfiguration.class }, webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @SuppressWarnings("java:S6813") // constructor injects are not possible for test classes
 class RepositoryEntityEventTest extends AbstractJpaIntegrationTest {
@@ -61,8 +60,10 @@ class RepositoryEntityEventTest extends AbstractJpaIntegrationTest {
         eventListener.queue.clear();
     }
 
+    /**
+     * Verifies that the target created event is published when a target has been created
+     */
     @Test
-    @Description("Verifies that the target created event is published when a target has been created")
     void targetCreatedEventIsPublished() throws InterruptedException {
         final Target createdTarget = testdataFactory.createTarget("12345");
 
@@ -71,8 +72,10 @@ class RepositoryEntityEventTest extends AbstractJpaIntegrationTest {
         assertThat(getIdOfEntity(targetCreatedEvent)).isEqualTo(createdTarget.getId());
     }
 
+    /**
+     * Verifies that the target update event is published when a target has been updated
+     */
     @Test
-    @Description("Verifies that the target update event is published when a target has been updated")
     void targetUpdateEventIsPublished() throws InterruptedException {
         final Target createdTarget = testdataFactory.createTarget("12345");
         targetManagement.update(entityFactory.target().update(createdTarget.getControllerId()).name("updateName"));
@@ -82,8 +85,10 @@ class RepositoryEntityEventTest extends AbstractJpaIntegrationTest {
         assertThat(getIdOfEntity(targetUpdatedEvent)).isEqualTo(createdTarget.getId());
     }
 
+    /**
+     * Verifies that the target deleted event is published when a target has been deleted
+     */
     @Test
-    @Description("Verifies that the target deleted event is published when a target has been deleted")
     void targetDeletedEventIsPublished() throws InterruptedException {
         final Target createdTarget = testdataFactory.createTarget("12345");
 
@@ -94,8 +99,10 @@ class RepositoryEntityEventTest extends AbstractJpaIntegrationTest {
         assertThat(targetDeletedEvent.getEntityId()).isEqualTo(createdTarget.getId());
     }
 
+    /**
+     * Verifies that the target type created event is published when a target type has been created
+     */
     @Test
-    @Description("Verifies that the target type created event is published when a target type has been created")
     void targetTypeCreatedEventIsPublished() throws InterruptedException {
         final TargetType createdTargetType = testdataFactory.findOrCreateTargetType("targettype");
 
@@ -104,8 +111,10 @@ class RepositoryEntityEventTest extends AbstractJpaIntegrationTest {
         assertThat(getIdOfEntity(targetTypeCreatedEvent)).isEqualTo(createdTargetType.getId());
     }
 
+    /**
+     * Verifies that the target type updated event is published when a target type has been updated
+     */
     @Test
-    @Description("Verifies that the target type updated event is published when a target type has been updated")
     void targetTypeUpdatedEventIsPublished() throws InterruptedException {
         final TargetType createdTargetType = testdataFactory.findOrCreateTargetType("targettype");
         targetTypeManagement
@@ -116,8 +125,10 @@ class RepositoryEntityEventTest extends AbstractJpaIntegrationTest {
         assertThat(getIdOfEntity(targetTypeUpdatedEvent)).isEqualTo(createdTargetType.getId());
     }
 
+    /**
+     * Verifies that the target type deleted event is published when a target type has been deleted
+     */
     @Test
-    @Description("Verifies that the target type deleted event is published when a target type has been deleted")
     void targetTypeDeletedEventIsPublished() throws InterruptedException {
         final TargetType createdTargetType = testdataFactory.findOrCreateTargetType("targettype");
         targetTypeManagement.delete(createdTargetType.getId());
@@ -127,8 +138,10 @@ class RepositoryEntityEventTest extends AbstractJpaIntegrationTest {
         assertThat(targetTypeDeletedEvent.getEntityId()).isEqualTo(createdTargetType.getId());
     }
 
+    /**
+     * Verifies that the rollout deleted event is published when a rollout has been deleted
+     */
     @Test
-    @Description("Verifies that the rollout deleted event is published when a rollout has been deleted")
     void rolloutDeletedEventIsPublished() throws InterruptedException {
         final int amountTargetsForRollout = 50;
         final int amountGroups = 5;
@@ -150,8 +163,10 @@ class RepositoryEntityEventTest extends AbstractJpaIntegrationTest {
         assertThat(rolloutDeletedEvent.getEntityId()).isEqualTo(createdRollout.getId());
     }
 
+    /**
+     * Verifies that the distribution set created event is published when a distribution set has been created
+     */
     @Test
-    @Description("Verifies that the distribution set created event is published when a distribution set has been created")
     void distributionSetCreatedEventIsPublished() throws InterruptedException {
         final DistributionSet createDistributionSet = testdataFactory.createDistributionSet();
 
@@ -161,8 +176,10 @@ class RepositoryEntityEventTest extends AbstractJpaIntegrationTest {
         assertThat(getIdOfEntity(dsCreatedEvent)).isEqualTo(createDistributionSet.getId());
     }
 
+    /**
+     * Verifies that the distribution set deleted event is published when a distribution set has been deleted
+     */
     @Test
-    @Description("Verifies that the distribution set deleted event is published when a distribution set has been deleted")
     void distributionSetDeletedEventIsPublished() throws InterruptedException {
         final DistributionSet createDistributionSet = testdataFactory.createDistributionSet();
 
@@ -174,8 +191,10 @@ class RepositoryEntityEventTest extends AbstractJpaIntegrationTest {
         assertThat(dsDeletedEvent.getEntityId()).isEqualTo(createDistributionSet.getId());
     }
 
+    /**
+     * Verifies that the software module created event is published when a software module has been created
+     */
     @Test
-    @Description("Verifies that the software module created event is published when a software module has been created")
     void softwareModuleCreatedEventIsPublished() throws InterruptedException {
         final SoftwareModule softwareModule = testdataFactory.createSoftwareModuleApp();
 
@@ -185,8 +204,10 @@ class RepositoryEntityEventTest extends AbstractJpaIntegrationTest {
         assertThat(getIdOfEntity(softwareModuleCreatedEvent)).isEqualTo(softwareModule.getId());
     }
 
+    /**
+     * Verifies that the software module update event is published when a software module has been updated
+     */
     @Test
-    @Description("Verifies that the software module update event is published when a software module has been updated")
     void softwareModuleUpdateEventIsPublished() throws InterruptedException {
         final SoftwareModule softwareModule = testdataFactory.createSoftwareModuleApp();
         softwareModuleManagement
@@ -198,8 +219,10 @@ class RepositoryEntityEventTest extends AbstractJpaIntegrationTest {
         assertThat(getIdOfEntity(softwareModuleUpdatedEvent)).isEqualTo(softwareModule.getId());
     }
 
+    /**
+     * Verifies that the software module deleted event is published when a software module has been deleted
+     */
     @Test
-    @Description("Verifies that the software module deleted event is published when a software module has been deleted")
     void softwareModuleDeletedEventIsPublished() throws InterruptedException {
         final SoftwareModule softwareModule = testdataFactory.createSoftwareModuleApp();
         softwareModuleManagement.delete(softwareModule.getId());

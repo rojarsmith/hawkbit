@@ -15,9 +15,6 @@ import java.io.ByteArrayInputStream;
 import java.util.List;
 import java.util.Random;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.eclipse.hawkbit.im.authentication.SpPermission.SpringEvalExpressions;
 import org.eclipse.hawkbit.repository.jpa.AbstractJpaIntegrationTest;
 import org.eclipse.hawkbit.repository.model.ArtifactUpload;
@@ -30,13 +27,17 @@ import org.eclipse.hawkbit.repository.test.util.SecurityContextSwitch;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
-@Feature("Component Tests - Repository")
-@Story("System Management")
+/**
+ * Feature: Component Tests - Repository<br/>
+ * Story: System Management
+ */
 @ExtendWith(DisposableSqlTestDatabaseExtension.class)
 class SystemManagementTest extends AbstractJpaIntegrationTest {
 
+    /**
+     * Ensures that findTenants returns all tenants and not only restricted to the tenant which currently is logged in
+     */
     @Test
-    @Description("Ensures that findTenants returns all tenants and not only restricted to the tenant which currently is logged in")
     void findTenantsReturnsAllTenantsNotOnlyWhichLoggedIn() throws Exception {
         assertThat(systemManagement.findTenants(PAGE).getContent()).hasSize(1);
 
@@ -45,8 +46,10 @@ class SystemManagementTest extends AbstractJpaIntegrationTest {
         assertThat(systemManagement.findTenants(PAGE).getContent()).hasSize(3);
     }
 
+    /**
+     * Ensures that getSystemUsageStatisticsWithTenants returns the usage of all tenants and not only the first 1000 (max page size).
+     */
     @Test
-    @Description("Ensures that getSystemUsageStatisticsWithTenants returns the usage of all tenants and not only the first 1000 (max page size).")
     void systemUsageReportCollectsStatisticsOfManyTenants() throws Exception {
         // Prepare tenants
         createTestTenantsForSystemStatistics(1050, 0, 0, 0);
@@ -55,8 +58,10 @@ class SystemManagementTest extends AbstractJpaIntegrationTest {
         assertThat(tenants).hasSize(1051); // +1 from the setup
     }
 
+    /**
+     * Checks that the system report calculates correctly the artifact size of all tenants in the system. It ignores deleted software modules with their artifacts.
+     */
     @Test
-    @Description("Checks that the system report calculates correctly the artifact size of all tenants in the system. It ignores deleted software modules with their artifacts.")
     void systemUsageReportCollectsArtifactsOfAllTenants() throws Exception {
         // Prepare tenants
         createTestTenantsForSystemStatistics(2, 1234, 0, 0);
@@ -79,8 +84,10 @@ class SystemManagementTest extends AbstractJpaIntegrationTest {
                 tenantUsage1);
     }
 
+    /**
+     * Checks that the system report calculates correctly the targets size of all tenants in the system
+     */
     @Test
-    @Description("Checks that the system report calculates correctly the targets size of all tenants in the system")
     void systemUsageReportCollectsTargetsOfAllTenants() throws Exception {
         // Prepare tenants
         createTestTenantsForSystemStatistics(2, 0, 100, 0);
@@ -99,8 +106,10 @@ class SystemManagementTest extends AbstractJpaIntegrationTest {
         assertThat(tenants).containsOnly(new TenantUsage("DEFAULT"), tenantUsage0, tenantUsage1);
     }
 
+    /**
+     * Checks that the system report calculates correctly the actions size of all tenants in the system
+     */
     @Test
-    @Description("Checks that the system report calculates correctly the actions size of all tenants in the system")
     void systemUsageReportCollectsActionsOfAllTenants() throws Exception {
         // Prepare tenants
         createTestTenantsForSystemStatistics(2, 0, 20, 2);

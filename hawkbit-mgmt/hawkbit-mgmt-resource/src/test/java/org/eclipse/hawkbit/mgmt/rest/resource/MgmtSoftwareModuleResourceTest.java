@@ -40,9 +40,6 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import com.jayway.jsonpath.JsonPath;
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.apache.commons.io.IOUtils;
 import org.awaitility.Awaitility;
 import org.eclipse.hawkbit.exception.SpServerError;
@@ -86,9 +83,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Tests for {@link MgmtSoftwareModuleResource} {@link RestController}.
+  * <p/>
+ * Feature: Component Tests - Management API<br/>
+ * Story: Software Module Resource
  */
-@Feature("Component Tests - Management API")
-@Story("Software Module Resource")
 @TestPropertySource(properties = {
         "hawkbit.server.security.dos.maxArtifactSize=100000",
         "hawkbit.server.security.dos.maxArtifactStorage=500000" })
@@ -99,9 +97,11 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
         assertThat(softwareModuleManagement.findAll(PAGE)).as("no softwaremodule should be founded").isEmpty();
     }
 
+    /**
+     * Trying to create a SM from already marked as deleted type - should get as response 400 Bad Request
+     */
     @Test
-    @Description("Trying to create a SM from already marked as deleted type - should get as response 400 Bad Request")
-    public void createSMFromAlreadyMarkedAsDeletedType() throws Exception {
+     void createSMFromAlreadyMarkedAsDeletedType() throws Exception {
         final String SM_TYPE = "someSmType";
         final SoftwareModule sm = testdataFactory.createSoftwareModule(SM_TYPE);
         testdataFactory.findOrCreateDistributionSetType(
@@ -136,9 +136,11 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
         assertTrue(exceptionInfo.getMessage().contains("Software Module Type already deleted"));
     }
 
+    /**
+     * Handles the GET request of retrieving all meta data of artifacts assigned to a software module (in full representation mode including a download URL by the artifact provider).
+     */
     @Test
-    @Description("Handles the GET request of retrieving all meta data of artifacts assigned to a software module (in full representation mode including a download URL by the artifact provider).")
-    public void getArtifactsWithParameters() throws Exception {
+     void getArtifactsWithParameters() throws Exception {
         final SoftwareModule sm = testdataFactory.createSoftwareModuleOs();
 
         final byte[] random = randomBytes(5);
@@ -153,9 +155,11 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                 .andExpect(content().contentType(MediaTypes.HAL_JSON));
     }
 
+    /**
+     *  Get a paged list of meta data for a software module.
+     */
     @Test
-    @Description(" Get a paged list of meta data for a software module.")
-    public void getMetadata() throws Exception {
+     void getMetadata() throws Exception {
         final int totalMetadata = 4;
         final String knownKeyPrefix = "knownKey";
         final String knownValuePrefix = "knownValue";
@@ -173,9 +177,11 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                 .andExpect(content().contentType(MediaTypes.HAL_JSON));
     }
 
+    /**
+     *  Get a paged list of meta data for a software module with defined page size and sorting by name descending and key starting with 'known'.
+     */
     @Test
-    @Description(" Get a paged list of meta data for a software module with defined page size and sorting by name descending and key starting with 'known'.")
-    public void getMetadataWithParameters() throws Exception {
+     void getMetadataWithParameters() throws Exception {
         final int totalMetadata = 4;
         final String knownKeyPrefix = "knownKey";
         final String knownValuePrefix = "knownValue";
@@ -194,9 +200,11 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                 .andExpect(content().contentType(MediaTypes.HAL_JSON));
     }
 
+    /**
+     * Get a single meta data value for a meta data key.
+     */
     @Test
-    @Description("Get a single meta data value for a meta data key.")
-    public void getMetadataValue() throws Exception {
+     void getMetadataValue() throws Exception {
 
         // prepare and create metadata
         final String knownKey = "knownKey";
@@ -211,8 +219,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                 .andExpect(status().isOk());
     }
 
+    /**
+     * Tests the update of software module metadata. It is verfied that only the selected fields for the update are really updated and the modification values are filled (i.e. updated by and at).
+     */
     @Test
-    @Description("Tests the update of software module metadata. It is verfied that only the selected fields for the update are really updated and the modification values are filled (i.e. updated by and at).")
     @WithUser(principal = "smUpdateTester", allSpPermissions = true)
     void updateSoftwareModuleOnlyDescriptionAndVendorNameUntouched() throws Exception {
         final String knownSWName = "name1";
@@ -265,8 +275,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
 
     }
 
+    /**
+     * Tests the update of the deletion flag. It is verified that the software module can't be marked as deleted through update operation.
+     */
     @Test
-    @Description("Tests the update of the deletion flag. It is verified that the software module can't be marked as deleted through update operation.")
     @WithUser(principal = "smUpdateTester", allSpPermissions = true)
     void updateSoftwareModuleDeletedFlag() throws Exception {
         final String knownSWName = "name1";
@@ -301,8 +313,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
 
     }
 
+    /**
+     * Tests the lock. It is verified that the software module can be marked as locked through update operation.
+     */
     @Test
-    @Description("Tests the lock. It is verified that the software module can be marked as locked through update operation.")
     @WithUser(principal = "smUpdateTester", allSpPermissions = true)
     void lockSoftwareModule() throws Exception {
         final SoftwareModule sm = softwareModuleManagement.create(
@@ -333,8 +347,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                 .andExpect(jsonPath("$.locked", equalTo(true)));
     }
 
+    /**
+     * Tests the unlock.
+     */
     @Test
-    @Description("Tests the unlock.")
     @WithUser(principal = "smUpdateTester", allSpPermissions = true)
     void unlockSoftwareModule() throws Exception {
         final SoftwareModule sm = softwareModuleManagement.create(
@@ -368,8 +384,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                 .andExpect(jsonPath("$.locked", equalTo(false)));
     }
 
+    /**
+     * Tests the upload of an artifact binary. The upload is executed and the content checked in the repository for completeness.
+     */
     @Test
-    @Description("Tests the upload of an artifact binary. The upload is executed and the content checked in the repository for completeness.")
     void uploadArtifact() throws Exception {
         final SoftwareModule sm = testdataFactory.createSoftwareModuleOs();
 
@@ -409,8 +427,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
         assertArtifact(sm, random);
     }
 
+    /**
+     * Verifies that artifacts which exceed the configured maximum size cannot be uploaded.
+     */
     @Test
-    @Description("Verifies that artifacts which exceed the configured maximum size cannot be uploaded.")
     void uploadArtifactFailsIfTooLarge() throws Exception {
         final SoftwareModule sm = testdataFactory.createSoftwareModule("quota", "quota", false);
         final long maxSize = quotaManagement.getMaxArtifactSize();
@@ -429,8 +449,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                 .andExpect(jsonPath("$.errorCode", equalTo(SpServerError.SP_FILE_SIZE_QUOTA_EXCEEDED.getKey())));
     }
 
+    /**
+     * Verifies that artifact with invalid filename cannot be uploaded to prevent cross site scripting.
+     */
     @Test
-    @Description("Verifies that artifact with invalid filename cannot be uploaded to prevent cross site scripting.")
     void uploadArtifactFailsIfFilenameInvalide() throws Exception {
         final SoftwareModule sm = testdataFactory.createSoftwareModule("quota", "quota", false);
         final String illegalFilename = "<img src=ernw onerror=alert(1)>.xml";
@@ -445,8 +467,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                 .andExpect(jsonPath("$.message", containsString("Invalid characters in string")));
     }
 
+    /**
+     * Verifies that the system does not accept empty artifact uploads. Expected response: BAD REQUEST
+     */
     @Test
-    @Description("Verifies that the system does not accept empty artifact uploads. Expected response: BAD REQUEST")
     void emptyUploadArtifact() throws Exception {
         assertThat(softwareModuleManagement.findAll(PAGE)).isEmpty();
         assertThat(artifactManagement.count()).isZero();
@@ -461,8 +485,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                 .andExpect(status().isBadRequest());
     }
 
+    /**
+     * Verifies that the system does not accept identical artifacts uploads for the same software module. Expected response: CONFLICT
+     */
     @Test
-    @Description("Verifies that the system does not accept identical artifacts uploads for the same software module. Expected response: CONFLICT")
     void duplicateUploadArtifact() throws Exception {
         final SoftwareModule sm = testdataFactory.createSoftwareModuleOs();
 
@@ -488,8 +514,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                 .andExpect(status().isConflict());
     }
 
+    /**
+     * verifies that option to upload artifacts with a custom defined by metadata, i.e. not the file name of the binary itself.
+     */
     @Test
-    @Description("verifies that option to upload artifacts with a custom defined by metadata, i.e. not the file name of the binary itself.")
     void uploadArtifactWithCustomName() throws Exception {
         final SoftwareModule sm = testdataFactory.createSoftwareModuleOs();
         assertThat(artifactManagement.count()).isZero();
@@ -515,8 +543,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
         assertThat(artifactManagement.getByFilename("customFilename")).as("Local artifact is wrong").isPresent();
     }
 
+    /**
+     * Verifies that the system refuses upload of an artifact where the provided hash sums do not match. Expected result: BAD REQUEST
+     */
     @Test
-    @Description("Verifies that the system refuses upload of an artifact where the provided hash sums do not match. Expected result: BAD REQUEST")
     void uploadArtifactWithHashCheck() throws Exception {
         final SoftwareModule sm = testdataFactory.createSoftwareModuleOs();
         assertThat(artifactManagement.count()).isZero();
@@ -577,8 +607,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
 
     }
 
+    /**
+     * Verifies that only a limited number of artifacts can be uploaded for one software module.
+     */
     @Test
-    @Description("Verifies that only a limited number of artifacts can be uploaded for one software module.")
     void uploadArtifactsUntilQuotaExceeded() throws Exception {
         final SoftwareModule sm = testdataFactory.createSoftwareModuleOs();
         final long maxArtifacts = quotaManagement.getMaxArtifactsPerSoftwareModule();
@@ -619,8 +651,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
 
     }
 
+    /**
+     * Verifies that artifacts can only be added as long as the artifact storage quota is not exceeded.
+     */
     @Test
-    @Description("Verifies that artifacts can only be added as long as the artifact storage quota is not exceeded.")
     void uploadArtifactsUntilStorageQuotaExceeded() throws Exception {
 
         final long storageLimit = quotaManagement.getMaxArtifactStorage();
@@ -667,8 +701,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
 
     }
 
+    /**
+     * Tests binary download of an artifact including verfication that the downloaded binary is consistent and that the etag header is as expected identical to the SHA1 hash of the file.
+     */
     @Test
-    @Description("Tests binary download of an artifact including verfication that the downloaded binary is consistent and that the etag header is as expected identical to the SHA1 hash of the file.")
     void downloadArtifact() throws Exception {
         final SoftwareModule sm = testdataFactory.createSoftwareModuleOs();
 
@@ -687,8 +723,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
         assertThat(artifactManagement.count()).isEqualTo(2);
     }
 
+    /**
+     * Verifies the listing of one defined artifact assigned to a given software module. That includes the artifact metadata and download links.
+     */
     @Test
-    @Description("Verifies the listing of one defined artifact assigned to a given software module. That includes the artifact metadata and download links.")
     void getArtifact() throws Exception {
         // prepare data for test
         final SoftwareModule sm = testdataFactory.createSoftwareModuleOs();
@@ -719,9 +757,11 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                                 artifact.getId()))));
     }
 
+    /**
+     * Verifies the listing of one defined artifact assigned to a given software module. That includes the artifact metadata and cdn download links.
+     */
     @ParameterizedTest
     @ValueSource(booleans = { true, false })
-    @Description("Verifies the listing of one defined artifact assigned to a given software module. That includes the artifact metadata and cdn download links.")
     void getArtifactWithUseArtifactUrlHandlerParameter(final boolean useArtifactUrlHandler) throws Exception {
         // prepare data for test
         final SoftwareModule sm = testdataFactory.createSoftwareModuleOs();
@@ -754,8 +794,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                                 artifact.getId()))));
     }
 
+    /**
+     * Verifies the listing of an artifact that belongs to a soft deleted software module.
+     */
     @Test
-    @Description("Verifies the listing of an artifact that belongs to a soft deleted software module.")
     void getArtifactSoftDeleted() throws Exception {
         // prepare data for test
         final SoftwareModule sm = testdataFactory.createSoftwareModuleOs("softDeleted");
@@ -781,8 +823,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                                 artifact.getId()))));
     }
 
+    /**
+     * Verifies the listing of all artifacts assigned to a software module. That includes the artifact metadata.
+     */
     @Test
-    @Description("Verifies the listing of all artifacts assigned to a software module. That includes the artifact metadata.")
     void getArtifacts() throws Exception {
         final SoftwareModule sm = testdataFactory.createSoftwareModuleOs();
 
@@ -816,9 +860,11 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                         "http://localhost/rest/v1/softwaremodules/" + sm.getId() + "/artifacts/" + artifact2.getId())));
     }
 
+    /**
+     * Verifies the listing of all artifacts assigned to a software module. That includes the artifact metadata and download links.
+     */
     @ParameterizedTest
     @ValueSource(booleans = { true, false })
-    @Description("Verifies the listing of all artifacts assigned to a software module. That includes the artifact metadata and download links.")
     void getArtifactsWithUseArtifactUrlHandlerParameter(final boolean useArtifactUrlHandler) throws Exception {
         final SoftwareModule sm = testdataFactory.createSoftwareModuleOs();
 
@@ -864,8 +910,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                                 artifact2.getId()))));
     }
 
+    /**
+     * Verifies that the system refuses unsupported request types and answers as defined to them, e.g. NOT FOUND on a non existing resource. Or a HTTP POST for updating a resource results in METHOD NOT ALLOWED etc.
+     */
     @Test
-    @Description("Verifies that the system refuses unsupported request types and answers as defined to them, e.g. NOT FOUND on a non existing resource. Or a HTTP POST for updating a resource results in METHOD NOT ALLOWED etc.")
     void invalidRequestsOnArtifactResource() throws Exception {
 
         final int artifactSize = 5 * 1024;
@@ -920,8 +968,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                 .andExpect(status().isGone());
     }
 
+    /**
+     * Tests the deletion of an artifact including verification that the artifact is actually erased in the repository and removed from the software module.
+     */
     @Test
-    @Description("Tests the deletion of an artifact including verification that the artifact is actually erased in the repository and removed from the software module.")
     void deleteArtifact() throws Exception {
         // Create 1 SM
         final SoftwareModule sm = testdataFactory.createSoftwareModuleOs();
@@ -954,8 +1004,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
 
     }
 
+    /**
+     * Verifies that the system refuses unsupported request types and answers as defined to them, e.g. NOT FOUND on a non existing resource. Or a HTTP POST for updating a resource results in METHOD NOT ALLOWED etc.
+     */
     @Test
-    @Description("Verifies that the system refuses unsupported request types and answers as defined to them, e.g. NOT FOUND on a non existing resource. Or a HTTP POST for updating a resource results in METHOD NOT ALLOWED etc.")
     void invalidRequestsOnSoftwareModulesResource() throws Exception {
         final SoftwareModule sm = testdataFactory.createSoftwareModuleOs();
 
@@ -1020,8 +1072,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
 
     }
 
+    /**
+     * Test of modules retrieval without any parameters. Will return all modules in the system as defined by standard page size.
+     */
     @Test
-    @Description("Test of modules retrieval without any parameters. Will return all modules in the system as defined by standard page size.")
     void getSoftwareModulesWithoutAdditionalRequestParameters() throws Exception {
         final int modules = 5;
         createSoftwareModulesAlphabetical(modules);
@@ -1033,8 +1087,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                 .andExpect(jsonPath(MgmtTargetResourceTest.JSON_PATH_PAGED_LIST_CONTENT, hasSize(modules)));
     }
 
+    /**
+     * Test of modules retrieval with paging limit parameter. Will return all modules in the system as defined by given page size.
+     */
     @Test
-    @Description("Test of modules retrieval with paging limit parameter. Will return all modules in the system as defined by given page size.")
     void detSoftwareModulesWithPagingLimitRequestParameter() throws Exception {
         final int modules = 5;
         final int limitSize = 1;
@@ -1048,8 +1104,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                 .andExpect(jsonPath(MgmtTargetResourceTest.JSON_PATH_PAGED_LIST_CONTENT, hasSize(limitSize)));
     }
 
+    /**
+     * Test of modules retrieval with paging limit offset parameters. Will return all modules in the system as defined by given page size starting from given offset.
+     */
     @Test
-    @Description("Test of modules retrieval with paging limit offset parameters. Will return all modules in the system as defined by given page size starting from given offset.")
     void getSoftwareModulesWithPagingLimitAndOffsetRequestParameter() throws Exception {
         final int modules = 5;
         final int offsetParam = 2;
@@ -1065,9 +1123,11 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                 .andExpect(jsonPath(MgmtTargetResourceTest.JSON_PATH_PAGED_LIST_CONTENT, hasSize(expectedSize)));
     }
 
+    /**
+     * Test retrieval of all software modules the user has access to.
+     */
     @Test
     @WithUser(principal = "uploadTester", allSpPermissions = true)
-    @Description("Test retrieval of all software modules the user has access to.")
     void getSoftwareModules() throws Exception {
         final SoftwareModule os = testdataFactory.createSoftwareModuleOs();
         final SoftwareModule app = testdataFactory.createSoftwareModuleApp();
@@ -1100,8 +1160,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
         assertThat(softwareModuleManagement.findAll(PAGE)).as("Softwaremodule size is wrong").hasSize(2);
     }
 
+    /**
+     * Test the various filter parameters, e.g. filter by name or type of the module.
+     */
     @Test
-    @Description("Test the various filter parameters, e.g. filter by name or type of the module.")
     void getSoftwareModulesWithFilterParameters() throws Exception {
         final SoftwareModule os1 = testdataFactory.createSoftwareModuleOs("1");
         final SoftwareModule app1 = testdataFactory.createSoftwareModuleApp("1");
@@ -1165,8 +1227,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                 .andExpect(jsonPath("$.total", equalTo(1)));
     }
 
+    /**
+     * Verifies that the system answers as defined in case of a wrong filter parameter syntax. Expected result: BAD REQUEST with error description.
+     */
     @Test
-    @Description("Verifies that the system answers as defined in case of a wrong filter parameter syntax. Expected result: BAD REQUEST with error description.")
     void getSoftwareModulesWithSyntaxErrorFilterParameter() throws Exception {
         mvc.perform(get("/rest/v1/softwaremodules?q=wrongFIQLSyntax").accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
@@ -1174,8 +1238,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                 .andExpect(jsonPath("$.errorCode", equalTo("hawkbit.server.error.rest.param.rsqlParamSyntax")));
     }
 
+    /**
+     * Verifies that the system answers as defined in case of a non existing field used in filter. Expected result: BAD REQUEST with error description.
+     */
     @Test
-    @Description("Verifies that the system answers as defined in case of a non existing field used in filter. Expected result: BAD REQUEST with error description.")
     void getSoftwareModulesWithUnknownFieldErrorFilterParameter() throws Exception {
         mvc.perform(get("/rest/v1/softwaremodules?q=wrongField==abc").accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
@@ -1183,9 +1249,11 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                 .andExpect(jsonPath("$.errorCode", equalTo("hawkbit.server.error.rest.param.rsqlInvalidField")));
     }
 
+    /**
+     * Tests GET request on /rest/v1/softwaremodules/{smId}.
+     */
     @Test
     @WithUser(principal = "uploadTester", allSpPermissions = true)
-    @Description("Tests GET request on /rest/v1/softwaremodules/{smId}.")
     void getSoftwareModule() throws Exception {
         final SoftwareModule os = testdataFactory.createSoftwareModuleOs();
 
@@ -1211,9 +1279,11 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
         assertThat(softwareModuleManagement.findAll(PAGE)).as("Softwaremodule size is wrong").hasSize(1);
     }
 
+    /**
+     * Verifies that the create request actually results in the creation of the modules in the repository.
+     */
     @Test
     @WithUser(principal = "uploadTester", allSpPermissions = true)
-    @Description("Verifies that the create request actually results in the creation of the modules in the repository.")
     void createSoftwareModules() throws Exception {
         final SoftwareModule os = entityFactory.softwareModule()
                 .create()
@@ -1284,8 +1354,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                 "Softwaremoudle name is wrong").isEqualTo(ah.getName());
     }
 
+    /**
+     * Verifies successfull deletion of software modules that are not in use, i.e. assigned to a DS.
+     */
     @Test
-    @Description("Verifies successfull deletion of software modules that are not in use, i.e. assigned to a DS.")
     void deleteUnassignedSoftwareModule() throws Exception {
 
         final SoftwareModule sm = testdataFactory.createSoftwareModuleOs();
@@ -1308,8 +1380,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
         assertThat(artifactManagement.count()).isZero();
     }
 
+    /**
+     * Verifies successfull deletion of a software module that is in use, i.e. assigned to a DS which should result in movinf the module to the archive.
+     */
     @Test
-    @Description("Verifies successfull deletion of a software module that is in use, i.e. assigned to a DS which should result in movinf the module to the archive.")
     void deleteAssignedSoftwareModule() throws Exception {
         final DistributionSet ds1 = testdataFactory.createDistributionSet("a");
 
@@ -1342,8 +1416,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
         assertThat(artifactManagement.count()).isEqualTo(1);
     }
 
+    /**
+     * Verifies the successful creation of metadata and the enforcement of the meta data quota.
+     */
     @Test
-    @Description("Verifies the successful creation of metadata and the enforcement of the meta data quota.")
     void createMetadata() throws Exception {
         final String knownKey1 = "knownKey1";
         final String knownValue1 = "knownValue1";
@@ -1384,8 +1460,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
 
     }
 
+    /**
+     * Verifies the successful update of metadata based on given key.
+     */
     @Test
-    @Description("Verifies the successful update of metadata based on given key.")
     void updateMetadataKey() throws Exception {
         // prepare and create metadata for update
         final String knownKey = "knownKey";
@@ -1410,8 +1488,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
         assertThat(assertDS.isTargetVisible()).as("target visible is wrong").isTrue();
     }
 
+    /**
+     * Verifies the successful deletion of metadata entry.
+     */
     @Test
-    @Description("Verifies the successful deletion of metadata entry.")
     void deleteMetadata() throws Exception {
         // prepare and create metadata for deletion
         final String knownKey = "knownKey";
@@ -1429,8 +1509,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
                 .isThrownBy(() -> softwareModuleManagement.getMetadata(smId, knownKey));
     }
 
+    /**
+     * Ensures that module metadata deletion request to API on an entity that does not exist results in NOT_FOUND.
+     */
     @Test
-    @Description("Ensures that module metadata deletion request to API on an entity that does not exist results in NOT_FOUND.")
     void deleteModuleMetadataThatDoesNotExistLeadsToNotFound() throws Exception {
         // prepare and create metadata for deletion
         final String knownKey = "knownKey";
@@ -1451,8 +1533,10 @@ class MgmtSoftwareModuleResourceTest extends AbstractManagementApiIntegrationTes
         assertThat(softwareModuleManagement.getMetadata(smId, knownKey)).isNotNull();
     }
 
+    /**
+     * Ensures that module deletion request to API on an entity that does not exist results in NOT_FOUND.
+     */
     @Test
-    @Description("Ensures that module deletion request to API on an entity that does not exist results in NOT_FOUND.")
     void deleteSoftwareModuleThatDoesNotExistLeadsToNotFound() throws Exception {
         mvc.perform(delete("/rest/v1/softwaremodules/1234"))
                 .andDo(MockMvcResultPrinter.print())

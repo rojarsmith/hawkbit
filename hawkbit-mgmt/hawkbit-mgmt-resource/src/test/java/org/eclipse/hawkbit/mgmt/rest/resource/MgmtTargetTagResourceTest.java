@@ -27,9 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.eclipse.hawkbit.mgmt.rest.api.MgmtRestConstants;
 import org.eclipse.hawkbit.mgmt.rest.api.MgmtTargetTagRestApi;
 import org.eclipse.hawkbit.mgmt.rest.resource.util.ResourceUtility;
@@ -53,16 +50,19 @@ import org.springframework.test.web.servlet.ResultActions;
 
 /**
  * Spring MVC Tests against the MgmtTargetTagResource.
+  * <p/>
+ * Feature: Component Tests - Management API<br/>
+ * Story: Target Tag Resource
  */
-@Feature("Component Tests - Management API")
-@Story("Target Tag Resource")
 public class MgmtTargetTagResourceTest extends AbstractManagementApiIntegrationTest {
 
     private static final String TARGETTAGS_ROOT = "http://localhost" + MgmtRestConstants.TARGET_TAG_V1_REQUEST_MAPPING + "/";
     private static final Random RND = new Random();
 
+    /**
+     * Verifies that a paged result list of target tags reflects the content on the repository side.
+     */
     @Test
-    @Description("Verifies that a paged result list of target tags reflects the content on the repository side.")
     @ExpectEvents({ @Expect(type = TargetTagCreatedEvent.class, count = 2) })
     public void getTargetTags() throws Exception {
         final List<TargetTag> tags = testdataFactory.createTargetTags(2, "");
@@ -83,18 +83,22 @@ public class MgmtTargetTagResourceTest extends AbstractManagementApiIntegrationT
 
     }
 
+    /**
+     * Handles the GET request of retrieving all targets tags within SP based by parameter
+     */
     @Test
-    @Description("Handles the GET request of retrieving all targets tags within SP based by parameter")
-    public void getTargetTagsWithParameters() throws Exception {
+     void getTargetTagsWithParameters() throws Exception {
         testdataFactory.createTargetTags(2, "");
         mvc.perform(get(MgmtRestConstants.TARGET_TAG_V1_REQUEST_MAPPING + "?limit=10&sort=name:ASC&offset=0&q=name==targetTag"))
                 .andExpect(status().isOk())
                 .andDo(MockMvcResultPrinter.print());
     }
 
+    /**
+     * Verifies that a page result when listing tags reflects on the content in the repository when filtered by 2 fields - one tag field and one target field
+     */
     @Test
-    @Description("Verifies that a page result when listing tags reflects on the content in the repository when filtered by 2 fields - one tag field and one target field")
-    public void getTargetTagsFilteredByColor() throws Exception {
+     void getTargetTagsFilteredByColor() throws Exception {
         final String controllerId1 = "controllerTestId1";
         final String controllerId2 = "controllerTestId2";
         testdataFactory.createTarget(controllerId1);
@@ -122,8 +126,10 @@ public class MgmtTargetTagResourceTest extends AbstractManagementApiIntegrationT
                 .andExpect(jsonPath(MgmtTargetResourceTest.JSON_PATH_PAGED_LIST_CONTENT, hasSize(1)));
     }
 
+    /**
+     * Verifies that a single result of a target tag reflects the content on the repository side.
+     */
     @Test
-    @Description("Verifies that a single result of a target tag reflects the content on the repository side.")
     @ExpectEvents({ @Expect(type = TargetTagCreatedEvent.class, count = 2) })
     public void getTargetTag() throws Exception {
         final List<TargetTag> tags = testdataFactory.createTargetTags(2, "");
@@ -141,8 +147,10 @@ public class MgmtTargetTagResourceTest extends AbstractManagementApiIntegrationT
 
     }
 
+    /**
+     * Verifies that created target tags are stored in the repository as send to the API.
+     */
     @Test
-    @Description("Verifies that created target tags are stored in the repository as send to the API.")
     @ExpectEvents({ @Expect(type = TargetTagCreatedEvent.class, count = 2) })
     public void createTargetTags() throws Exception {
         final Tag tagOne = entityFactory.tag().create().colour("testcol1").description("its a test1").name("thetest1")
@@ -171,8 +179,10 @@ public class MgmtTargetTagResourceTest extends AbstractManagementApiIntegrationT
                 .andExpect(applyTagMatcherOnArrayResult(createdTwo));
     }
 
+    /**
+     * Verifies that an updated target tag is stored in the repository as send to the API.
+     */
     @Test
-    @Description("Verifies that an updated target tag is stored in the repository as send to the API.")
     @ExpectEvents({
             @Expect(type = TargetTagCreatedEvent.class, count = 1),
             @Expect(type = TargetTagUpdatedEvent.class, count = 1) })
@@ -200,8 +210,10 @@ public class MgmtTargetTagResourceTest extends AbstractManagementApiIntegrationT
                 .andExpect(applyTagMatcherOnArrayResult(updated));
     }
 
+    /**
+     * Verifies that the delete call is reflected by the repository.
+     */
     @Test
-    @Description("Verifies that the delete call is reflected by the repository.")
     @ExpectEvents({
             @Expect(type = TargetTagCreatedEvent.class, count = 1),
             @Expect(type = TargetTagDeletedEvent.class, count = 1) })
@@ -216,8 +228,10 @@ public class MgmtTargetTagResourceTest extends AbstractManagementApiIntegrationT
         assertThat(targetTagManagement.get(original.getId())).isNotPresent();
     }
 
+    /**
+     * Ensures that assigned targets to tag in repository are listed with proper paging results.
+     */
     @Test
-    @Description("Ensures that assigned targets to tag in repository are listed with proper paging results.")
     @ExpectEvents({
             @Expect(type = TargetTagCreatedEvent.class, count = 1),
             @Expect(type = TargetCreatedEvent.class, count = 5), 
@@ -236,8 +250,10 @@ public class MgmtTargetTagResourceTest extends AbstractManagementApiIntegrationT
                 .andExpect(jsonPath(MgmtTargetResourceTest.JSON_PATH_PAGED_LIST_CONTENT, hasSize(targetsAssigned)));
     }
 
+    /**
+     * Ensures that assigned DS to tag in repository are listed with proper paging results with paging limit parameter.
+     */
     @Test
-    @Description("Ensures that assigned DS to tag in repository are listed with proper paging results with paging limit parameter.")
     @ExpectEvents({
             @Expect(type = TargetTagCreatedEvent.class, count = 1),
             @Expect(type = TargetCreatedEvent.class, count = 5), 
@@ -258,8 +274,10 @@ public class MgmtTargetTagResourceTest extends AbstractManagementApiIntegrationT
                 .andExpect(jsonPath(MgmtTargetResourceTest.JSON_PATH_PAGED_LIST_CONTENT, hasSize(limitSize)));
     }
 
+    /**
+     * Ensures that assigned targets to tag in repository are listed with proper paging results with paging limit and offset parameter.
+     */
     @Test
-    @Description("Ensures that assigned targets to tag in repository are listed with proper paging results with paging limit and offset parameter.")
     @ExpectEvents({
             @Expect(type = TargetTagCreatedEvent.class, count = 1),
             @Expect(type = TargetCreatedEvent.class, count = 5), 
@@ -283,8 +301,10 @@ public class MgmtTargetTagResourceTest extends AbstractManagementApiIntegrationT
                 .andExpect(jsonPath(MgmtTargetResourceTest.JSON_PATH_PAGED_LIST_CONTENT, hasSize(expectedSize)));
     }
 
+    /**
+     * Verifies that tag assignments done through tag API command are correctly stored in the repository.
+     */
     @Test
-    @Description("Verifies that tag assignments done through tag API command are correctly stored in the repository.")
     @ExpectEvents({
             @Expect(type = TargetTagCreatedEvent.class, count = 1),
             @Expect(type = TargetCreatedEvent.class, count = 1),
@@ -302,8 +322,10 @@ public class MgmtTargetTagResourceTest extends AbstractManagementApiIntegrationT
         assertThat(updated.stream().map(Target::getControllerId).toList()).containsOnly(assigned.getControllerId());
     }
 
+    /**
+     * Verifies that tag assignments (multi targets) done through tag API command are correctly stored in the repository.
+     */
     @Test
-    @Description("Verifies that tag assignments (multi targets) done through tag API command are correctly stored in the repository.")
     @ExpectEvents({
             @Expect(type = TargetTagCreatedEvent.class, count = 1),
             @Expect(type = TargetCreatedEvent.class, count = 2),
@@ -314,7 +336,7 @@ public class MgmtTargetTagResourceTest extends AbstractManagementApiIntegrationT
         final Target assigned0 = targets.get(0);
         final Target assigned1 = targets.get(1);
 
-        mvc.perform(put(MgmtRestConstants.TARGET_TAG_V1_REQUEST_MAPPING + "/" + tag.getId() + "/assigned")
+        mvc.perform(post(MgmtRestConstants.TARGET_TAG_V1_REQUEST_MAPPING + "/" + tag.getId() + "/assigned")
                         .content(JsonBuilder.toArray(Arrays.asList(assigned0.getControllerId(), assigned1.getControllerId())))
                         .contentType(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
@@ -325,8 +347,10 @@ public class MgmtTargetTagResourceTest extends AbstractManagementApiIntegrationT
                 .containsOnly(assigned0.getControllerId(), assigned1.getControllerId());
     }
 
+    /**
+     * Verifies that tag assignments (multi targets) done through tag API command are correctly stored in the repository.
+     */
     @Test
-    @Description("Verifies that tag assignments (multi targets) done through tag API command are correctly stored in the repository.")
     @ExpectEvents({
             @Expect(type = TargetTagCreatedEvent.class, count = 1),
             @Expect(type = TargetCreatedEvent.class, count = 2) })
@@ -347,7 +371,7 @@ public class MgmtTargetTagResourceTest extends AbstractManagementApiIntegrationT
         final List<String> withMissing = new ArrayList<>(targets);
         withMissing.addAll(missing);
 
-        mvc.perform(put(MgmtRestConstants.TARGET_TAG_V1_REQUEST_MAPPING + "/" + tag.getId() + "/assigned")
+        mvc.perform(post(MgmtRestConstants.TARGET_TAG_V1_REQUEST_MAPPING + "/" + tag.getId() + "/assigned")
                         .content(JsonBuilder.toArray(withMissing))
                         .contentType(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
@@ -364,8 +388,10 @@ public class MgmtTargetTagResourceTest extends AbstractManagementApiIntegrationT
         assertThat(targetManagement.findByTag(tag.getId(), PAGE).getContent()).isEmpty();
     }
 
+    /**
+     * Verifies that tag assignments (multi targets) done through tag API command are correctly stored in the repository.
+     */
     @Test
-    @Description("Verifies that tag assignments (multi targets) done through tag API command are correctly stored in the repository.")
     @ExpectEvents({
             @Expect(type = TargetTagCreatedEvent.class, count = 1),
             @Expect(type = TargetCreatedEvent.class, count = 2),
@@ -387,7 +413,7 @@ public class MgmtTargetTagResourceTest extends AbstractManagementApiIntegrationT
         final List<String> withMissing = new ArrayList<>(targets);
         withMissing.addAll(missing);
 
-        mvc.perform(put(MgmtRestConstants.TARGET_TAG_V1_REQUEST_MAPPING + "/" + tag.getId() + "/assigned")
+        mvc.perform(post(MgmtRestConstants.TARGET_TAG_V1_REQUEST_MAPPING + "/" + tag.getId() + "/assigned")
                         .param("onNotFoundPolicy", MgmtTargetTagRestApi.OnNotFoundPolicy.ON_WHAT_FOUND_AND_FAIL.name())
                         .content(JsonBuilder.toArray(withMissing))
                         .contentType(MediaType.APPLICATION_JSON))
@@ -406,8 +432,10 @@ public class MgmtTargetTagResourceTest extends AbstractManagementApiIntegrationT
                 .isEqualTo(targets.stream().sorted().toList());
     }
 
+    /**
+     * Verifies that tag assignments (multi targets) done through tag API command are correctly stored in the repository.
+     */
     @Test
-    @Description("Verifies that tag assignments (multi targets) done through tag API command are correctly stored in the repository.")
     @ExpectEvents({
             @Expect(type = TargetTagCreatedEvent.class, count = 1),
             @Expect(type = TargetCreatedEvent.class, count = 2),
@@ -429,7 +457,7 @@ public class MgmtTargetTagResourceTest extends AbstractManagementApiIntegrationT
         final List<String> withMissing = new ArrayList<>(targets);
         withMissing.addAll(missing);
 
-        mvc.perform(put(MgmtRestConstants.TARGET_TAG_V1_REQUEST_MAPPING + "/" + tag.getId() + "/assigned")
+        mvc.perform(post(MgmtRestConstants.TARGET_TAG_V1_REQUEST_MAPPING + "/" + tag.getId() + "/assigned")
                         .param("onNotFoundPolicy", MgmtTargetTagRestApi.OnNotFoundPolicy.ON_WHAT_FOUND_AND_SUCCESS.name())
                         .content(JsonBuilder.toArray(withMissing))
                         .contentType(MediaType.APPLICATION_JSON))
@@ -439,8 +467,10 @@ public class MgmtTargetTagResourceTest extends AbstractManagementApiIntegrationT
                 .isEqualTo(targets.stream().sorted().toList());
     }
 
+    /**
+     * Verifies that tag unassignments done through tag API command are correctly stored in the repository.
+     */
     @Test
-    @Description("Verifies that tag unassignments done through tag API command are correctly stored in the repository.")
     @ExpectEvents({
             @Expect(type = TargetTagCreatedEvent.class, count = 1),
             @Expect(type = TargetCreatedEvent.class, count = 2),
@@ -463,8 +493,10 @@ public class MgmtTargetTagResourceTest extends AbstractManagementApiIntegrationT
                 .containsOnly(assigned.getControllerId());
     }
 
+    /**
+     * Verifies that tag unassignments (multi targets) done through tag API command are correctly stored in the repository.
+     */
     @Test
-    @Description("Verifies that tag unassignments (multi targets) done through tag API command are correctly stored in the repository.")
     @ExpectEvents({
             @Expect(type = TargetTagCreatedEvent.class, count = 1),
             @Expect(type = TargetCreatedEvent.class, count = 3),
@@ -489,8 +521,10 @@ public class MgmtTargetTagResourceTest extends AbstractManagementApiIntegrationT
                 .containsOnly(assigned.getControllerId());
     }
 
+    /**
+     * Verifies that tag assignments (multi targets) done through tag API command are correctly stored in the repository.
+     */
     @Test
-    @Description("Verifies that tag assignments (multi targets) done through tag API command are correctly stored in the repository.")
     @ExpectEvents({
             @Expect(type = TargetTagCreatedEvent.class, count = 1),
             @Expect(type = TargetCreatedEvent.class, count = 2),
@@ -532,8 +566,10 @@ public class MgmtTargetTagResourceTest extends AbstractManagementApiIntegrationT
                 .isEqualTo(targets.stream().sorted().toList());
     }
 
+    /**
+     * Verifies that tag assignments (multi targets) done through tag API command are correctly stored in the repository.
+     */
     @Test
-    @Description("Verifies that tag assignments (multi targets) done through tag API command are correctly stored in the repository.")
     @ExpectEvents({
             @Expect(type = TargetTagCreatedEvent.class, count = 1),
             @Expect(type = TargetCreatedEvent.class, count = 2),
@@ -575,8 +611,10 @@ public class MgmtTargetTagResourceTest extends AbstractManagementApiIntegrationT
         assertThat(targetManagement.findByTag(tag.getId(), PAGE).getContent()).isEmpty();
     }
 
+    /**
+     * Verifies that tag assignments (multi targets) done through tag API command are correctly stored in the repository.
+     */
     @Test
-    @Description("Verifies that tag assignments (multi targets) done through tag API command are correctly stored in the repository.")
     @ExpectEvents({
             @Expect(type = TargetTagCreatedEvent.class, count = 1),
             @Expect(type = TargetCreatedEvent.class, count = 2),

@@ -27,10 +27,6 @@ import java.util.UUID;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Step;
-import io.qameta.allure.Story;
 import org.eclipse.hawkbit.amqp.AmqpMessageHandlerService;
 import org.eclipse.hawkbit.amqp.AmqpProperties;
 import org.eclipse.hawkbit.dmf.amqp.api.EventTopic;
@@ -78,8 +74,10 @@ import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.beans.factory.annotation.Autowired;
 
-@Feature("Component Tests - Device Management Federation API")
-@Story("Amqp Message Handler Service")
+/**
+ * Feature: Component Tests - Device Management Federation API<br/>
+ * Story: Amqp Message Handler Service
+ */
 class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegrationTest {
 
     static final String DMF_REGISTER_TEST_CONTROLLER_ID = "Dmf_hand_registerTargets_1";
@@ -93,8 +91,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     @Autowired
     private AmqpMessageHandlerService amqpMessageHandlerService;
 
+    /**
+     * Tests DMF PING request and expected response.
+     */
     @Test
-    @Description("Tests DMF PING request and expected response.")
     void pingDmfInterface() {
         final Message pingMessage = createPingMessage(CORRELATION_ID, TENANT_EXIST);
         getDmfClient().send(pingMessage);
@@ -104,8 +104,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         Mockito.verifyNoInteractions(getDeadletterListener());
     }
 
+    /**
+     * Tests register target
+     */
     @Test
-    @Description("Tests register target")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 2),
             @Expect(type = TargetPollEvent.class, count = 3) })
@@ -120,8 +122,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         Mockito.verifyNoInteractions(getDeadletterListener());
     }
 
+    /**
+     * Tests register target with name
+     */
     @Test
-    @Description("Tests register target with name")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetUpdatedEvent.class, count = 1), 
@@ -138,8 +142,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         Mockito.verifyNoInteractions(getDeadletterListener());
     }
 
+    /**
+     * Tests register target with attributes
+     */
     @Test
-    @Description("Tests register target with attributes")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetUpdatedEvent.class, count = 2), 
@@ -159,8 +165,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         Mockito.verifyNoInteractions(getDeadletterListener());
     }
 
+    /**
+     * Tests register target with name and attributes
+     */
     @Test
-    @Description("Tests register target with name and attributes")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetUpdatedEvent.class, count = 3), 
@@ -183,9 +191,11 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     }
 
     @ParameterizedTest
+    /**
+     * Tests register invalid target with empty controller id.
+     */
     @ValueSource(strings = { "", "Invalid Invalid" })
     @NullSource
-    @Description("Tests register invalid target with empty controller id.")
     @ExpectEvents({ @Expect(type = TargetCreatedEvent.class) })
     void shouldNotRegisterTargetsWithInvalidControllerIds(String controllerId) {
         createAndSendThingCreated(controllerId);
@@ -193,8 +203,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         verifyOneDeadLetterMessage();
     }
 
+    /**
+     * Tests register invalid target with too long controller id
+     */
     @Test
-    @Description("Tests register invalid target with too long controller id")
     @ExpectEvents({ @Expect(type = TargetCreatedEvent.class) })
     void registerInvalidTargetWithTooLongControllerId() {
         createAndSendThingCreated(randomString(Target.CONTROLLER_ID_MAX_SIZE + 1));
@@ -202,8 +214,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         verifyOneDeadLetterMessage();
     }
 
+    /**
+     * Tests null reply to property in message header. This message should forwarded to the deadletter queue
+     */
     @Test
-    @Description("Tests null reply to property in message header. This message should forwarded to the deadletter queue")
     @ExpectEvents({ @Expect(type = TargetCreatedEvent.class) })
     void missingReplyToProperty() {
         final String controllerId = TARGET_PREFIX + "missingReplyToProperty";
@@ -215,8 +229,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         assertAllTargetsCount(0);
     }
 
+    /**
+     * Tests missing reply to property in message header. This message should forwarded to the deadletter queue
+     */
     @Test
-    @Description("Tests missing reply to property in message header. This message should forwarded to the deadletter queue")
     @ExpectEvents({ @Expect(type = TargetCreatedEvent.class) })
     void emptyReplyToProperty() {
         final String controllerId = TARGET_PREFIX + "emptyReplyToProperty";
@@ -228,8 +244,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         assertAllTargetsCount(0);
     }
 
+    /**
+     * Tests missing thing id property in message. This message should forwarded to the deadletter queue
+     */
     @Test
-    @Description("Tests missing thing id property in message. This message should forwarded to the deadletter queue")
     @ExpectEvents({ @Expect(type = TargetCreatedEvent.class) })
     void missingThingIdProperty() {
         final Message createTargetMessage = createTargetMessage(null, TENANT_EXIST);
@@ -240,8 +258,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         assertAllTargetsCount(0);
     }
 
+    /**
+     * Tests null thing id property in message. This message should forwarded to the deadletter queue
+     */
     @Test
-    @Description("Tests null thing id property in message. This message should forwarded to the deadletter queue")
     @ExpectEvents({ @Expect(type = TargetCreatedEvent.class) })
     void nullThingIdProperty() {
         final Message createTargetMessage = createTargetMessage(null, TENANT_EXIST);
@@ -251,8 +271,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         assertAllTargetsCount(0);
     }
 
+    /**
+     * Tests missing tenant message header. This message should forwarded to the deadletter queue
+     */
     @Test
-    @Description("Tests missing tenant message header. This message should forwarded to the deadletter queue")
     @ExpectEvents({ @Expect(type = TargetCreatedEvent.class) })
     void missingTenantHeader() {
         final String controllerId = TARGET_PREFIX + "missingTenantHeader";
@@ -264,8 +286,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         assertAllTargetsCount(0);
     }
 
+    /**
+     * Tests null tenant message header. This message should forwarded to the deadletter queue
+     */
     @Test
-    @Description("Tests null tenant message header. This message should forwarded to the deadletter queue")
     @ExpectEvents({ @Expect(type = TargetCreatedEvent.class) })
     void nullTenantHeader() {
         final String controllerId = TARGET_PREFIX + "nullTenantHeader";
@@ -276,8 +300,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         assertAllTargetsCount(0);
     }
 
+    /**
+     * Tests empty tenant message header. This message should forwarded to the deadletter queue
+     */
     @Test
-    @Description("Tests empty tenant message header. This message should forwarded to the deadletter queue")
     @ExpectEvents({ @Expect(type = TargetCreatedEvent.class) })
     void emptyTenantHeader() {
         final String controllerId = TARGET_PREFIX + "emptyTenantHeader";
@@ -288,8 +314,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         assertAllTargetsCount(0);
     }
 
+    /**
+     * Tests missing type message header. This message should forwarded to the deadletter queue
+     */
     @Test
-    @Description("Tests missing type message header. This message should forwarded to the deadletter queue")
     @ExpectEvents({ @Expect(type = TargetCreatedEvent.class) })
     void missingTypeHeader() {
         final Message createTargetMessage = createTargetMessage(null, TENANT_EXIST);
@@ -301,9 +329,11 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     }
 
     @ParameterizedTest
+    /**
+     * Tests null type message header. This message should forwarded to the deadletter queue
+     */
     @ValueSource(strings = { "", "NotExist" })
     @NullSource
-    @Description("Tests null type message header. This message should forwarded to the deadletter queue")
     @ExpectEvents({ @Expect(type = TargetCreatedEvent.class) })
     void shouldNotCreateTargetsWithInvalidTypeInHeader(String type) {
         final Message createTargetMessage = createTargetMessage(null, TENANT_EXIST);
@@ -315,9 +345,11 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     }
 
     @ParameterizedTest
+    /**
+     * Tests null topic message header. This message should forwarded to the deadletter queue
+     */
     @ValueSource(strings = { "", "NotExist" })
     @NullSource
-    @Description("Tests null topic message header. This message should forwarded to the deadletter queue")
     @ExpectEvents({ @Expect(type = TargetCreatedEvent.class) })
     void shouldNotSendMessagesWithInvalidTopic(String topic) {
         final Message eventMessage = createUpdateActionEventMessage("");
@@ -327,8 +359,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         verifyOneDeadLetterMessage();
     }
 
+    /**
+     * Tests missing topic message header. This message should forwarded to the deadletter queue
+     */
     @Test
-    @Description("Tests missing topic message header. This message should forwarded to the deadletter queue")
     @ExpectEvents({ @Expect(type = TargetCreatedEvent.class) })
     void missingTopicHeader() {
         final Message eventMessage = createUpdateActionEventMessage("");
@@ -339,9 +373,11 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     }
 
     @ParameterizedTest
+    /**
+     * Tests invalid null message content. This message should forwarded to the deadletter queue
+     */
     @ValueSource(strings = { "", "Invalid Content" })
     @NullSource
-    @Description("Tests invalid null message content. This message should forwarded to the deadletter queue")
     @ExpectEvents({ @Expect(type = TargetCreatedEvent.class) })
     void shouldMoveUpdateActionStatusWithInvalidPayloadIntoDeadLetter(String payload) {
         final Message eventMessage = createUpdateActionEventMessage(payload);
@@ -349,8 +385,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         verifyOneDeadLetterMessage();
     }
 
+    /**
+     * Tests invalid topic message header. This message should forwarded to the deadletter queue
+     */
     @Test
-    @Description("Tests invalid topic message header. This message should forwarded to the deadletter queue")
     @ExpectEvents({ @Expect(type = TargetCreatedEvent.class) })
     void updateActionStatusWithInvalidActionId() {
         final DmfActionUpdateStatus actionUpdateStatus = new DmfActionUpdateStatus(1L, DmfActionStatus.RUNNING);
@@ -359,8 +397,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         verifyOneDeadLetterMessage();
     }
 
+    /**
+     * Tests register target and send finished message
+     */
     @Test
-    @Description("Tests register target and send finished message")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
@@ -378,8 +418,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         registerTargetAndSendAndAssertUpdateActionStatus(DmfActionStatus.FINISHED, Status.FINISHED, controllerId);
     }
 
+    /**
+     * Register a target and send a update action status (running). Verify if the updated action status is correct.
+     */
     @Test
-    @Description("Register a target and send a update action status (running). Verify if the updated action status is correct.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
@@ -396,8 +438,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         registerTargetAndSendAndAssertUpdateActionStatus(DmfActionStatus.RUNNING, Status.RUNNING, controllerId);
     }
 
+    /**
+     * Register a target and send an update action status (downloaded). Verify if the updated action status is correct.
+     */
     @Test
-    @Description("Register a target and send an update action status (downloaded). Verify if the updated action status is correct.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
@@ -414,8 +458,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         registerTargetAndSendAndAssertUpdateActionStatus(DmfActionStatus.DOWNLOADED, Status.DOWNLOADED, controllerId);
     }
 
+    /**
+     * Register a target and send a update action status (download). Verify if the updated action status is correct.
+     */
     @Test
-    @Description("Register a target and send a update action status (download). Verify if the updated action status is correct.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
@@ -431,8 +477,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         registerTargetAndSendAndAssertUpdateActionStatus(DmfActionStatus.DOWNLOAD, Status.DOWNLOAD, controllerId);
     }
 
+    /**
+     * Register a target and send a update action status (error). Verify if the updated action status is correct.
+     */
     @Test
-    @Description("Register a target and send a update action status (error). Verify if the updated action status is correct.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
@@ -449,8 +497,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         registerTargetAndSendAndAssertUpdateActionStatus(DmfActionStatus.ERROR, Status.ERROR, controllerId);
     }
 
+    /**
+     * Register a target and send a update action status (warning). Verify if the updated action status is correct.
+     */
     @Test
-    @Description("Register a target and send a update action status (warning). Verify if the updated action status is correct.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
@@ -466,8 +516,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         registerTargetAndSendAndAssertUpdateActionStatus(DmfActionStatus.WARNING, Status.WARNING, controllerId);
     }
 
+    /**
+     * Register a target and send a update action status (retrieved). Verify if the updated action status is correct.
+     */
     @Test
-    @Description("Register a target and send a update action status (retrieved). Verify if the updated action status is correct.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
@@ -483,8 +535,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         registerTargetAndSendAndAssertUpdateActionStatus(DmfActionStatus.RETRIEVED, Status.RETRIEVED, controllerId);
     }
 
+    /**
+     * Register a target and send a invalid update action status (cancel). This message should forwarded to the deadletter queue
+     */
     @Test
-    @Description("Register a target and send a invalid update action status (cancel). This message should forwarded to the deadletter queue")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
@@ -501,8 +555,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         verifyOneDeadLetterMessage();
     }
 
+    /**
+     * Verify receiving a download and install message if a deployment is done before the target has polled the first time.
+     */
     @Test
-    @Description("Verify receiving a download and install message if a deployment is done before the target has polled the first time.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
@@ -530,8 +586,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         Mockito.verifyNoInteractions(getDeadletterListener());
     }
 
+    /**
+     * Verify receiving a download message if a deployment is done with window configured but before maintenance window start time.
+     */
     @Test
-    @Description("Verify receiving a download message if a deployment is done with window configured but before maintenance window start time.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
@@ -560,8 +618,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         Mockito.verifyNoInteractions(getDeadletterListener());
     }
 
+    /**
+     * Verify receiving a download_and_install message if a deployment is done with window configured and during maintenance window start time.
+     */
     @Test
-    @Description("Verify receiving a download_and_install message if a deployment is done with window configured and during maintenance window start time.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
@@ -590,8 +650,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         Mockito.verifyNoInteractions(getDeadletterListener());
     }
 
+    /**
+     * Verify receiving a cancel update message if a deployment is canceled before the target has polled the first time.
+     */
     @Test
-    @Description("Verify receiving a cancel update message if a deployment is canceled before the target has polled the first time.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
@@ -622,8 +684,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         Mockito.verifyNoInteractions(getDeadletterListener());
     }
 
+    /**
+     * Register a target and send a invalid update action status (canceled). The current status (pending) is not a canceling state. This message should forwarded to the deadletter queue
+     */
     @Test
-    @Description("Register a target and send a invalid update action status (canceled). The current status (pending) is not a canceling state. This message should forwarded to the deadletter queue")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
@@ -646,8 +710,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         verifyOneDeadLetterMessage();
     }
 
+    /**
+     * Register a target and send a invalid update action status (cancel_rejected). This message should forwarded to the deadletter queue
+     */
     @Test
-    @Description("Register a target and send a invalid update action status (cancel_rejected). This message should forwarded to the deadletter queue")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
@@ -664,8 +730,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         verifyOneDeadLetterMessage();
     }
 
+    /**
+     * Register a target and send a valid update action status (cancel_rejected). Verify if the updated action status is correct.
+     */
     @Test
-    @Description("Register a target and send a valid update action status (cancel_rejected). Verify if the updated action status is correct.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
@@ -692,8 +760,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
 
     }
 
+    /**
+     * Verify that sending an update controller attribute message to an existing target works. Verify that different update modes (merge, replace, remove) can be used.
+     */
     @Test
-    @Description("Verify that sending an update controller attribute message to an existing target works. Verify that different update modes (merge, replace, remove) can be used.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetUpdatedEvent.class, count = 4), 
@@ -718,8 +788,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
 
     }
 
+    /**
+     * Verify that sending an update controller attribute message with no thingid header to an existing target does not work.
+     */
     @Test
-    @Description("Verify that sending an update controller attribute message with no thingid header to an existing target does not work.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetUpdatedEvent.class), 
@@ -744,8 +816,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         assertUpdateAttributes(controllerId, controllerAttributeEmpty.getAttributes());
     }
 
+    /**
+     * Verify that sending an update controller attribute message with invalid body to an existing target does not work.
+     */
     @Test
-    @Description("Verify that sending an update controller attribute message with invalid body to an existing target does not work.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetUpdatedEvent.class), 
@@ -762,8 +836,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         verifyOneDeadLetterMessage();
     }
 
+    /**
+     * Verifies that sending an UPDATE_ATTRIBUTES message with invalid attributes is handled correctly.
+     */
     @Test
-    @Description("Verifies that sending an UPDATE_ATTRIBUTES message with invalid attributes is handled correctly.")
     void updateAttributesWithInvalidValues() {
         registerAndAssertTargetWithExistingTenant(UPDATE_ATTR_TEST_CONTROLLER_ID);
 
@@ -774,8 +850,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         verifyNumberOfDeadLetterMessages(3);
     }
 
+    /**
+     * Tests the download_only assignment: tests the handling of a target reporting DOWNLOADED
+     */
     @Test
-    @Description("Tests the download_only assignment: tests the handling of a target reporting DOWNLOADED")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
@@ -808,8 +886,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         verifyAssignedDsAndInstalledDs(distributionSet.getId(), null);
     }
 
+    /**
+     * Tests the download_only assignment: tests the handling of a target reporting FINISHED
+     */
     @Test
-    @Description("Tests the download_only assignment: tests the handling of a target reporting FINISHED")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
@@ -850,8 +930,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         verifyAssignedDsAndInstalledDs(distributionSet.getId(), distributionSet.getId());
     }
 
+    /**
+     * Messages that result into certain exceptions being raised should not be requeued. This message should forwarded to the deadletter queue
+     */
     @Test
-    @Description("Messages that result into certain exceptions being raised should not be requeued. This message should forwarded to the deadletter queue")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class) })
     void ignoredExceptionTypesShouldNotBeRequeued() {
@@ -875,8 +957,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         }
     }
 
+    /**
+     * Register a target and send a update action status (confirmed). Verify if the updated action status is correct.
+     */
     @Test
-    @Description("Register a target and send a update action status (confirmed). Verify if the updated action status is correct.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
@@ -903,8 +987,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         assertDownloadAndInstallMessage(assignmentResult.getDistributionSet().getModules(), controllerId);
     }
 
+    /**
+     * Verify the DMF confirmed feedback can be provided if confirmation flow is disabled
+     */
     @Test
-    @Description("Verify the DMF confirmed feedback can be provided if confirmation flow is disabled")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
@@ -937,8 +1023,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         assertDownloadAndInstallMessage(assignmentResult.getDistributionSet().getModules(), controllerId);
     }
 
+    /**
+     * Verify the DMF confirmed feedback can be provided if confirmation flow is disabled
+     */
     @Test
-    @Description("Verify the DMF confirmed feedback can be provided if confirmation flow is disabled")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
@@ -967,8 +1055,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         assertActionStatusList(actionId, 2, Status.WAIT_FOR_CONFIRMATION);
     }
 
+    /**
+     * Verify the DMF download and install message is send directly if auto-confirmation is active
+     */
     @Test
-    @Description("Verify the DMF download and install message is send directly if auto-confirmation is active")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetUpdatedEvent.class, count = 2),
@@ -1001,8 +1091,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         assertDownloadAndInstallMessage(assignmentResult.getDistributionSet().getModules(), controllerId);
     }
 
+    /**
+     * Register a target and send a update action status (denied). Verify if the updated action status is correct.
+     */
     @Test
-    @Description("Register a target and send a update action status (denied). Verify if the updated action status is correct.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
@@ -1032,7 +1124,6 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         return node.get("actionId").asText();
     }
 
-    @Step
     private void updateAttributesWithUpdateModeRemove() {
 
         // assemble the expected attributes
@@ -1053,7 +1144,6 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         assertUpdateAttributes(DMF_ATTR_TEST_CONTROLLER_ID, expectedAttributes);
     }
 
-    @Step
     private void updateAttributesWithUpdateModeMerge() {
         // get the current attributes
         final Map<String, String> attributes = new HashMap<>(
@@ -1074,7 +1164,6 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         assertUpdateAttributes(DMF_ATTR_TEST_CONTROLLER_ID, expectedAttributes);
     }
 
-    @Step
     private void updateAttributesWithUpdateModeReplace() {
         // send an update message with update mode REPLACE
         final Map<String, String> expectedAttributes = new HashMap<>();
@@ -1089,7 +1178,6 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         assertUpdateAttributes(DMF_ATTR_TEST_CONTROLLER_ID, expectedAttributes);
     }
 
-    @Step
     private void updateAttributesWithoutUpdateMode() {
         // send an update message which does not specify an update mode
         final Map<String, String> expectedAttributes = new HashMap<>();
@@ -1103,7 +1191,6 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         assertUpdateAttributes(DMF_ATTR_TEST_CONTROLLER_ID, expectedAttributes);
     }
 
-    @Step
     private void verifyAssignedDsAndInstalledDs(final Long assignedDsId, final Long installedDsId) {
         final Optional<Target> target = controllerManagement.getByControllerId(DMF_REGISTER_TEST_CONTROLLER_ID);
         assertThat(target).isPresent();

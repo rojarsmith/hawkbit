@@ -26,10 +26,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Step;
-import io.qameta.allure.Story;
 import org.awaitility.Awaitility;
 import org.eclipse.hawkbit.mgmt.rest.api.MgmtActionRestApi;
 import org.eclipse.hawkbit.mgmt.rest.api.MgmtRepresentationMode;
@@ -46,9 +42,10 @@ import org.springframework.test.web.servlet.ResultActions;
 
 /**
  * Integration test for the {@link MgmtActionRestApi}.
+  * <p/>
+ * Feature: Component Tests - Management API<br/>
+ * Story: Action Resource
  */
-@Feature("Component Tests - Management API")
-@Story("Action Resource")
 class MgmtActionResourceTest extends AbstractManagementApiIntegrationTest {
 
     private static final String JSON_PATH_ROOT = "$";
@@ -64,20 +61,26 @@ class MgmtActionResourceTest extends AbstractManagementApiIntegrationTest {
 
     private static final String JSON_PATH_ACTION_ID = JSON_PATH_ROOT + JSON_PATH_FIELD_ID;
 
+    /**
+     * Handles the GET request of retrieving a specific action.
+     */
     @Test
-    @Description("Handles the GET request of retrieving a specific action.")
-    public void getAction() throws Exception {
+     void getAction() throws Exception {
         getAction(false);
     }
 
+    /**
+     * Handles the GET request of retrieving a specific action with external reference.
+     */
     @Test
-    @Description("Handles the GET request of retrieving a specific action with external reference.")
-    public void getActionExtRef() throws Exception {
+     void getActionExtRef() throws Exception {
         getAction(true);
     }
 
+    /**
+     * Verifies that actions can be filtered based on action status.
+     */
     @Test
-    @Description("Verifies that actions can be filtered based on action status.")
     void filterActionsByStatus() throws Exception {
 
         // prepare test
@@ -113,8 +116,10 @@ class MgmtActionResourceTest extends AbstractManagementApiIntegrationTest {
 
     }
 
+    /**
+     * Verifies that actions can be filtered based on the detailed action status.
+     */
     @Test
-    @Description("Verifies that actions can be filtered based on the detailed action status.")
     void filterActionsByDetailStatus() throws Exception {
         // prepare test
         final DistributionSet dsA = testdataFactory.createDistributionSet("");
@@ -150,8 +155,10 @@ class MgmtActionResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath("content[0].status", equalTo("pending")));
     }
 
+    /**
+     * Verifies that actions can be filtered based on extRef.
+     */
     @Test
-    @Description("Verifies that actions can be filtered based on extRef.")
     void filterActionsByExternalRef() throws Exception {
         // prepare test
         final String knownTargetId = "targetId";
@@ -193,8 +200,10 @@ class MgmtActionResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath("size", equalTo(0)));
     }
 
+    /**
+     * Verifies that actions can be filtered based on the action status code that was reported last.
+     */
     @Test
-    @Description("Verifies that actions can be filtered based on the action status code that was reported last.")
     void filterActionsByLastStatusCode() throws Exception {
         // assign a distribution set to three targets
         final DistributionSet dsA = testdataFactory.createDistributionSet("");
@@ -228,8 +237,10 @@ class MgmtActionResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath("size", equalTo(0)));
     }
 
+    /**
+     * Verifies that actions can be filtered based on distribution set fields.
+     */
     @Test
-    @Description("Verifies that actions can be filtered based on distribution set fields.")
     void filterActionsByDistributionSet() throws Exception {
         // prepare test
         final DistributionSet ds = testdataFactory.createDistributionSet("");
@@ -273,8 +284,10 @@ class MgmtActionResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath("size", equalTo(1)));
     }
 
+    /**
+     * Verifies that actions can be filtered based on rollout fields.
+     */
     @Test
-    @Description("Verifies that actions can be filtered based on rollout fields.")
     void filterActionsByRollout() throws Exception {
         // prepare test
         final DistributionSet ds = testdataFactory.createDistributionSet();
@@ -314,8 +327,10 @@ class MgmtActionResourceTest extends AbstractManagementApiIntegrationTest {
                         "content.[0]._links.distributionset.name", equalTo(ds.getName() + ":" + ds.getVersion())));
     }
 
+    /**
+     * Verifies that actions can be filtered based on target fields.
+     */
     @Test
-    @Description("Verifies that actions can be filtered based on target fields.")
     void filterActionsByTargetProperties() throws Exception {
         // prepare test
         final Target target = testdataFactory.createTarget("knownTargetId", "knownTargetName", "http://0.0.0.0");
@@ -328,20 +343,26 @@ class MgmtActionResourceTest extends AbstractManagementApiIntegrationTest {
         verifyResultsByTargetPropertyFilter(target, ds, "target.address==http://0.0.0.0");
     }
 
+    /**
+     * Verifies that all available actions are returned if the complete collection is requested.
+     */
     @Test
-    @Description("Verifies that all available actions are returned if the complete collection is requested.")
     void getActions() throws Exception {
         getActions(false);
     }
 
+    /**
+     * Verifies that all available actions (whit ext refs) are returned if the complete collection is requested.
+     */
     @Test
-    @Description("Verifies that all available actions (whit ext refs) are returned if the complete collection is requested.")
     void getActionsExtRef() throws Exception {
         getActions(true);
     }
 
+    /**
+     * Verifies that a full representation of all actions is returned if the collection is requested for representation mode 'full'.
+     */
     @Test
-    @Description("Verifies that a full representation of all actions is returned if the collection is requested for representation mode 'full'.")
     void getActionsFullRepresentation() throws Exception {
         final String knownTargetId = "targetId";
         final List<Action> actions = generateTargetWithTwoUpdatesWithOneOverride(knownTargetId);
@@ -382,8 +403,10 @@ class MgmtActionResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath(JSON_PATH_PAGED_LIST_CONTENT, hasSize(2)));
     }
 
+    /**
+     * Verifies that the get request for actions returns an empty collection if no assignments have been done yet.
+     */
     @Test
-    @Description("Verifies that the get request for actions returns an empty collection if no assignments have been done yet.")
     void getActionsWithEmptyResult() throws Exception {
         mvc.perform(get(MgmtRestConstants.ACTION_V1_REQUEST_MAPPING))
                 .andDo(MockMvcResultPrinter.print())
@@ -393,8 +416,10 @@ class MgmtActionResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath("total", equalTo(0)));
     }
 
+    /**
+     * Verifies paging is respected as expected.
+     */
     @Test
-    @Description("Verifies paging is respected as expected.")
     void getMultipleActionsWithPagingLimitRequestParameter() throws Exception {
         final String knownTargetId = "targetId";
         final List<Action> actions = generateTargetWithTwoUpdatesWithOneOverride(knownTargetId);
@@ -444,8 +469,10 @@ class MgmtActionResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath(JSON_PATH_PAGED_LIST_CONTENT, hasSize(1)));
     }
 
+    /**
+     * Verifies that the actions resource is read-only.
+     */
     @Test
-    @Description("Verifies that the actions resource is read-only.")
     void invalidRequestsOnActionResource() throws Exception {
         final String knownTargetId = "targetId";
 
@@ -463,8 +490,10 @@ class MgmtActionResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(status().isMethodNotAllowed());
     }
 
+    /**
+     * Verifies that the correct action is returned
+     */
     @Test
-    @Description("Verifies that the correct action is returned")
     void shouldRetrieveCorrectActionById() throws Exception {
         final String knownTargetId = "targetId";
 
@@ -477,8 +506,10 @@ class MgmtActionResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath(JSON_PATH_ACTION_ID, equalTo(actionId.intValue())));
     }
 
+    /**
+     * Verifies that NOT_FOUND is returned when there is no such action.
+     */
     @Test
-    @Description("Verifies that NOT_FOUND is returned when there is no such action.")
     void requestActionThatDoesNotExistsLeadsToNotFound() throws Exception {
         mvc.perform(get(MgmtRestConstants.ACTION_V1_REQUEST_MAPPING + "/" + 101))
                 .andDo(MockMvcResultPrinter.print())
@@ -499,7 +530,6 @@ class MgmtActionResourceTest extends AbstractManagementApiIntegrationTest {
                 + action.getDistributionSet().getId();
     }
 
-    @Step
     private void verifyResultsByTargetPropertyFilter(final Target target, final DistributionSet ds, final String rsqlTargetFilter)
             throws Exception {
         // pending status one result

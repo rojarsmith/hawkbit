@@ -29,9 +29,6 @@ import java.util.stream.Stream;
 
 import jakarta.validation.ConstraintViolationException;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import lombok.Getter;
 import org.assertj.core.api.Assertions;
 import org.eclipse.hawkbit.repository.ActionStatusFields;
@@ -96,16 +93,19 @@ import org.springframework.data.domain.Sort.Direction;
 
 /**
  * Test class testing the functionality of triggering a deployment of {@link DistributionSet}s to {@link Target}s.
+  * <p/>
+ * Feature: Component Tests - Repository<br/>
+ * Story: Deployment Management
  */
-@Feature("Component Tests - Repository")
-@Story("Deployment Management")
 class DeploymentManagementTest extends AbstractJpaIntegrationTest {
 
     private static final boolean STATE_ACTIVE = true;
     private static final boolean STATE_INACTIVE = false;
 
+    /**
+     * Tests that an exception is thrown when a target is assigned to an incomplete distribution set
+     */
     @Test
-    @Description("Tests that an exception is thrown when a target is assigned to an incomplete distribution set")
     void verifyAssignTargetsToIncompleteDistribution() {
         final DistributionSet distributionSet = testdataFactory.createIncompleteDistributionSet();
         final Target target = testdataFactory.createTarget();
@@ -115,8 +115,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
                 .isThrownBy(() -> assignDistributionSet(distributionSet, target));
     }
 
+    /**
+     * Tests that an exception is thrown when a target is assigned to an invalidated distribution set
+     */
     @Test
-    @Description("Tests that an exception is thrown when a target is assigned to an invalidated distribution set")
     void verifyAssignTargetsToInvalidDistribution() {
         final DistributionSet distributionSet = testdataFactory.createAndInvalidateDistributionSet();
         final Target target = testdataFactory.createTarget();
@@ -126,18 +128,22 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
                 .isThrownBy(() -> assignDistributionSet(distributionSet, target));
     }
 
+    /**
+     * Verifies that management get access react as specified on calls for non existing entities by means 
+     * of Optional not present.
+     */
     @Test
-    @Description("Verifies that management get access react as specified on calls for non existing entities by means " +
-            "of Optional not present.")
     @ExpectEvents({ @Expect(type = TargetCreatedEvent.class) })
     void nonExistingEntityAccessReturnsNotPresent() {
         assertThat(deploymentManagement.findAction(1234L)).isNotPresent();
         assertThat(deploymentManagement.findActionWithDetails(NOT_EXIST_IDL)).isNotPresent();
     }
 
+    /**
+     * Verifies that management queries react as specified on calls for non existing entities 
+     *  by means of throwing EntityNotFoundException.
+     */
     @Test
-    @Description("Verifies that management queries react as specified on calls for non existing entities " +
-            " by means of throwing EntityNotFoundException.")
     @ExpectEvents({ @Expect(type = TargetCreatedEvent.class, count = 1) })
     void entityQueriesReferringToNotExistingEntitiesThrowsException() {
         final Target target = testdataFactory.createTarget();
@@ -160,8 +166,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
         verifyThrownExceptionBy(() -> deploymentManagement.forceTargetAction(NOT_EXIST_IDL), "Action");
     }
 
+    /**
+     * Test verifies that the repistory retrieves the action including all defined (lazy) details.
+     */
     @Test
-    @Description("Test verifies that the repistory retrieves the action including all defined (lazy) details.")
     void findActionWithLazyDetails() {
         final DistributionSet testDs = testdataFactory.createDistributionSet("TestDs", "1.0",
                 new ArrayList<>());
@@ -177,8 +185,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
                 .isNotNull();
     }
 
+    /**
+     * Test verifies that actions of a target are found by using id-based search.
+     */
     @Test
-    @Description("Test verifies that actions of a target are found by using id-based search.")
     void findActionByTargetId() {
         final DistributionSet testDs = testdataFactory.createDistributionSet("TestDs", "1.0", new ArrayList<>());
         final List<Target> testTarget = testdataFactory.createTargets(1);
@@ -193,8 +203,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
         assertThat(actions.getContent().get(0).getId()).as("Action of target").isEqualTo(actionId);
     }
 
+    /**
+     * Test verifies that the 'max actions per target' quota is enforced.
+     */
     @Test
-    @Description("Test verifies that the 'max actions per target' quota is enforced.")
     void assertMaxActionsPerTargetQuotaIsEnforced() {
         enableMultiAssignments();
 
@@ -211,8 +223,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
                 .isThrownBy(() -> assignDistributionSet(ds1Id, controllerId, 77));
     }
 
+    /**
+     * An assignment request with more assignments than allowed by 'maxTargetDistributionSetAssignmentsPerManualAssignment' quota throws an exception.
+     */
     @Test
-    @Description("An assignment request with more assignments than allowed by 'maxTargetDistributionSetAssignmentsPerManualAssignment' quota throws an exception.")
     void assignmentRequestThatIsTooLarge() {
         final int maxActions = quotaManagement.getMaxTargetDistributionSetAssignmentsPerManualAssignment();
         final DistributionSet ds1 = testdataFactory.createDistributionSet("1");
@@ -225,8 +239,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
         assertThatExceptionOfType(AssignmentQuotaExceededException.class).isThrownBy(() -> assignDistributionSet(ds2, targets));
     }
 
+    /**
+     * Test verifies that action-states of an action are found by using id-based search.
+     */
     @Test
-    @Description("Test verifies that action-states of an action are found by using id-based search.")
     void findActionStatusByActionId() {
         final DistributionSet testDs = testdataFactory.createDistributionSet("TestDs", "1.0", Collections.emptyList());
         final List<Target> testTarget = testdataFactory.createTargets(1);
@@ -242,8 +258,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
         assertThat(actionStates.getContent().get(0)).as("Action-status of action").isEqualTo(expectedActionStatus);
     }
 
+    /**
+     * Test verifies that messages of an action-status are found by using id-based search.
+     */
     @Test
-    @Description("Test verifies that messages of an action-status are found by using id-based search.")
     void findMessagesByActionStatusId() {
         final DistributionSet testDs = testdataFactory.createDistributionSet("TestDs", "1.0", new ArrayList<>());
         final List<Target> testTarget = testdataFactory.createTargets(1);
@@ -268,8 +286,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
         assertThat(messages.getContent().get(0)).as("Message of action-status").isEqualTo(expectedMsg);
     }
 
+    /**
+     * Ensures that tag to distribution set assignment that does not exist will cause EntityNotFoundException.
+     */
     @Test
-    @Description("Ensures that tag to distribution set assignment that does not exist will cause EntityNotFoundException.")
     void assignDistributionSetToTagThatDoesNotExistThrowsException() {
         final List<Long> assignDS = new ArrayList<>(5);
         for (int i = 0; i < 4; i++) {
@@ -286,8 +306,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
                 .withMessageContaining(String.valueOf(100L));
     }
 
+    /**
+     * Test verifies that an assignment with automatic cancelation works correctly even if the update is split into multiple partitions on the database.
+     */
     @Test
-    @Description("Test verifies that an assignment with automatic cancelation works correctly even if the update is split into multiple partitions on the database.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 20),
             @Expect(type = TargetUpdatedEvent.class, count = 40),
@@ -313,10 +335,11 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
         assertThat(deploymentManagement.countActionsAll()).isEqualTo(2L * quotaManagement.getMaxTargetsPerAutoAssignment());
     }
 
+    /**
+     * Cancels multiple active actions on a target. Expected behaviour is that with two active 
+     * After canceling the first one also the target goes back to IN_SYNC as no open action is left.
+     */
     @Test
-    @Description("Cancels multiple active actions on a target. Expected behaviour is that with two active " +
-            "actions after canceling the second active action the first one is still running as it is not touched by the cancelation. " +
-            "After canceling the first one also the target goes back to IN_SYNC as no open action is left.")
     void manualCancelWithMultipleAssignmentsCancelLastOneFirst() {
         final Action action = prepareFinishedUpdate("4712", "installed", true);
         final Target target = action.getTarget();
@@ -360,10 +383,11 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
                 .isEqualTo(TargetUpdateStatus.IN_SYNC);
     }
 
+    /**
+     * Cancels multiple active actions on a target. Expected behaviour is that with two active 
+     * also the target goes back to IN_SYNC as no open action is left.
+     */
     @Test
-    @Description("Cancels multiple active actions on a target. Expected behaviour is that with two active "
-            + "actions after canceling the first active action the system switched to second one. After canceling this one "
-            + "also the target goes back to IN_SYNC as no open action is left.")
     void manualCancelWithMultipleAssignmentsCancelMiddleOneFirst() {
         final Action action = prepareFinishedUpdate("4712", "installed", true);
         final Target target = action.getTarget();
@@ -411,8 +435,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
                 .isEqualTo(TargetUpdateStatus.IN_SYNC);
     }
 
+    /**
+     * Force Quit an Assignment. Expected behaviour is that the action is canceled and is marked as deleted. The assigned Software module
+     */
     @Test
-    @Description("Force Quit an Assignment. Expected behaviour is that the action is canceled and is marked as deleted. The assigned Software module")
     void forceQuitSetActionToInactive() {
         final Action action = prepareFinishedUpdate("4712", "installed", true);
         final Target target = action.getTarget();
@@ -446,8 +472,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
                 .isEqualTo(TargetUpdateStatus.IN_SYNC);
     }
 
+    /**
+     * Force Quit an not canceled Assignment. Expected behaviour is that the action can not be force quit and there is thrown an exception.
+     */
     @Test
-    @Description("Force Quit an not canceled Assignment. Expected behaviour is that the action can not be force quit and there is thrown an exception.")
     void forceQuitNotAllowedThrowsException() {
         final Action action = prepareFinishedUpdate("4712", "installed", true);
         // verify initial status
@@ -468,9 +496,11 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
                 .isThrownBy(() -> deploymentManagement.forceQuitAction(assigningActionId));
     }
 
+    /**
+     * Simple offline deployment of a distribution set to a list of targets. Verifies that offline assigment 
+     * is correctly executed for targets that do not have a running update already. Those are ignored.
+     */
     @Test
-    @Description("Simple offline deployment of a distribution set to a list of targets. Verifies that offline assigment "
-            + "is correctly executed for targets that do not have a running update already. Those are ignored.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 20),
             @Expect(type = TargetUpdatedEvent.class, count = 20),
@@ -512,8 +542,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
                 .allMatch(target -> target.getLastModifiedAt() == target.getInstallationDate());
     }
 
+    /**
+     * Offline assign multiple DSs to a single Target in multiassignment mode.
+     */
     @Test
-    @Description("Offline assign multiple DSs to a single Target in multiassignment mode.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetUpdatedEvent.class, count = 4),
@@ -548,8 +580,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
         });
     }
 
+    /**
+     * Verifies that if an account is set to action autoclose running actions in case of a new assigned set get closed and set to CANCELED.
+     */
     @Test
-    @Description("Verifies that if an account is set to action autoclose running actions in case of a new assigned set get closed and set to CANCELED.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 10),
             @Expect(type = TargetUpdatedEvent.class, count = 20),
@@ -591,8 +625,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
         }
     }
 
+    /**
+     * If multi-assignment is enabled, verify that the previous Distribution Set assignment is not canceled when a new one is assigned.
+     */
     @Test
-    @Description("If multi-assignment is enabled, verify that the previous Distribution Set assignment is not canceled when a new one is assigned.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 10),
             @Expect(type = TargetUpdatedEvent.class, count = 20),
@@ -622,8 +658,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
         assertDsExclusivelyAssignedToTargets(targets, ds1.getId(), STATE_ACTIVE, RUNNING);
     }
 
+    /**
+     * Assign multiple DSs to a single Target in one request in multiassignment mode.
+     */
     @Test
-    @Description("Assign multiple DSs to a single Target in one request in multiassignment mode.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetUpdatedEvent.class, count = 4),
@@ -659,8 +697,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
         });
     }
 
+    /**
+     * Assign multiple DSs to single Target in one request in multiAssignment mode and cancel each created action afterwards.
+     */
     @Test
-    @Description("Assign multiple DSs to single Target in one request in multiAssignment mode and cancel each created action afterwards.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetUpdatedEvent.class, count = 4),
@@ -695,8 +735,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
                 }));
     }
 
+    /**
+     * A Request resulting in multiple assignments to a single target is only allowed when multiassignment is enabled.
+     */
     @Test
-    @Description("A Request resulting in multiple assignments to a single target is only allowed when multiassignment is enabled.")
     void multipleAssignmentsToTargetOnlyAllowedInMultiAssignMode() {
         final Target target = testdataFactory.createTarget();
         final List<DistributionSet> distributionSets = testdataFactory.createDistributionSets(2);
@@ -716,8 +758,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
                 deploymentManagement.assignDistributionSets(Arrays.asList(targetToDS0, targetToDS1)))).isEqualTo(2);
     }
 
+    /**
+     * Assigning distribution set to the list of targets with a non-existing one leads to successful assignment of valid targets, while not found targets are silently ignored.
+     */
     @Test
-    @Description("Assigning distribution set to the list of targets with a non-existing one leads to successful assignment of valid targets, while not found targets are silently ignored.")
     void assignDistributionSetToNotExistingTarget() {
         final String notExistingId = "notExistingTarget";
 
@@ -741,9 +785,11 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
         }
     }
 
+    /**
+     * Assignments with confirmation flow active will result in actions in 'WAIT_FOR_CONFIRMATION' state
+     */
     @ParameterizedTest
     @ValueSource(booleans = { true, false })
-    @Description("Assignments with confirmation flow active will result in actions in 'WAIT_FOR_CONFIRMATION' state")
     void assignmentWithConfirmationFlowActive(final boolean confirmationRequired) {
         final List<String> controllerIds = testdataFactory.createTargets(1).stream().map(Target::getControllerId).toList();
         final DistributionSet distributionSet = testdataFactory.createDistributionSet();
@@ -767,9 +813,11 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
                 }));
     }
 
+    /**
+     * Verify auto confirmation assignments and check action status with messages
+     */
     @ParameterizedTest
     @ValueSource(booleans = { true, false })
-    @Description("Verify auto confirmation assignments and check action status with messages")
     void assignmentWithAutoConfirmationWillBeHandledCorrectly(final boolean confirmationRequired) {
         enableConfirmationFlow();
 
@@ -816,8 +864,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
                 });
     }
 
+    /**
+     * Multiple assignments with confirmation flow active will result in correct cancel behaviour
+     */
     @Test
-    @Description("Multiple assignments with confirmation flow active will result in correct cancel behaviour")
     void multipleAssignmentWithConfirmationFlowActiveVerifyCancelBehaviour() {
         final Target target = testdataFactory.createTarget("firstDevice");
         final DistributionSet firstDs = testdataFactory.createDistributionSet();
@@ -852,8 +902,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
 
     }
 
+    /**
+     * Assignments with confirmation flow deactivated will result in actions in only in 'RUNNING' state
+     */
     @Test
-    @Description("Assignments with confirmation flow deactivated will result in actions in only in 'RUNNING' state")
     void verifyConfirmationRequiredFlagHaveNoInfluenceIfFlowIsDeactivated() {
         final List<String> targets1 = testdataFactory.createTargets("group1", 1).stream().map(Target::getControllerId).toList();
         final List<String> targets2 = testdataFactory.createTargets("group2", 1).stream().map(Target::getControllerId).toList();
@@ -877,8 +929,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
                 }));
     }
 
+    /**
+     * Duplicate Assignments are removed from a request when multiassignment is disabled, otherwise not
+     */
     @Test
-    @Description("Duplicate Assignments are removed from a request when multiassignment is disabled, otherwise not")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = DistributionSetCreatedEvent.class, count = 1),
@@ -907,8 +961,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
                 .isEqualTo(1);
     }
 
+    /**
+     * An assignment request is not accepted if it would lead to a target exceeding the max actions per target quota.
+     */
     @Test
-    @Description("An assignment request is not accepted if it would lead to a target exceeding the max actions per target quota.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = DistributionSetCreatedEvent.class, count = 21), // max actions per target are 20 for test
@@ -936,8 +992,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
         assertThat(actionRepository.countByTargetControllerId(controllerId)).isZero();
     }
 
+    /**
+     * An assignment request without a weight is ok when multi assignment in enabled.
+     */
     @Test
-    @Description("An assignment request without a weight is ok when multi assignment in enabled.")
     void weightNotRequiredInMultiAssignmentMode() {
         final String targetId = testdataFactory.createTarget().getControllerId();
         final Long dsId = testdataFactory.createDistributionSet().getId();
@@ -949,8 +1007,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
         assertThat(deploymentManagement.assignDistributionSets(List.of(assignWithoutWeight, assignWithWeight))).isNotNull();
     }
 
+    /**
+     * An assignment request containing a weight don't causes an error when multi assignment in disabled.
+     */
     @Test
-    @Description("An assignment request containing a weight don't causes an error when multi assignment in disabled.")
     void weightAllowedWhenMultiAssignmentModeNotEnabled() {
         final String targetId = testdataFactory.createTarget().getControllerId();
         final Long dsId = testdataFactory.createDistributionSet().getId();
@@ -959,8 +1019,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
         assertThat(deploymentManagement.assignDistributionSets(Collections.singletonList(assignWithoutWeight))).isNotNull().size().isEqualTo(1);
     }
 
+    /**
+     * Weights are validated and contained in the resulting Action.
+     */
     @Test
-    @Description("Weights are validated and contained in the resulting Action.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = DistributionSetCreatedEvent.class, count = 1),
@@ -1002,8 +1064,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
      * {@link TargetRepository#assignDistributionSet(DistributionSet, Iterable)} and
      * checking the active action and the action history of the targets.
      */
+    /**
+     * Simple deployment or distribution set to target assignment test.
+     */
     @Test
-    @Description("Simple deployment or distribution set to target assignment test.")
     @ExpectEvents({
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
             @Expect(type = DistributionSetCreatedEvent.class, count = 1),
@@ -1058,8 +1122,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
         }
     }
 
+    /**
+     * Test that it is not possible to assign a distribution set that is not complete.
+     */
     @Test
-    @Description("Test that it is not possible to assign a distribution set that is not complete.")
     @ExpectEvents({
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
             @Expect(type = DistributionSetCreatedEvent.class, count = 1),
@@ -1089,9 +1155,11 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
                 .isEqualTo(10);
     }
 
+    /**
+     * Multiple deployments or distribution set to target assignment test. Expected behaviour is that a new deployment 
+     * overides unfinished old one which are canceled as part of the operation.
+     */
     @Test
-    @Description("Multiple deployments or distribution set to target assignment test. Expected behaviour is that a new deployment "
-            + "overides unfinished old one which are canceled as part of the operation.")
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 5 + 4),
             @Expect(type = TargetUpdatedEvent.class, count = 3 * 4),
@@ -1153,10 +1221,11 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
                 .doesNotContain(toArray(deployedTargetsFromDB, JpaTarget.class));
     }
 
+    /**
+     * Multiple deployments or distribution set to target assignment test including finished response 
+     * IN_SYNC status and installed DS is set to the assigned DS entry.
+     */
     @Test
-    @Description("Multiple deployments or distribution set to target assignment test including finished response "
-            + "from target/controller. Expected behaviour is that in case of OK finished update the target will go to "
-            + "IN_SYNC status and installed DS is set to the assigned DS entry.")
     void assignDistributionSetAndAddFinishedActionStatus() {
         final PageRequest pageRequest = PageRequest.of(0, 100, Direction.ASC, ActionStatusFields.ID.getJpaEntityFieldName());
 
@@ -1247,9 +1316,11 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
      * {@link Target}s are assigned by {@link Target#getAssignedDistributionSet()}
      * or {@link Target#getInstalledDistributionSet()}
      */
+    /**
+     * Deletes distribution set. Expected behaviour is that a soft delete is performed 
+     * if the DS is assigned to a target and a hard delete if the DS is not in use at all.
+     */
     @Test
-    @Description("Deletes distribution set. Expected behaviour is that a soft delete is performed "
-            + "if the DS is assigned to a target and a hard delete if the DS is not in use at all.")
     void deleteDistributionSet() {
 
         final PageRequest pageRequest = PageRequest.of(0, 100, Direction.ASC, "id");
@@ -1304,8 +1375,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
 
     }
 
+    /**
+     * Deletes multiple targets and verifies that all related metadata is also deleted.
+     */
     @Test
-    @Description("Deletes multiple targets and verifies that all related metadata is also deleted.")
     void deletesTargetsAndVerifyCascadeDeletes() {
         final String undeployedTargetPrefix = "undep-T";
         final int noOfUndeployedTargets = 2;
@@ -1330,8 +1403,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
         assertThat(actionStatusRepository.count()).as("size of action status is wrong").isZero();
     }
 
+    /**
+     * Testing if changing target and the status without refreshing the entities from the DB (e.g. concurrent changes from UI and from controller) works
+     */
     @Test
-    @Description("Testing if changing target and the status without refreshing the entities from the DB (e.g. concurrent changes from UI and from controller) works")
     void alternatingAssignmentAndAddUpdateActionStatus() {
 
         final DistributionSet dsA = testdataFactory.createDistributionSet("a");
@@ -1402,9 +1477,11 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
                 .get(0).getDistributionSet(), "Active ds is wrong");
     }
 
+    /**
+     * The test verifies that the DS itself is not changed because of an target assignment
+     *  which is a relationship but not a changed on the entity itself..
+     */
     @Test
-    @Description("The test verifies that the DS itself is not changed because of an target assignment"
-            + " which is a relationship but not a changed on the entity itself..")
     void checkThatDsRevisionsIsNotChangedWithTargetAssignment() {
         final DistributionSet dsA = testdataFactory.createDistributionSet("a");
         testdataFactory.createDistributionSet("b");
@@ -1421,8 +1498,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
                 .isEqualTo(distributionSetManagement.getWithDetails(dsA.getId()).get().getOptLockRevision());
     }
 
+    /**
+     * Tests the switch from a soft to hard update by API
+     */
     @Test
-    @Description("Tests the switch from a soft to hard update by API")
     void forceSoftAction() {
         // prepare
         final Target target = testdataFactory.createTarget("knownControllerId");
@@ -1443,8 +1522,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
         assertThat(findAction.getActionType()).as("action type is wrong").isEqualTo(ActionType.FORCED);
     }
 
+    /**
+     * Tests the switch from a hard to hard update by API, e.g. which in fact should not change anything.
+     */
     @Test
-    @Description("Tests the switch from a hard to hard update by API, e.g. which in fact should not change anything.")
     void forceAlreadyForcedActionNothingChanges() {
         // prepare
         final Target target = testdataFactory.createTarget("knownControllerId");
@@ -1466,8 +1547,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
         assertThat(findAction.getActionType()).as("action type is wrong").isEqualTo(ActionType.FORCED);
     }
 
+    /**
+     * Tests the computation of already assigned entities returned as a result of an assignment
+     */
     @Test
-    @Description("Tests the computation of already assigned entities returned as a result of an assignment")
     void testAlreadyAssignedAndAssignedActionsInAssignmentResult() {
         // create target1, distributionSet, assign ds to target1 and finish
         // update (close all actions)
@@ -1495,8 +1578,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
                 .noneMatch(a -> a.getTarget().getControllerId().equals("target1"));
     }
 
+    /**
+     * Verify that the DistributionSetAssignmentResult not contains already assigned targets.
+     */
     @Test
-    @Description("Verify that the DistributionSetAssignmentResult not contains already assigned targets.")
     void verifyDistributionSetAssignmentResultNotContainsAlreadyAssignedTargets() {
         final DistributionSet dsToTargetAssigned = testdataFactory.createDistributionSet("ds-3");
 
@@ -1512,8 +1597,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
         assertThat(distributionSetRepository.findAll()).hasSize(1);
     }
 
+    /**
+     * Verify that the DistributionSet assignments work for multiple targets of the same target type within the same request.
+     */
     @Test
-    @Description("Verify that the DistributionSet assignments work for multiple targets of the same target type within the same request.")
     void verifyDSAssignmentForMultipleTargetsWithSameTargetType() {
         final DistributionSet ds = testdataFactory.createDistributionSet("test-ds");
         final TargetType targetType = testdataFactory.createTargetType("test-type",
@@ -1537,8 +1624,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
                 .forEach(jpaTarget -> assertThat(jpaTarget.getAssignedDistributionSet()).isEqualTo(ds));
     }
 
+    /**
+     * Verify that the DistributionSet assignments work for multiple targets of different target types.
+     */
     @Test
-    @Description("Verify that the DistributionSet assignments work for multiple targets of different target types.")
     void verifyDSAssignmentForMultipleTargetsWithDifferentTargetTypes() {
         final DistributionSet ds = testdataFactory.createDistributionSet("test-ds");
         final TargetType targetType1 = testdataFactory.createTargetType("test-type1", Collections.singletonList(ds.getType()));
@@ -1562,8 +1651,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
         assertThat(assignedDsTarget2).isEqualTo(ds);
     }
 
+    /**
+     * Verify that the DistributionSet assignment fails for target with incompatible target type.
+     */
     @Test
-    @Description("Verify that the DistributionSet assignment fails for target with incompatible target type.")
     void verifyDSAssignmentFailsForTargetsWithIncompatibleTargetTypes() {
         final DistributionSet ds = testdataFactory.createDistributionSet("test-ds");
         final DistributionSetType dsType = testdataFactory.findOrCreateDistributionSetType("test-ds-type", "dsType");
@@ -1579,8 +1670,10 @@ class DeploymentManagementTest extends AbstractJpaIntegrationTest {
                 .isThrownBy(() -> deploymentManagement.assignDistributionSets(deploymentRequests));
     }
 
+    /**
+     * Verify that the DistributionSet assignment fails for target with target type that is not compatible with any dsType.
+     */
     @Test
-    @Description("Verify that the DistributionSet assignment fails for target with target type that is not compatible with any dsType.")
     void verifyDSAssignmentFailsForTargetsWithTargetTypesThatAreNotCompatibleWithAnyDs() {
         final DistributionSet ds = testdataFactory.createDistributionSet("test-ds");
         final TargetType emptyTargetType = testdataFactory.createTargetType("target-type", Collections.emptyList());

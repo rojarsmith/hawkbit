@@ -47,10 +47,6 @@ import jakarta.validation.ConstraintViolationException;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Step;
-import io.qameta.allure.Story;
 import org.awaitility.Awaitility;
 import org.eclipse.hawkbit.exception.SpServerError;
 import org.eclipse.hawkbit.im.authentication.SpPermission;
@@ -106,9 +102,10 @@ import org.springframework.test.web.servlet.ResultActions;
 
 /**
  * Spring MVC Tests against the MgmtTargetResource.
+  * <p/>
+ * Feature: Component Tests - Management API<br/>
+ * Story: Target Resource
  */
-@Feature("Component Tests - Management API")
-@Story("Target Resource")
 class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
 
     private static final String TARGET_DESCRIPTION_TEST = "created in test";
@@ -148,8 +145,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    /**
+     * Ensures that when targetType value of -1 is provided the target type is unassigned from the target.
+     */
     @Test
-    @Description("Ensures that when targetType value of -1 is provided the target type is unassigned from the target.")
     void updateTargetAndUnassignTargetType() throws Exception {
         final String knownControllerId = "123";
         final String knownNewAddress = "amqp://test123/foobar";
@@ -185,8 +184,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
 
     }
 
+    /**
+     * Ensures that when targetType value of -1 is provided the target type is unassigned from the target when updating multiple fields in target object.
+     */
     @Test
-    @Description("Ensures that when targetType value of -1 is provided the target type is unassigned from the target when updating multiple fields in target object.")
     void updateTargetNameAndUnassignTargetType() throws Exception {
         final String knownControllerId = "123";
         final String knownNewAddress = "amqp://test123/foobar";
@@ -225,8 +226,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath("$.targetType").doesNotExist());
     }
 
+    /**
+     * Handles the GET request of retrieving all targets within SP..
+     */
     @Test
-    @Description("Handles the GET request of retrieving all targets within SP..")
     void getTargets() throws Exception {
         enableConfirmationFlow();
         mvc.perform(get(MgmtRestConstants.TARGET_V1_REQUEST_MAPPING))
@@ -234,16 +237,20 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andDo(MockMvcResultPrinter.print());
     }
 
+    /**
+     * Handles the GET request of retrieving all targets within SP based by parameter.
+     */
     @Test
-    @Description("Handles the GET request of retrieving all targets within SP based by parameter.")
     void getTargetsWithParameters() throws Exception {
         mvc.perform(get(MgmtRestConstants.TARGET_V1_REQUEST_MAPPING + "?limit=10&sort=name:ASC&offset=0&q=name==a"))
                 .andExpect(status().isOk())
                 .andDo(MockMvcResultPrinter.print());
     }
 
+    /**
+     * Handles the POST request to activate auto-confirm on a target. Payload can be provided to specify more details about the operation.
+     */
     @Test
-    @Description("Handles the POST request to activate auto-confirm on a target. Payload can be provided to specify more details about the operation.")
     void postActivateAutoConfirm() throws Exception {
         final Target testTarget = testdataFactory.createTarget("targetId");
 
@@ -257,8 +264,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    /**
+     * Handles the POST request to deactivate auto-confirm on a target.
+     */
     @Test
-    @Description("Handles the POST request to deactivate auto-confirm on a target.")
     void postDeactivateAutoConfirm() throws Exception {
         final Target testTarget = testdataFactory.createTarget("targetId");
         confirmationManagement.activateAutoConfirmation(testTarget.getControllerId(), null, null);
@@ -269,8 +278,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    /**
+     * Test confirmation of single Action with confirm status. Check that Action goes into Running status with appropriate messages and status code
+     */
     @Test
-    @Description("Test confirmation of single Action with confirm status. Check that Action goes into Running status with appropriate messages and status code")
     void updateActionConfirmationWithConfirm() throws Exception {
         final int expectedStatusCode = 210;
         final String expectedStatusMessage1 = "some-custom-message1";
@@ -280,8 +291,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         testActionConfirmation("targetId", actionId, MgmtActionConfirmationRequestBodyPut.Confirmation.CONFIRMED, expectedStatusCode, new String[]{expectedStatusMessage1, expectedStatusMessage2}, HttpStatus.OK ,expectedStatusAfterActionConfirmationCall);
     }
 
+    /**
+     * Test confirmation of single Action with deny status. Check that Action stays in WAIT_FOR_CONFIRMATION status with appropriate messages and status code
+     */
     @Test
-    @Description("Test confirmation of single Action with deny status. Check that Action stays in WAIT_FOR_CONFIRMATION status with appropriate messages and status code")
     void updateActionConfirmationWithDeny() throws Exception {
         final int expectedStatusCode = 410;
         final String expectedStatusMessage1 = "some-error-custom-message1";
@@ -291,8 +304,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         testActionConfirmation("targetId", actionId, MgmtActionConfirmationRequestBodyPut.Confirmation.DENIED, expectedStatusCode, new String[]{expectedStatusMessage1, expectedStatusMessage2}, HttpStatus.OK, expectedStatusAfterActionConfirmationCall);
     }
 
+    /**
+     * Test confirmation of single Action with wrong ControllerId - e.g. the given Action is not assigned to the given Target - confirmation call must fail.
+     */
     @Test
-    @Description("Test confirmation of single Action with wrong ControllerId - e.g. the given Action is not assigned to the given Target - confirmation call must fail.")
     void updateActionConfirmationFailsIfActionNotAssignedToTarget() throws Exception {
         final int payloadCallCode = 200;
         final String payloadCallMessage1 = "random1";
@@ -364,8 +379,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         }
     }
 
+    /**
+     * Ensures that actions list is in expected order.
+     */
     @Test
-    @Description("Ensures that actions list is in expected order.")
     void getActionStatusReturnsCorrectType() throws Exception {
         final int limitSize = 2;
         final String knownTargetId = "targetId";
@@ -395,8 +412,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath("content.[1].type", equalTo("canceling")));
     }
 
+    /**
+     * Ensures that security token is not returned if user does not have READ_TARGET_SEC_TOKEN permission.
+     */
     @Test
-    @Description("Ensures that security token is not returned if user does not have READ_TARGET_SEC_TOKEN permission.")
     @WithUser(allSpPermissions = false, authorities = { SpPermission.READ_TARGET, SpPermission.CREATE_TARGET })
     void securityTokenIsNotInResponseIfMissingPermission() throws Exception {
 
@@ -408,8 +427,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath("securityToken").doesNotExist());
     }
 
+    /**
+     * Ensures that security token is returned if user does have READ_TARGET_SEC_TOKEN permission.
+     */
     @Test
-    @Description("Ensures that security token is returned if user does have READ_TARGET_SEC_TOKEN permission.")
     @WithUser(allSpPermissions = false, authorities = { SpPermission.READ_TARGET, SpPermission.CREATE_TARGET,
             SpPermission.READ_TARGET_SEC_TOKEN })
     void securityTokenIsInResponseWithCorrectPermission() throws Exception {
@@ -422,8 +443,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath("securityToken", equalTo(createTarget.getSecurityToken())));
     }
 
+    /**
+     * Ensures that that IP address is in result as stored in the repository.
+     */
     @Test
-    @Description("Ensures that that IP address is in result as stored in the repository.")
     void addressAndIpAddressInTargetResult() throws Exception {
         // prepare targets with IP
         final String knownControllerId1 = "0815";
@@ -448,8 +471,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                         contains(IpUtil.createHttpUri("127.0.0.1").toString())));
     }
 
+    /**
+     * Ensures that actions history is returned as defined by filter status==pending,status==finished.
+     */
     @Test
-    @Description("Ensures that actions history is returned as defined by filter status==pending,status==finished.")
     void searchActionsRsql() throws Exception {
 
         // prepare test
@@ -489,8 +514,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath("content[0].status", equalTo("pending")));
     }
 
+    /**
+     * Ensures that a deletion of an active action results in cancellation triggered.
+     */
     @Test
-    @Description("Ensures that a deletion of an active action results in cancellation triggered.")
     void cancelActionOK() throws Exception {
         // prepare test
         final Target tA = createTargetAndStartAction();
@@ -516,8 +543,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(deploymentManagement.getInstalledDistributionSet(tA.getControllerId())).isNotPresent();
     }
 
+    /**
+     * Ensures that method not allowed is returned if cancellation is triggered on already canceled action.
+     */
     @Test
-    @Description("Ensures that method not allowed is returned if cancellation is triggered on already canceled action.")
     void cancelAndCancelActionIsNotAllowed() throws Exception {
         // prepare test
         final Target tA = createTargetAndStartAction();
@@ -538,8 +567,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(status().isMethodNotAllowed());
     }
 
+    /**
+     * Force Quit an Action, which is already canceled. Expected Result is an HTTP response code 204.
+     */
     @Test
-    @Description("Force Quit an Action, which is already canceled. Expected Result is an HTTP response code 204.")
     void forceQuitAnCanceledActionReturnsOk() throws Exception {
 
         final Target tA = createTargetAndStartAction();
@@ -561,8 +592,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(status().isNoContent());
     }
 
+    /**
+     * Force Quit an Action, which is not canceled. Expected Result is an HTTP response code 405.
+     */
     @Test
-    @Description("Force Quit an Action, which is not canceled. Expected Result is an HTTP response code 405.")
     void forceQuitAnNotCanceledActionReturnsMethodNotAllowed() throws Exception {
 
         final Target tA = createTargetAndStartAction();
@@ -576,8 +609,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(status().isMethodNotAllowed());
     }
 
+    /**
+     * Ensures that deletion is executed if permitted.
+     */
     @Test
-    @Description("Ensures that deletion is executed if permitted.")
     void deleteTargetReturnsOK() throws Exception {
         final String knownControllerId = "knownControllerIdDelete";
         testdataFactory.createTarget(knownControllerId);
@@ -588,8 +623,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(targetManagement.getByControllerID(knownControllerId)).isNotPresent();
     }
 
+    /**
+     * Ensures that deletion is refused with not found if target does not exist.
+     */
     @Test
-    @Description("Ensures that deletion is refused with not found if target does not exist.")
     void deleteTargetWhichDoesNotExistsLeadsToNotFound() throws Exception {
         final String knownControllerId = "knownControllerIdDelete";
 
@@ -597,8 +634,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    /**
+     * Ensures that update is refused with not found if target does not exist.
+     */
     @Test
-    @Description("Ensures that update is refused with not found if target does not exist.")
     void updateTargetWhichDoesNotExistsLeadsToNotFound() throws Exception {
         final String knownControllerId = "knownControllerIdUpdate";
         mvc.perform(put(MgmtRestConstants.TARGET_V1_REQUEST_MAPPING + "/" + knownControllerId).content("{}")
@@ -607,8 +646,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(status().isNotFound());
     }
 
+    /**
+     * Ensures that target update request is reflected by repository.
+     */
     @Test
-    @Description("Ensures that target update request is reflected by repository.")
     void updateTargetDescription() throws Exception {
         final String knownControllerId = "123";
         final String knownNewDescription = "a new desc updated over rest";
@@ -632,8 +673,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(findTargetByControllerID.getName()).isEqualTo(knownNameNotModify);
     }
 
+    /**
+     * Ensures that target update request fails is updated value fails against a constraint.
+     */
     @Test
-    @Description("Ensures that target update request fails is updated value fails against a constraint.")
     void updateTargetDescriptionFailsIfInvalidLength() throws Exception {
         final String knownControllerId = "123";
         final String knownNewDescription = randomString(513);
@@ -653,8 +696,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(findTargetByControllerID.getDescription()).isEqualTo("old description");
     }
 
+    /**
+     * Ensures that target update request is reflected by repository.
+     */
     @Test
-    @Description("Ensures that target update request is reflected by repository.")
     void updateTargetSecurityToken() throws Exception {
         final String knownControllerId = "123";
         final String knownNewToken = "6567576565";
@@ -678,8 +723,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(findTargetByControllerID.getName()).isEqualTo(knownNameNotModify);
     }
 
+    /**
+     * Ensures that target update request is reflected by repository.
+     */
     @Test
-    @Description("Ensures that target update request is reflected by repository.")
     void updateTargetAddress() throws Exception {
         final String knownControllerId = "123";
         final String knownNewAddress = "amqp://test123/foobar";
@@ -703,8 +750,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(findTargetByControllerID.getName()).isEqualTo(knownNameNotModify);
     }
 
+    /**
+     * Ensures that target query returns list of targets in defined format.
+     */
     @Test
-    @Description("Ensures that target query returns list of targets in defined format.")
     void getTargetWithoutAdditionalRequestParameters() throws Exception {
         final int knownTargetAmount = 3;
         final String idA = "a";
@@ -747,8 +796,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath("$.content.[?(@.name=='" + idA + "')].lastControllerRequestAt", notNullValue()));
     }
 
+    /**
+     * Ensures that target query returns list of targets in defined format in size reduced by given limit parameter.
+     */
     @Test
-    @Description("Ensures that target query returns list of targets in defined format in size reduced by given limit parameter.")
     void getTargetWithPagingLimitRequestParameter() throws Exception {
         final int knownTargetAmount = 3;
         final int limitSize = 1;
@@ -773,8 +824,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath("$.content.[?(@.name=='" + idA + "')].updateStatus", contains("registered")));
     }
 
+    /**
+     * Ensures that target query returns list of targets in defined format in size reduced by given limit and offset parameter.
+     */
     @Test
-    @Description("Ensures that target query returns list of targets in defined format in size reduced by given limit and offset parameter.")
     void getTargetWithPagingLimitAndOffsetRequestParameter() throws Exception {
         final int knownTargetAmount = 5;
         final int offsetParam = 2;
@@ -819,8 +872,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath("$.content.[?(@.name=='" + idE + "')].updateStatus", contains("registered")));
     }
 
+    /**
+     * Ensures that the get request for a target works.
+     */
     @Test
-    @Description("Ensures that the get request for a target works.")
     void getSingleTarget() throws Exception {
         // create first a target which can be retrieved by rest interface
         final String knownControllerId = "1";
@@ -844,8 +899,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                         equalTo(hrefPrefix + "actions" + "?offset=0&limit=50&sort=id%3ADESC")));
     }
 
+    /**
+     * Ensures that target get request returns a not found if the target does not exits.
+     */
     @Test
-    @Description("Ensures that target get request returns a not found if the target does not exits.")
     void getSingleTargetNoExistsResponseNotFound() throws Exception {
 
         final String targetIdNotExists = "bubu";
@@ -862,8 +919,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(exceptionInfo.getErrorCode()).isEqualTo(SpServerError.SP_REPO_ENTITY_NOT_EXISTS.getKey());
     }
 
+    /**
+     * Ensures that get request for asigned distribution sets returns no count if no distribution set has been assigned.
+     */
     @Test
-    @Description("Ensures that get request for asigned distribution sets returns no count if no distribution set has been assigned.")
     void getAssignedDistributionSetOfTargetIsEmpty() throws Exception {
         // create first a target which can be retrieved by rest interface
         final String knownControllerId = "1";
@@ -877,8 +936,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
 
     }
 
+    /**
+     * Ensures that the get request for asigned distribution sets works.
+     */
     @Test
-    @Description("Ensures that the get request for asigned distribution sets works.")
     void getAssignedDistributionSetOfTarget() throws Exception {
         // create first a target which can be retrieved by rest interface
         final String knownControllerId = "1";
@@ -935,8 +996,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
 
     }
 
+    /**
+     * Ensures that get request for installed distribution sets returns no count if no distribution set has been installed.
+     */
     @Test
-    @Description("Ensures that get request for installed distribution sets returns no count if no distribution set has been installed.")
     void getInstalledDistributionSetOfTargetIsEmpty() throws Exception {
         // create first a target which can be retrieved by rest interface
         final String knownControllerId = "1";
@@ -948,8 +1011,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(content().string(""));
     }
 
+    /**
+     * Ensures that a target creation with empty name and a controllerId that exceeds the name length limitation is successful and the name gets truncated.
+     */
     @Test
-    @Description("Ensures that a target creation with empty name and a controllerId that exceeds the name length limitation is successful and the name gets truncated.")
     void createTargetWithEmptyNameAndLongControllerId() throws Exception {
         final String randomString = randomString(JpaTarget.CONTROLLER_ID_MAX_SIZE);
 
@@ -969,8 +1034,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(targetManagement.getByControllerID(randomString).get().getName()).isEqualTo(expectedTargetName);
     }
 
+    /**
+     * Ensures that post request for creating a target with no payload returns a bad request.
+     */
     @Test
-    @Description("Ensures that post request for creating a target with no payload returns a bad request.")
     void createTargetWithoutPayloadBadRequest() throws Exception {
 
         final MvcResult mvcResult = mvc
@@ -988,8 +1055,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(exceptionInfo.getMessage()).isEqualTo(SpServerError.SP_REST_BODY_NOT_READABLE.getMessage());
     }
 
+    /**
+     * Ensures that post request for creating a target with invalid payload returns a bad request.
+     */
     @Test
-    @Description("Ensures that post request for creating a target with invalid payload returns a bad request.")
     void createTargetWithBadPayloadBadRequest() throws Exception {
         final String notJson = "abc";
 
@@ -1009,8 +1078,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(exceptionInfo.getErrorCode()).isEqualTo(SpServerError.SP_REST_BODY_NOT_READABLE.getKey());
     }
 
+    /**
+     * Verifies that a mandatory properties of new targets are validated as not null.
+     */
     @Test
-    @Description("Verifies that a mandatory properties of new targets are validated as not null.")
     void createTargetWithMissingMandatoryPropertyBadRequest() throws Exception {
         final MvcResult mvcResult = mvc
                 .perform(post(MgmtRestConstants.TARGET_V1_REQUEST_MAPPING).content("[{\"name\":\"id1\"}]")
@@ -1028,8 +1099,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(exceptionInfo.getErrorCode()).isEqualTo(SpServerError.SP_REPO_CONSTRAINT_VIOLATION.getKey());
     }
 
+    /**
+     * Verifies that a  properties of new targets are validated as in allowed size range.
+     */
     @Test
-    @Description("Verifies that a  properties of new targets are validated as in allowed size range.")
     void createTargetWithInvalidPropertyBadRequest() throws Exception {
         final Target test1 = entityFactory.target().create().controllerId("id1")
                 .name(randomString(NamedEntity.NAME_MAX_SIZE + 1)).build();
@@ -1051,8 +1124,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(exceptionInfo.getErrorCode()).isEqualTo(SpServerError.SP_REPO_CONSTRAINT_VIOLATION.getKey());
     }
 
+    /**
+     * Ensures that a post request for creating multiple targets works.
+     */
     @Test
-    @Description("Ensures that a post request for creating multiple targets works.")
     void createTargetsListReturnsSuccessful() throws Exception {
         final Target test1 = entityFactory.target().create().controllerId("id1").name("testname1")
                 .securityToken("token").address("amqp://test123/foobar").description("testid1").build();
@@ -1104,8 +1179,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertTarget("id3", "testname3", "testid3");
     }
 
+    /**
+     * Ensures that a post request for creating one target within a list works.
+     */
     @Test
-    @Description("Ensures that a post request for creating one target within a list works.")
     void createTargetsSingleEntryListReturnsSuccessful() throws Exception {
         final String knownName = "someName";
         final String knownControllerId = "controllerId1";
@@ -1125,8 +1202,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(target.getDescription()).isEqualTo(knownDescription);
     }
 
+    /**
+     * Ensures that a post request for creating the same target again leads to a conflict response.
+     */
     @Test
-    @Description("Ensures that a post request for creating the same target again leads to a conflict response.")
     void createTargetsSingleEntryListDoubleReturnConflict() throws Exception {
         final String knownName = "someName";
         final String knownControllerId = "controllerId1";
@@ -1157,8 +1236,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(exceptionInfo.getMessage()).isEqualTo(SpServerError.SP_REPO_ENTITY_ALREADY_EXISTS.getMessage());
     }
 
+    /**
+     * Ensures that the get request for action of a target returns no actions if nothing has happened.
+     */
     @Test
-    @Description("Ensures that the get request for action of a target returns no actions if nothing has happened.")
     void getActionWithEmptyResult() throws Exception {
         final String knownTargetId = "targetId";
         testdataFactory.createTarget(knownTargetId);
@@ -1172,8 +1253,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath("total", equalTo(0)));
     }
 
+    /**
+     * Ensures that the expected response is returned for update action.
+     */
     @Test
-    @Description("Ensures that the expected response is returned for update action.")
     void getUpdateAction() throws Exception {
         final String knownTargetId = "targetId";
         final List<Action> actions = generateTargetWithTwoUpdatesWithOneOverride(knownTargetId);
@@ -1195,8 +1278,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                         equalTo(generateStatusreferenceLink(knownTargetId, actions.get(1).getId()))));
     }
 
+    /**
+     * Ensures that the expected response is returned for update action with maintenance window.
+     */
     @Test
-    @Description("Ensures that the expected response is returned for update action with maintenance window.")
     void getUpdateActionWithMaintenanceWindow() throws Exception {
         final String knownTargetId = "targetId";
         final String schedule = getTestSchedule(10);
@@ -1226,8 +1311,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                         equalTo(generateStatusreferenceLink(knownTargetId, actions.get(1).getId()))));
     }
 
+    /**
+     * Ensures that the expected response is returned when update action was cancelled.
+     */
     @Test
-    @Description("Ensures that the expected response is returned when update action was cancelled.")
     void getCancelAction() throws Exception {
         final String knownTargetId = "targetId";
         final List<Action> actions = generateTargetWithTwoUpdatesWithOneOverride(knownTargetId);
@@ -1249,8 +1336,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                         equalTo(generateStatusreferenceLink(knownTargetId, actions.get(0).getId()))));
     }
 
+    /**
+     * Ensures that the expected response is returned when update action with maintenance window was cancelled.
+     */
     @Test
-    @Description("Ensures that the expected response is returned when update action with maintenance window was cancelled.")
     void getCancelActionWithMaintenanceWindow() throws Exception {
         final String knownTargetId = "targetId";
         final String schedule = getTestSchedule(10);
@@ -1280,20 +1369,26 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                         equalTo(generateStatusreferenceLink(knownTargetId, actions.get(0).getId()))));
     }
 
+    /**
+     * Ensures that the expected response of getting actions of a target is returned.
+     */
     @Test
-    @Description("Ensures that the expected response of getting actions of a target is returned.")
     void getActions() throws Exception {
         getActions(false);
     }
 
+    /**
+     * Ensures that the expected response of getting actions (with ext refs) of a target is returned.
+     */
     @Test
-    @Description("Ensures that the expected response of getting actions (with ext refs) of a target is returned.")
     void getActionsExtRef() throws Exception {
         getActions(true);
     }
 
+    /**
+     * Ensures that the expected response of getting actions with maintenance window of a target is returned.
+     */
     @Test
-    @Description("Ensures that the expected response of getting actions with maintenance window of a target is returned.")
     void getActionsWithMaintenanceWindow() throws Exception {
         final String knownTargetId = "targetId";
         final String schedule = getTestSchedule(10);
@@ -1331,8 +1426,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath(JSON_PATH_PAGED_LIST_CONTENT, hasSize(2)));
     }
 
+    /**
+     * Verifies that the API returns the status list with expected content.
+     */
     @Test
-    @Description("Verifies that the API returns the status list with expected content.")
     void getActionsStatus() throws Exception {
         final String knownTargetId = "targetId";
         final Action action = generateTargetWithTwoUpdatesWithOneOverride(knownTargetId).get(0);
@@ -1360,8 +1457,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath(JSON_PATH_PAGED_LIST_CONTENT, hasSize(2)));
     }
 
+    /**
+     * Verifies that the API returns the status list with expected content sorted by reportedAt field.
+     */
     @Test
-    @Description("Verifies that the API returns the status list with expected content sorted by reportedAt field.")
     void getActionsStatusSortedByReportedAt() throws Exception {
         final String knownTargetId = "targetId";
         final Action action = generateTargetWithTwoUpdatesWithOneOverride(knownTargetId).get(0);
@@ -1408,8 +1507,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath(JSON_PATH_PAGED_LIST_CONTENT, hasSize(2)));
     }
 
+    /**
+     * Verifies that the API returns the status list with expected content split into two pages.
+     */
     @Test
-    @Description("Verifies that the API returns the status list with expected content split into two pages.")
     void getActionsStatusWithPagingLimitRequestParameter() throws Exception {
         final String knownTargetId = "targetId";
 
@@ -1450,8 +1551,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath(JSON_PATH_PAGED_LIST_CONTENT, hasSize(1)));
     }
 
+    /**
+     * Verifies getting multiple actions with the paging request parameter.
+     */
     @Test
-    @Description("Verifies getting multiple actions with the paging request parameter.")
     void getActionsWithPagingLimitRequestParameter() throws Exception {
         final String knownTargetId = "targetId";
         final List<Action> actions = generateTargetWithTwoUpdatesWithOneOverride(knownTargetId);
@@ -1491,8 +1594,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath(JSON_PATH_PAGED_LIST_CONTENT, hasSize(1)));
     }
 
+    /**
+     * Verifies that an action is switched from soft to forced if requested by management API
+     */
     @Test
-    @Description("Verifies that an action is switched from soft to forced if requested by management API")
     void updateAction() throws Exception {
         final Target target = testdataFactory.createTarget();
         final DistributionSet set = testdataFactory.createDistributionSet();
@@ -1520,9 +1625,11 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(deploymentManagement.findAction(actionId).get().getActionType()).isEqualTo(ActionType.FORCED);
     }
 
+    /**
+     * Verifies that a DS to target assignment is reflected by the repository and that repeating
+     * the assignment does not change the target.
+     */
     @Test
-    @Description("Verifies that a DS to target assignment is reflected by the repository and that repeating "
-            + "the assignment does not change the target.")
     void assignDistributionSetToTarget() throws Exception {
         Target target = testdataFactory.createTarget();
         final DistributionSet set = testdataFactory.createDistributionSet("one");
@@ -1552,9 +1659,11 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(targetManagement.getByControllerID(target.getControllerId()).get()).isEqualTo(target);
     }
 
+    /**
+     * Ensures that confirmation option is considered in assignment request.
+     */
     @ParameterizedTest
     @MethodSource("confirmationOptions")
-    @Description("Ensures that confirmation option is considered in assignment request.")
     void assignDistributionSetToTargetWithConfirmationOptions(final boolean confirmationFlowActive,
             final Boolean confirmationRequired) throws Exception {
         final Target target = testdataFactory.createTarget();
@@ -1594,8 +1703,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 });
     }
 
+    /**
+     * Verifies that a DOWNLOAD_ONLY DS to target assignment is properly handled
+     */
     @Test
-    @Description("Verifies that a DOWNLOAD_ONLY DS to target assignment is properly handled")
     void assignDownloadOnlyDistributionSetToTarget() throws Exception {
         final Target target = testdataFactory.createTarget();
         final DistributionSet set = testdataFactory.createDistributionSet("one");
@@ -1616,9 +1727,11 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .extracting(Action::getActionType).containsOnly(ActionType.DOWNLOAD_ONLY);
     }
 
+    /**
+     * Verifies that an offline DS to target assignment is reflected by the repository and that repeating 
+     * the assignment does not change the target.
+     */
     @Test
-    @Description("Verifies that an offline DS to target assignment is reflected by the repository and that repeating "
-            + "the assignment does not change the target.")
     void offlineAssignDistributionSetToTarget() throws Exception {
         Target target = testdataFactory.createTarget();
         final DistributionSet set = testdataFactory.createDistributionSet("one");
@@ -1675,8 +1788,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(deploymentManagement.getAssignedDistributionSet("fsdfsd").get()).isEqualTo(set);
     }
 
+    /**
+     * Assigns distribution set to target with only maintenance schedule.
+     */
     @Test
-    @Description("Assigns distribution set to target with only maintenance schedule.")
     void assignDistributionSetToTargetWithMaintenanceWindowStartTimeOnly() throws Exception {
 
         final Target target = testdataFactory.createTarget("fsdfsd");
@@ -1691,8 +1806,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
+    /**
+     * Assigns distribution set to target with only maintenance window duration.
+     */
     @Test
-    @Description("Assigns distribution set to target with only maintenance window duration.")
     void assignDistributionSetToTargetWithMaintenanceWindowEndTimeOnly() throws Exception {
 
         final Target target = testdataFactory.createTarget("fsdfsd");
@@ -1707,8 +1824,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
+    /**
+     * Assigns distribution set to target with valid maintenance window.
+     */
     @Test
-    @Description("Assigns distribution set to target with valid maintenance window.")
     void assignDistributionSetToTargetWithValidMaintenanceWindow() throws Exception {
 
         final Target target = testdataFactory.createTarget("fsdfsd");
@@ -1725,8 +1844,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    /**
+     * Assigns distribution set to target with maintenance window next execution start (should be ignored, calculated automaticaly based on schedule, duration and timezone)
+     */
     @Test
-    @Description("Assigns distribution set to target with maintenance window next execution start (should be ignored, calculated automaticaly based on schedule, duration and timezone)")
     void assignDistributionSetToTargetWithMaintenanceWindowNextExecutionStart() throws Exception {
 
         final Target target = testdataFactory.createTarget("fsdfsd");
@@ -1750,8 +1871,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath("content.[0].maintenanceWindow.nextStartAt", not(nextExecutionStart)));
     }
 
+    /**
+     * Assigns distribution set to target with last maintenance window scheduled before current time.
+     */
     @Test
-    @Description("Assigns distribution set to target with last maintenance window scheduled before current time.")
     void assignDistributionSetToTargetWithMaintenanceWindowEndTimeBeforeStartTime() throws Exception {
 
         final Target target = testdataFactory.createTarget("fsdfsd");
@@ -1908,8 +2031,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(status().is(HttpStatus.NO_CONTENT.value()));
     }
 
+    /**
+     * Request update of Controller Attributes.
+     */
     @Test
-    @Description("Request update of Controller Attributes.")
     void triggerControllerAttributesUpdate() throws Exception {
         // create target with attributes
         final String knownTargetId = "targetIdNeedsUpdate";
@@ -1971,8 +2096,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath("$.[1].name", in(tagNames)));
     }
 
+    /**
+     * Ensures that the metadata creation through API is reflected by the repository.
+     */
     @Test
-    @Description("Ensures that the metadata creation through API is reflected by the repository.")
     void createMetadata() throws Exception {
         final String knownControllerId = "targetIdWithMetadata";
         testdataFactory.createTarget(knownControllerId);
@@ -2014,8 +2141,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(targetManagement.getMetadata(knownControllerId)).hasSize(metaData1.length());
     }
 
+    /**
+     * Ensures that a metadata update through API is reflected by the repository.
+     */
     @Test
-    @Description("Ensures that a metadata update through API is reflected by the repository.")
     void updateMetadata() throws Exception {
         final String knownControllerId = "targetIdWithMetadata";
         final String updateValue = "valueForUpdate";
@@ -2034,8 +2163,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(targetManagement.getMetadata(knownControllerId).get(KNOWN_KEY)).isEqualTo(updateValue);
     }
 
+    /**
+     * Ensures that a metadata entry deletion through API is reflected by the repository.
+     */
     @Test
-    @Description("Ensures that a metadata entry deletion through API is reflected by the repository.")
     void deleteMetadata() throws Exception {
         final String knownControllerId = "targetIdWithMetadata";
 
@@ -2053,8 +2184,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(targetManagement.getMetadata(knownControllerId).get(KNOWN_KEY)).isNull();
     }
 
+    /**
+     * Ensures that target metadata deletion request to API on an entity that does not exist results in NOT_FOUND.
+     */
     @Test
-    @Description("Ensures that target metadata deletion request to API on an entity that does not exist results in NOT_FOUND.")
     void deleteMetadataThatDoesNotExistLeadsToNotFound() throws Exception {
         final String knownControllerId = "targetIdWithMetadata";
 
@@ -2071,8 +2204,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(targetManagement.getMetadata(knownControllerId).get(KNOWN_KEY)).isNotNull();
     }
 
+    /**
+     * Ensures that a metadata entry selection through API reflects the repository content.
+     */
     @Test
-    @Description("Ensures that a metadata entry selection through API reflects the repository content.")
     void getMetadataKey() throws Exception {
         final String knownControllerId = "targetIdWithMetadata";
 
@@ -2085,8 +2220,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath(JSON_PATH_VALUE, equalTo(KNOWN_VALUE)));
     }
 
+    /**
+     * Ensures that a metadata entry paged list selection through API reflectes the repository content.
+     */
     @Test
-    @Description("Ensures that a metadata entry paged list selection through API reflectes the repository content.")
     void getMetadata() throws Exception {
         final String knownControllerId = "targetIdWithMetadata";
 
@@ -2121,8 +2258,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath("content[0].value", equalTo(knownValuePrefix + "0")));
     }
 
+    /**
+     * A request for assigning multiple DS to a target results in a Bad Request when multiassignment in disabled.
+     */
     @Test
-    @Description("A request for assigning multiple DS to a target results in a Bad Request when multiassignment in disabled.")
     void multiAssignmentRequestNotAllowedIfDisabled() throws Exception {
         final String targetId = testdataFactory.createTarget().getControllerId();
         final List<Long> dsIds = testdataFactory.createDistributionSets(2).stream().map(DistributionSet::getId)
@@ -2137,8 +2276,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(status().isBadRequest());
     }
 
+    /**
+     * Passing an array in assignment request is allowed if multiassignment is disabled and array size in 1.
+     */
     @Test
-    @Description("Passing an array in assignment request is allowed if multiassignment is disabled and array size in 1.")
     void multiAssignmentRequestAllowedIfDisabledButHasSizeOne() throws Exception {
         final String targetId = testdataFactory.createTarget().getControllerId();
         final Long dsId = testdataFactory.createDistributionSet().getId();
@@ -2150,8 +2291,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    /**
+     * Identical assignments in a single request are removed when multiassignment in disabled.
+     */
     @Test
-    @Description("Identical assignments in a single request are removed when multiassignment in disabled.")
     void identicalAssignmentInRequestAreRemovedIfMultiassignmentsDisabled() throws Exception {
         final String targetId = testdataFactory.createTarget().getControllerId();
         final Long dsId = testdataFactory.createDistributionSet().getId();
@@ -2166,8 +2309,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath("total", equalTo(1)));
     }
 
+    /**
+     * Assign multiple DSs to a target in one request with multiassignments enabled.
+     */
     @Test
-    @Description("Assign multiple DSs to a target in one request with multiassignments enabled.")
     void multiAssignment() throws Exception {
         final String targetId = testdataFactory.createTarget().getControllerId();
         final List<Long> dsIds = testdataFactory.createDistributionSets(2).stream().map(DistributionSet::getId)
@@ -2184,8 +2329,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath("total", equalTo(2)));
     }
 
+    /**
+     * An assignment request containing a weight is only accepted when weight is valid and multi assignment is on.
+     */
     @Test
-    @Description("An assignment request containing a weight is only accepted when weight is valid and multi assignment is on.")
     void weightValidation() throws Exception {
         final String targetId = testdataFactory.createTarget().getControllerId();
         final Long dsId = testdataFactory.createDistributionSet().getId();
@@ -2210,8 +2357,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(actions.get(0).getWeight()).get().isEqualTo(weight);
     }
 
+    /**
+     * An assignment request containing a valid weight when multi assignment is off.
+     */
     @Test
-    @Description("An assignment request containing a valid weight when multi assignment is off.")
     void weightWithSingleAssignment() throws Exception {
         final String targetId = testdataFactory.createTarget().getControllerId();
         final Long dsId = testdataFactory.createDistributionSet().getId();
@@ -2224,8 +2373,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    /**
+     * An assignment request containing a valid weight when multi assignment is on.
+     */
     @Test
-    @Description("An assignment request containing a valid weight when multi assignment is on.")
     void weightWithMultiAssignment() throws Exception {
         final String targetId = testdataFactory.createTarget().getControllerId();
         final Long dsId = testdataFactory.createDistributionSet().getId();
@@ -2244,8 +2395,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(actions.get(0).getWeight()).get().isEqualTo(weight);
     }
 
+    /**
+     * Get weight of action
+     */
     @Test
-    @Description("Get weight of action")
     void getActionWeight() throws Exception {
         final String targetId = testdataFactory.createTarget().getControllerId();
         final Long dsId = testdataFactory.createDistributionSet().getId();
@@ -2265,8 +2418,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath("content.[2].weight", equalTo(1000)));
     }
 
+    /**
+     * An action provides information of the rollout it was created for (if any).
+     */
     @Test
-    @Description("An action provides information of the rollout it was created for (if any).")
     void getActionWithRolloutInfo() throws Exception {
 
         // setup
@@ -2302,8 +2457,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                         "$._links.rollout.href", containsString("/rest/v1/rollouts/" + rollout.getId().intValue())));
     }
 
+    /**
+     * Ensures that a post request for creating targets with target type works.
+     */
     @Test
-    @Description("Ensures that a post request for creating targets with target type works.")
     void createTargetsWithTargetType() throws Exception {
         final TargetType type1 = testdataFactory.createTargetType("typeWithDs",
                 Collections.singletonList(standardDsType));
@@ -2371,8 +2528,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(target3.getTargetType()).extracting(TargetType::getName).isEqualTo("typeWithOutDs");
     }
 
+    /**
+     * Ensures that a post request for creating target with target type works.
+     */
     @Test
-    @Description("Ensures that a post request for creating target with target type works.")
     void createTargetWithExistingTargetType() throws Exception {
         // create target type
         final List<TargetType> targetTypes = testdataFactory.createTargetTypes("targettype", 1);
@@ -2394,8 +2553,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .isEqualTo(targetTypes.get(0).getId());
     }
 
+    /**
+     * Ensures that a put request for updating targets with target type works.
+     */
     @Test
-    @Description("Ensures that a put request for updating targets with target type works.")
     void updateTargetTypeInTarget() throws Exception {
         // create target type
         final List<TargetType> targetTypes = testdataFactory.createTargetTypes("targettype", 2);
@@ -2417,8 +2578,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath("targetType", equalTo(targetTypes.get(1).getId().intValue())));
     }
 
+    /**
+     * Ensures that a post request for creating targets with unknown target type fails.
+     */
     @Test
-    @Description("Ensures that a post request for creating targets with unknown target type fails.")
     void addingNonExistingTargetTypeInTargetShouldFail() throws Exception {
         final long unknownTargetTypeId = 999;
         final String errorMsg = String.format("TargetType with given identifier {%s} does not exist.",
@@ -2439,8 +2602,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath("message", Matchers.containsString(errorMsg)));
     }
 
+    /**
+     * Ensures that a post request for assign target type to target works.
+     */
     @Test
-    @Description("Ensures that a post request for assign target type to target works.")
     void assignTargetTypeToTarget() throws Exception {
         // create target type
         final TargetType targetType = testdataFactory.findOrCreateTargetType("targettype");
@@ -2461,8 +2626,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .isEqualTo(targetType.getId());
     }
 
+    /**
+     * Ensures that a post request for assign a invalid target type to target fails.
+     */
     @Test
-    @Description("Ensures that a post request for assign a invalid target type to target fails.")
     void assignInvalidTargetTypeToTargetFails() throws Exception {
         // Invalid target type ID
         final long invalidTargetTypeId = 999;
@@ -2494,8 +2661,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(exceptionInfo.getMessage()).contains("targetTypeId");
     }
 
+    /**
+     * Ensures that a delete request for unassign target type from target works.
+     */
     @Test
-    @Description("Ensures that a delete request for unassign target type from target works.")
     void unassignTargetTypeFromTarget() throws Exception {
         // create target type
         final List<TargetType> targetTypes = testdataFactory.createTargetTypes("targettype", 1);
@@ -2656,8 +2825,10 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(jsonPath("_links.autoConfirm").exists());
     }
 
+    /**
+     * Verifies that the status code that was reported in the last action status update is correctly exposed via the action.
+     */
     @Test
-    @Description("Verifies that the status code that was reported in the last action status update is correctly exposed via the action.")
     void lastActionStatusCode() throws Exception {
 
         // prepare test
@@ -2825,7 +2996,6 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         return actions;
     }
 
-    @Step
     private void verifyAttributeUpdateCanBeRequested(final String knownTargetId) throws Exception {
         final String body = new JSONObject().put("requestAttributes", true).toString();
 
@@ -2837,7 +3007,6 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
         assertThat(targetManagement.isControllerAttributesRequested(knownTargetId)).isTrue();
     }
 
-    @Step
     private void verifyRequestAttributesAttributeIsOptional(final String knownTargetId) throws Exception {
         final String body = new JSONObject().put("description", "verify attribute can be missing").toString();
 
@@ -2847,7 +3016,6 @@ class MgmtTargetResourceTest extends AbstractManagementApiIntegrationTest {
                 .andExpect(status().isOk());
     }
 
-    @Step
     private void verifyResettingRequestAttributesIsNotAllowed(final String knownTargetId) throws Exception {
         final String body = new JSONObject().put("requestAttributes", false).toString();
 

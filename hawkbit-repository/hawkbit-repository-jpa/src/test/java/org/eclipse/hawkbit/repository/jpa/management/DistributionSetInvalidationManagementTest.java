@@ -15,9 +15,6 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import java.util.Collections;
 import java.util.List;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.eclipse.hawkbit.repository.exception.IncompleteDistributionSetException;
 import org.eclipse.hawkbit.repository.exception.InsufficientPermissionException;
 import org.eclipse.hawkbit.repository.jpa.AbstractJpaIntegrationTest;
@@ -41,13 +38,16 @@ import org.springframework.data.repository.query.Param;
 /**
  * Test class testing the functionality of invalidating a
  * {@link DistributionSet}
+  * <p/>
+ * Feature: Component Tests - Repository<br/>
+ * Story: Distribution set invalidation management
  */
-@Feature("Component Tests - Repository")
-@Story("Distribution set invalidation management")
 class DistributionSetInvalidationManagementTest extends AbstractJpaIntegrationTest {
 
+    /**
+     * Verify invalidation of distribution sets that only removes distribution sets from auto assignments
+     */
     @Test
-    @Description("Verify invalidation of distribution sets that only removes distribution sets from auto assignments")
     void verifyInvalidateDistributionSetStopAutoAssignment() {
         final InvalidationTestData invalidationTestData = createInvalidationTestData("verifyInvalidateDistributionSetStopAutoAssignment");
 
@@ -74,8 +74,10 @@ class DistributionSetInvalidationManagementTest extends AbstractJpaIntegrationTe
         }
     }
 
+    /**
+     * Verify invalidation of distribution sets that removes distribution sets from auto assignments and stops rollouts
+     */
     @Test
-    @Description("Verify invalidation of distribution sets that removes distribution sets from auto assignments and stops rollouts")
     void verifyInvalidateDistributionSetStopRollouts() {
         final InvalidationTestData invalidationTestData = createInvalidationTestData(
                 "verifyInvalidateDistributionSetStopRollouts");
@@ -106,8 +108,10 @@ class DistributionSetInvalidationManagementTest extends AbstractJpaIntegrationTe
         }
     }
 
+    /**
+     * Verify invalidation of distribution sets that removes distribution sets from auto assignments, stops rollouts and force cancels assignments
+     */
     @Test
-    @Description("Verify invalidation of distribution sets that removes distribution sets from auto assignments, stops rollouts and force cancels assignments")
     void verifyInvalidateDistributionSetStopAllAndForceCancel() {
         final InvalidationTestData invalidationTestData = createInvalidationTestData(
                 "verifyInvalidateDistributionSetStopAllAndForceCancel");
@@ -136,8 +140,10 @@ class DistributionSetInvalidationManagementTest extends AbstractJpaIntegrationTe
         }
     }
 
+    /**
+     * Verify invalidation of distribution sets that removes distribution sets from auto assignments, stops rollouts and cancels assignments
+     */
     @Test
-    @Description("Verify invalidation of distribution sets that removes distribution sets from auto assignments, stops rollouts and cancels assignments")
     void verifyInvalidateDistributionSetStopAll() {
         final InvalidationTestData invalidationTestData = createInvalidationTestData(
                 "verifyInvalidateDistributionSetStopAll");
@@ -163,8 +169,10 @@ class DistributionSetInvalidationManagementTest extends AbstractJpaIntegrationTe
         }
     }
 
+    /**
+     * Verify that invalidating an incomplete distribution set throws an exception
+     */
     @Test
-    @Description("Verify that invalidating an incomplete distribution set throws an exception")
     void verifyInvalidateIncompleteDistributionSetThrowsException() {
         final DistributionSet distributionSet = testdataFactory.createIncompleteDistributionSet();
 
@@ -175,9 +183,11 @@ class DistributionSetInvalidationManagementTest extends AbstractJpaIntegrationTe
                 .isThrownBy(() -> distributionSetInvalidationManagement.invalidateDistributionSet(distributionSetInvalidation));
     }
 
+    /**
+     * Verify that invalidating an invalidated distribution set don't throws an exception
+     *  -> should be able to cancel actions again (if previous time there was a problem
+     */
     @Test
-    @Description("Verify that invalidating an invalidated distribution set don't throws an exception" +
-            " -> should be able to cancel actions again (if previous time there was a problem")
     @SuppressWarnings("java:S2699") // test that no exception is thrown
     void verifyInvalidateInvalidatedDistributionSetDontThrowsException() {
         final DistributionSet distributionSet = testdataFactory.createAndInvalidateDistributionSet();
@@ -186,8 +196,10 @@ class DistributionSetInvalidationManagementTest extends AbstractJpaIntegrationTe
                         CancelationType.SOFT, true));
     }
 
+    /**
+     * Verify that a user that has authority READ_REPOSITORY and UPDATE_REPOSITORY is allowed to invalidate a distribution set
+     */
     @Test
-    @Description("Verify that a user that has authority READ_REPOSITORY and UPDATE_REPOSITORY is allowed to invalidate a distribution set")
     @WithUser(authorities = { "READ_REPOSITORY", "UPDATE_REPOSITORY" })
     void verifyInvalidateWithReadAndUpdateRepoAuthority() {
         final InvalidationTestData invalidationTestData = systemSecurityContext
@@ -201,8 +213,10 @@ class DistributionSetInvalidationManagementTest extends AbstractJpaIntegrationTe
                 .isFalse();
     }
 
+    /**
+     * Verify that a user that has authority READ_REPOSITORY, UPDATE_REPOSITORY and UPDATE_TARGET is allowed to invalidate a distribution set only without canceling rollouts
+     */
     @Test
-    @Description("Verify that a user that has authority READ_REPOSITORY, UPDATE_REPOSITORY and UPDATE_TARGET is allowed to invalidate a distribution set only without canceling rollouts")
     @WithUser(authorities = { "READ_REPOSITORY", "UPDATE_REPOSITORY", "UPDATE_TARGET" })
     void verifyInvalidateWithReadAndUpdateRepoAndUpdateTargetAuthority() {
         final InvalidationTestData invalidationTestData = systemSecurityContext.runAsSystem(
@@ -222,8 +236,10 @@ class DistributionSetInvalidationManagementTest extends AbstractJpaIntegrationTe
                 .isFalse();
     }
 
+    /**
+     * Verify that a user that has authority READ_REPOSITORY, UPDATE_REPOSITORY, UPDATE_ROLLOUT and UPDATE_TARGET is allowed to invalidate a distribution
+     */
     @Test
-    @Description("Verify that a user that has authority READ_REPOSITORY, UPDATE_REPOSITORY, UPDATE_ROLLOUT and UPDATE_TARGET is allowed to invalidate a distribution")
     @WithUser(authorities = { "READ_REPOSITORY", "UPDATE_REPOSITORY", "UPDATE_TARGET", "UPDATE_ROLLOUT" })
     void verifyInvalidateWithReadAndUpdateRepoAndUpdateTargetAndUpdateRolloutAuthority() {
         final InvalidationTestData invalidationTestData = systemSecurityContext.runAsSystem(

@@ -19,22 +19,22 @@ import java.util.Collections;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.junit.jupiter.api.Test;
 
 /**
  * Test serialization of DDI api model 'DdiActionFeedback'
+  * <p/>
+ * Feature: Unit Tests - Direct Device Integration API<br/>
+ * Story: Serialization of DDI api Models
  */
-@Feature("Unit Tests - Direct Device Integration API")
-@Story("Serialization of DDI api Models")
 class DdiActionFeedbackTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
+    /**
+     * Verify the correct serialization and deserialization of the model with minimal payload
+     */
     @Test
-    @Description("Verify the correct serialization and deserialization of the model with minimal payload")
     void shouldSerializeAndDeserializeObjectWithoutOptionalValues() throws IOException {
         // Setup
         final DdiStatus ddiStatus = new DdiStatus(DdiStatus.ExecutionStatus.CLOSED, null, null, Collections.emptyList());
@@ -48,8 +48,10 @@ class DdiActionFeedbackTest {
         assertThat(deserializedDdiActionFeedback.getStatus()).hasToString(ddiStatus.toString());
     }
 
+    /**
+     * Verify the correct serialization and deserialization of the model with all values provided
+     */
     @Test
-    @Description("Verify the correct serialization and deserialization of the model with all values provided")
     void shouldSerializeAndDeserializeObjectWithOptionalValues() throws IOException {
         // Setup
         final Long timestamp = System.currentTimeMillis();
@@ -65,8 +67,10 @@ class DdiActionFeedbackTest {
         assertThat(deserializedDdiActionFeedback.getStatus()).hasToString(ddiStatus.toString());
     }
 
+    /**
+     * Verify that deserialization fails for known properties with a wrong datatype
+     */
     @Test
-    @Description("Verify that deserialization fails for known properties with a wrong datatype")
     void shouldFailForObjectWithWrongDataTypes() {
         // Setup
         final String serializedDdiActionFeedback = """
@@ -83,8 +87,10 @@ class DdiActionFeedbackTest {
                 () -> mapper.readValue(serializedDdiActionFeedback, DdiActionFeedback.class));
     }
 
+    /**
+     * Verify that deserialization works if optional fields are not parsed
+     */
     @Test
-    @Description("Verify that deserialization works if optional fields are not parsed")
     void shouldConvertItWithoutOptionalFieldTimestamp() throws JsonProcessingException {
         // Setup
         final String serializedDdiActionFeedback = """

@@ -14,9 +14,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Duration;
 import java.util.List;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.awaitility.Awaitility;
 import org.eclipse.hawkbit.repository.jpa.AbstractJpaIntegrationTest;
 import org.eclipse.hawkbit.repository.jpa.model.JpaAction;
@@ -28,15 +25,19 @@ import org.eclipse.hawkbit.repository.model.DistributionSet;
 import org.eclipse.hawkbit.repository.model.Target;
 import org.junit.jupiter.api.Test;
 
-@Feature("Unit Tests - Repository")
-@Story("Deployment Management")
+/**
+ * Feature: Unit Tests - Repository<br/>
+ * Story: Deployment Management
+ */
 class ActionTest extends AbstractJpaIntegrationTest {
 
     private Target target;
     private DistributionSet distributionSet;
 
+    /**
+     * Ensures that timeforced moded switch from soft to forces after defined timeframe.
+     */
     @Test
-    @Description("Ensures that timeforced moded switch from soft to forces after defined timeframe.")
     void timeForcedHitNewHasCodeIsGenerated() {
         // current time + 1 seconds
         final long sleepTime = 1000;
@@ -50,8 +51,10 @@ class ActionTest extends AbstractJpaIntegrationTest {
         Awaitility.await().atMost(Duration.ofSeconds(2)).pollInterval(Duration.ofMillis(100)).until(timeforcedAction::isForcedOrTimeForced);
     }
 
+    /**
+     * Tests the action type mapping.
+     */
     @Test
-    @Description("Tests the action type mapping.")
     void testActionTypeConvert() {
         final long id = createAction().getId();
         for (final ActionType actionType : ActionType.values()) {
@@ -63,8 +66,10 @@ class ActionTest extends AbstractJpaIntegrationTest {
         }
     }
 
+    /**
+     * Tests the status mapping.
+     */
     @Test
-    @Description("Tests the status mapping.")
     void testStatusConvert() {
         final long id = createAction().getId();
         for (final Status status : Status.values()) {
@@ -76,8 +81,10 @@ class ActionTest extends AbstractJpaIntegrationTest {
         }
     }
 
+    /**
+     * Tests the action status status mapping.
+     */
     @Test
-    @Description("Tests the action status status mapping.")
     void testActionsStatusStatusConvert() {
         for (final Status status : Status.values()) {
             final long id = createAction().getId();

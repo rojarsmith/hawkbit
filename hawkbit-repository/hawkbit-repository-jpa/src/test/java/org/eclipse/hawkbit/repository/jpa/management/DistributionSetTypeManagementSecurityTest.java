@@ -12,9 +12,6 @@ package org.eclipse.hawkbit.repository.jpa.management;
 import java.util.List;
 import java.util.Random;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.eclipse.hawkbit.im.authentication.SpPermission;
 import org.eclipse.hawkbit.repository.RepositoryManagement;
 import org.eclipse.hawkbit.repository.builder.DistributionSetTypeCreate;
@@ -23,8 +20,10 @@ import org.eclipse.hawkbit.repository.jpa.AbstractRepositoryManagementSecurityTe
 import org.eclipse.hawkbit.repository.model.DistributionSetType;
 import org.junit.jupiter.api.Test;
 
-@Feature("SecurityTests - DistributionSetTypeManagement")
-@Story("SecurityTests DistributionSetTypeManagement")
+/**
+ * Feature: SecurityTests - DistributionSetTypeManagement<br/>
+ * Story: SecurityTests DistributionSetTypeManagement
+ */
 class DistributionSetTypeManagementSecurityTest
         extends AbstractRepositoryManagementSecurityTest<DistributionSetType, DistributionSetTypeCreate, DistributionSetTypeUpdate> {
 
@@ -43,34 +42,44 @@ class DistributionSetTypeManagementSecurityTest
         return entityFactory.distributionSetType().update(1L).description("description");
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void getByKeyPermissionsCheck() {
         assertPermissions(() -> distributionSetTypeManagement.findByKey("key"), List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void getByNamePermissionsCheck() {
         assertPermissions(() -> distributionSetTypeManagement.findByName("name"), List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void assignOptionalSoftwareModuleTypesPermissionsCheck() {
         assertPermissions(() -> distributionSetTypeManagement.assignOptionalSoftwareModuleTypes(1L, List.of(1L)),
                 List.of(SpPermission.UPDATE_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void assignMandatorySoftwareModuleTypesPermissionsCheck() {
         assertPermissions(() -> distributionSetTypeManagement.assignMandatorySoftwareModuleTypes(1L, List.of(1L)),
                 List.of(SpPermission.UPDATE_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void unassignSoftwareModuleTypePermissionsCheck() {
         assertPermissions(() -> distributionSetTypeManagement.unassignSoftwareModuleType(1L, 1L), List.of(SpPermission.UPDATE_REPOSITORY));
     }

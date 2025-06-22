@@ -16,10 +16,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Step;
-import io.qameta.allure.Story;
 import org.eclipse.hawkbit.repository.FilterParams;
 import org.eclipse.hawkbit.repository.builder.DistributionSetCreate;
 import org.eclipse.hawkbit.repository.jpa.AbstractJpaIntegrationTest;
@@ -33,14 +29,18 @@ import org.eclipse.hawkbit.repository.model.TargetType;
 import org.eclipse.hawkbit.repository.model.TargetUpdateStatus;
 import org.junit.jupiter.api.Test;
 
-@Feature("Component Tests - Repository")
-@Story("Target Management Searches")
+/**
+ * Feature: Component Tests - Repository<br/>
+ * Story: Target Management Searches
+ */
 class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
 
     private static final String SPACE_AND_DESCRIPTION = " description";
 
+    /**
+     * Verifies that targets with given target type are returned from repository.
+     */
     @Test
-    @Description("Verifies that targets with given target type are returned from repository.")
     void findTargetByTargetType() {
         final TargetType testType = testdataFactory.createTargetType("testType",
                 Collections.singletonList(standardDsType));
@@ -61,10 +61,11 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
 
     }
 
+    /**
+     * Tests different parameter combinations for target search operations. 
+     * and query definitions by RSQL (named and un-named).
+     */
     @Test
-    @Description("Tests different parameter combinations for target search operations. "
-            + "That includes both the test itself, as a count operation with the same filters "
-            + "and query definitions by RSQL (named and un-named).")
     void targetSearchWithVariousFilterCombinations() {
         final TargetTag targTagX = targetTagManagement.create(entityFactory.tag().create().name("TargTag-X"));
         final TargetTag targTagY = targetTagManagement.create(entityFactory.tag().create().name("TargTag-Y"));
@@ -187,8 +188,10 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
         verifyThat198TargetsAreInStatusUnknownAndOverdue(unknown, expected);
     }
 
+    /**
+     * Verifies that targets with given assigned DS are returned from repository.
+     */
     @Test
-    @Description("Verifies that targets with given assigned DS are returned from repository.")
     void findTargetByAssignedDistributionSet() {
         final DistributionSet assignedSet = testdataFactory.createDistributionSet("");
         testdataFactory.createTargets(10, "unassigned", "unassigned");
@@ -205,8 +208,10 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
 
     }
 
+    /**
+     * Verifies that targets without given assigned DS are returned from repository.
+     */
     @Test
-    @Description("Verifies that targets without given assigned DS are returned from repository.")
     void findTargetWithoutAssignedDistributionSet() {
         final DistributionSet assignedSet = testdataFactory.createDistributionSet("");
         final TargetFilterQuery tfq = targetFilterQueryManagement
@@ -223,8 +228,10 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
 
     }
 
+    /**
+     * Verifies that targets with given installed DS are returned from repository.
+     */
     @Test
-    @Description("Verifies that targets with given installed DS are returned from repository.")
     void findTargetByInstalledDistributionSet() {
         final DistributionSet assignedSet = testdataFactory.createDistributionSet("");
         final DistributionSet installedSet = testdataFactory.createDistributionSet("another");
@@ -245,8 +252,10 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
 
     }
 
+    /**
+     * Verifies that all compatible targets are returned from repository.
+     */
     @Test
-    @Description("Verifies that all compatible targets are returned from repository.")
     void shouldFindAllTargetsCompatibleWithDS() {
         final DistributionSet testDs = testdataFactory.createDistributionSet();
         final TargetType targetType = testdataFactory.createTargetType("testType",
@@ -264,8 +273,10 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .as("contains all targets").containsAll(targetWithCompatibleTypes).containsAll(targets);
     }
 
+    /**
+     * Verifies that incompatible targets are not returned from repository.
+     */
     @Test
-    @Description("Verifies that incompatible targets are not returned from repository.")
     void shouldNotFindTargetsIncompatibleWithDS() {
         final DistributionSetType dsType = testdataFactory.findOrCreateDistributionSetType("test-ds-type",
                 "test-ds-type");
@@ -295,7 +306,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .doesNotContainAnyElementsOf(targetsWithIncompatibleType);
     }
 
-    @Step
     private void verifyThat1TargetAIsInStatusPendingAndHasDSInstalled(final DistributionSet installedSet,
             final List<TargetUpdateStatus> pending, final Target expected) {
         final FilterParams filterParams = new FilterParams(pending, null, null, installedSet.getId(), Boolean.FALSE);
@@ -308,7 +318,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .containsAll(targetManagement.findByRsql(query, PAGE).getContent());
     }
 
-    @Step
     private void verifyThat200targetsWithGivenTagAreInStatusPendingOrUnknown(final TargetTag targTagW,
             final List<TargetUpdateStatus> both, final List<Target> expected) {
         final FilterParams filterParams = new FilterParams(both, null, null, null, Boolean.FALSE, targTagW.getName());
@@ -322,7 +331,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .containsAll(targetManagement.findByRsql(query, PAGE).getContent());
     }
 
-    @Step
     private void verifyThat2TargetsWithGivenTagAreInPending(final TargetTag targTagW,
             final List<TargetUpdateStatus> pending, final List<Target> expected) {
         final FilterParams filterParams = new FilterParams(pending, null, null, null, Boolean.FALSE,
@@ -337,7 +345,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .containsAll(targetManagement.findByRsql(query, PAGE).getContent());
     }
 
-    @Step
     private void verifyThat2TargetsWithGivenTagAndDSIsInPending(final TargetTag targTagW, final DistributionSet setA,
             final List<TargetUpdateStatus> pending, final List<Target> expected) {
         final FilterParams filterParams = new FilterParams(pending, null, null, setA.getId(), Boolean.FALSE,
@@ -353,7 +360,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .containsAll(targetManagement.findByRsql(query, PAGE).getContent());
     }
 
-    @Step
     private void verifyThat1TargetWithGivenNameOrDescAndTagAndDSIsInPending(final TargetTag targTagW,
             final DistributionSet setA, final List<TargetUpdateStatus> pending, final Target expected) {
         final FilterParams filterParams = new FilterParams(pending, null, "%targ-B%", setA.getId(), Boolean.FALSE,
@@ -369,7 +375,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .containsAll(targetManagement.findByRsql(query, PAGE).getContent());
     }
 
-    @Step
     private void verifyThat1TargetWithGivenNameOrDescAndDSIsInPending(final DistributionSet setA,
             final List<TargetUpdateStatus> pending, final Target expected) {
         final FilterParams filterParams = new FilterParams(pending, null, "%targ-A%", setA.getId(), Boolean.FALSE);
@@ -384,7 +389,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .containsAll(targetManagement.findByRsql(query, PAGE).getContent());
     }
 
-    @Step
     private void verifyThat3TargetsWithGivenDSAreInPending(final DistributionSet setA,
             final List<TargetUpdateStatus> pending, final List<Target> expected) {
         final FilterParams filterParams = new FilterParams(pending, null, null, setA.getId(), Boolean.FALSE);
@@ -399,7 +403,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .containsAll(targetManagement.findByRsql(query, PAGE).getContent());
     }
 
-    @Step
     private void verifyThat4TargetsAreInStatusPending(final List<TargetUpdateStatus> pending,
             final List<Target> expected) {
         final FilterParams filterParams = new FilterParams(pending, null, null, null, Boolean.FALSE);
@@ -413,7 +416,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .containsAll(targetManagement.findByRsql(query, PAGE).getContent());
     }
 
-    @Step
     private void verifyThat99TargetsWithGivenNameOrDescAndTagAreInStatusUnknown(final TargetTag targTagW,
             final List<TargetUpdateStatus> unknown, final List<Target> expected) {
         final FilterParams filterParams = new FilterParams(unknown, null, "%targ-B%", null, Boolean.FALSE,
@@ -429,7 +431,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .containsAll(targetManagement.findByRsql(query, PAGE).getContent());
     }
 
-    @Step
     private void verifyThat99TargetsWithNameOrDescriptionAreInGivenStatus(final List<TargetUpdateStatus> unknown,
             final List<Target> expected) {
         final FilterParams filterParams = new FilterParams(unknown, null, "%targ-A%", null, Boolean.FALSE);
@@ -443,7 +444,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .containsAll(targetManagement.findByRsql(query, PAGE).getContent());
     }
 
-    @Step
     private void verifyThat0TargetsAreInStatusUnknownAndHaveDSAssigned(final DistributionSet setA,
             final List<TargetUpdateStatus> unknown) {
         final FilterParams filterParams = new FilterParams(unknown, null, null, setA.getId(), Boolean.FALSE);
@@ -459,7 +459,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .isEmpty();
     }
 
-    @Step
     private void verifyThat198TargetsAreInStatusUnknownAndHaveGivenTags(final TargetTag targTagY,
             final TargetTag targTagW, final List<TargetUpdateStatus> unknown, final List<Target> expected) {
         final FilterParams filterParams = new FilterParams(unknown, null, null, null, Boolean.FALSE, targTagY.getName(),
@@ -475,7 +474,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .containsAll(targetManagement.findByRsql(query, PAGE).getContent());
     }
 
-    @Step
     private void verifyThat496TargetsAreInStatusUnknown(final List<TargetUpdateStatus> unknown,
             final List<Target> expected) {
         final FilterParams filterParams = new FilterParams(unknown, null, null, null, Boolean.FALSE);
@@ -489,7 +487,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .containsAll(targetManagement.findByRsql(query, PAGE).getContent());
     }
 
-    @Step
     private void verifyThat198TargetsAreInStatusUnknownAndOverdue(final List<TargetUpdateStatus> unknown,
             final List<Target> expected) {
         final FilterParams filterParams = new FilterParams(unknown, Boolean.TRUE, null, null, Boolean.FALSE);
@@ -504,7 +501,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .containsAll(targetManagement.findByRsql(query, PAGE).getContent());
     }
 
-    @Step
     private void verifyThat1TargetWithDescOrNameHasDS(final DistributionSet setA, final Target expected) {
         final FilterParams filterParams = new FilterParams(null, null, "%targ-A%", setA.getId(), Boolean.FALSE);
         final String query = "(name==*targ-A* or description==*targ-A*) and (assignedds.name==" + setA.getName()
@@ -518,7 +514,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .containsAll(targetManagement.findByRsql(query, PAGE).getContent());
     }
 
-    @Step
     private void verifyThat3TargetsHaveDSAssigned(final DistributionSet setA, final List<Target> expected) {
         final FilterParams filterParams = new FilterParams(null, null, null, setA.getId(), Boolean.FALSE);
         final String query = "assignedds.name==" + setA.getName() + " or installedds.name==" + setA.getName();
@@ -531,7 +526,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .containsAll(targetManagement.findByRsql(query, PAGE).getContent());
     }
 
-    @Step
     private void verifyThat0TargetsWithNameOrdescAndDSHaveTag(final TargetTag targTagX, final DistributionSet setA) {
         final FilterParams filterParams = new FilterParams(null, null, "%targ-C%", setA.getId(), Boolean.FALSE,
                 targTagX.getName());
@@ -546,7 +540,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .isEmpty();
     }
 
-    @Step
     private void verifyThat0TargetsWithTagAndDescOrNameHasDS(final TargetTag targTagW, final DistributionSet setA) {
         final FilterParams filterParams = new FilterParams(null, null, "%targ-A%", setA.getId(), Boolean.FALSE,
                 targTagW.getName());
@@ -560,7 +553,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .isEmpty();
     }
 
-    @Step
     private void verifyThat1TargetHasTagHasDescOrNameAndDs(final TargetTag targTagW, final DistributionSet setA,
             final Target expected) {
         final FilterParams filterParams = new FilterParams(null, null, "%targ-C%", setA.getId(), Boolean.FALSE,
@@ -575,7 +567,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .containsAll(targetManagement.findByRsql(query, PAGE).getContent());
     }
 
-    @Step
     private void verifyThat1TargetHasNameAndId(final String name, final String controllerId) {
         final FilterParams filterParamsByName = new FilterParams(null, null, name, null, Boolean.FALSE);
         assertThat(targetManagement.findByFilters(filterParamsByName, PAGE).getContent()).as("has number of elements")
@@ -588,7 +579,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .hasSize((int) targetManagement.countByFilters(filterParamsByControllerId));
     }
 
-    @Step
     private void verifyThat100TargetsContainsGivenTextAndHaveTagAssigned(final TargetTag targTagY,
             final TargetTag targTagW, final List<Target> expected) {
         final FilterParams filterParams = new FilterParams(null, null, "%targ-B%", null, Boolean.FALSE,
@@ -610,7 +600,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
         return result;
     }
 
-    @Step
     private void verifyThat200TargetsHaveTagD(final TargetTag targTagD, final List<Target> expected) {
         final FilterParams filterParams = new FilterParams(null, null, null, null, Boolean.FALSE, targTagD.getName());
         final String query = "tag==" + targTagD.getName();
@@ -622,7 +611,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .containsAll(targetManagement.findByRsql(query, PAGE).getContent());
     }
 
-    @Step
     private void verifyThatRepositoryContains500Targets() {
         final FilterParams filterParams = new FilterParams(null, null, null, null, null);
         assertThat(targetManagement.findByFilters(filterParams, PAGE).getContent())
@@ -632,7 +620,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .containsAll(targetManagement.findAll(PAGE).getContent());
     }
 
-    @Step
     private void verifyThat1TargetHasTypeAndDSAssigned(final TargetType type, final DistributionSet set,
             final Target expected) {
         final FilterParams filterParams = new FilterParams(null, set.getId(), Boolean.FALSE, type.getId());
@@ -642,7 +629,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .as("and contains the following elements").containsExactly(expected);
     }
 
-    @Step
     private void verifyThatTargetsHasNoTypeAndDSAssignedOrInstalled(final DistributionSet set,
             final List<Target> expected) {
         final FilterParams filterParams = new FilterParams(null, set.getId(), Boolean.TRUE, null);
@@ -652,7 +638,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .as("and contains the following elements").containsAll(expected);
     }
 
-    @Step
     private void verifyThat100TargetsContainsGivenTextAndHaveTypeAssigned(final TargetType targetType,
             final List<Target> expected) {
         final FilterParams filterParams = new FilterParams("%targ-E%", null, Boolean.FALSE, targetType.getId());
@@ -667,7 +652,6 @@ class TargetManagementSearchTest extends AbstractJpaIntegrationTest {
                 .containsAll(expected.stream().map(Target::getControllerId).toList());
     }
 
-    @Step
     private void verifyThat400TargetsContainsGivenTextAndHaveNoTypeAssigned(final List<Target> expected) {
         final FilterParams filterParams = new FilterParams("%targ-%", null, Boolean.TRUE, null);
         assertThat(targetManagement.findByFilters(filterParams, PAGE).getContent()).as("has number of elements")

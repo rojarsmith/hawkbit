@@ -9,27 +9,29 @@
  */
 package org.eclipse.hawkbit.repository.event.remote.entity;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.eclipse.hawkbit.repository.model.SoftwareModule;
 import org.junit.jupiter.api.Test;
 
 /**
  * Test the remote entity events.
+  * <p/>
+ * Feature: Component Tests - Repository<br/>
+ * Story: Test SoftwareModuleCreatedEvent, SoftwareModuleUpdatedEvent
  */
-@Feature("Component Tests - Repository")
-@Story("Test SoftwareModuleCreatedEvent, SoftwareModuleUpdatedEvent")
 class SoftwareModuleEventTest extends AbstractRemoteEntityEventTest<SoftwareModule> {
 
+    /**
+     * Verifies that the software module entity reloading by remote created event works
+     */
     @Test
-    @Description("Verifies that the software module entity reloading by remote created event works")
     void testTargetCreatedEvent() {
         assertAndCreateRemoteEvent(SoftwareModuleCreatedEvent.class);
     }
 
+    /**
+     * Verifies that the software module entity reloading by remote updated event works
+     */
     @Test
-    @Description("Verifies that the software module entity reloading by remote updated event works")
     void testTargetUpdatedEvent() {
         assertAndCreateRemoteEvent(SoftwareModuleUpdatedEvent.class);
     }

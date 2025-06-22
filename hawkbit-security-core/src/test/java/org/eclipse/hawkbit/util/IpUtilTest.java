@@ -19,9 +19,6 @@ import java.net.URI;
 
 import jakarta.servlet.http.HttpServletRequest;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.eclipse.hawkbit.security.HawkbitSecurityProperties;
 import org.eclipse.hawkbit.security.HawkbitSecurityProperties.Clients;
 import org.junit.jupiter.api.Assertions;
@@ -31,8 +28,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-@Feature("Unit Tests - Security")
-@Story("IP Util Test")
+/**
+ * Feature: Unit Tests - Security<br/>
+ * Story: IP Util Test
+ */
 class IpUtilTest {
 
     private static final String X_FORWARDED_FOR = HawkbitSecurityProperties.Clients.X_FORWARDED_FOR;
@@ -47,8 +46,10 @@ class IpUtilTest {
     @Mock
     private HawkbitSecurityProperties securityPropertyMock;
 
+    /**
+     * Tests create uri from request
+     */
     @Test
-    @Description("Tests create uri from request")
     void getRemoteAddrFromRequestIfForwardedHeaderNotPresent() {
         final URI knownRemoteClientIP = IpUtil.createHttpUri("127.0.0.1");
         when(requestMock.getRemoteAddr()).thenReturn(knownRemoteClientIP.getHost());
@@ -62,8 +63,10 @@ class IpUtilTest {
         verify(requestMock, times(1)).getRemoteAddr();
     }
 
+    /**
+     * Tests create uri from request with masked IP when IP tracking is disabled
+     */
     @Test
-    @Description("Tests create uri from request with masked IP when IP tracking is disabled")
     void maskRemoteAddrIfDisabled() {
         final URI knownRemoteClientIP = IpUtil.createHttpUri("***");
         when(securityPropertyMock.getClients()).thenReturn(clientMock);
@@ -78,8 +81,10 @@ class IpUtilTest {
         verify(requestMock, times(0)).getRemoteAddr();
     }
 
+    /**
+     * Tests create uri from x forward header
+     */
     @Test
-    @Description("Tests create uri from x forward header")
     void getRemoteAddrFromXForwardedForHeader() {
         final URI knownRemoteClientIP = IpUtil.createHttpUri("10.99.99.1");
         when(requestMock.getHeader(X_FORWARDED_FOR)).thenReturn(knownRemoteClientIP.getHost());
@@ -92,8 +97,10 @@ class IpUtilTest {
         verify(requestMock, times(0)).getRemoteAddr();
     }
 
+    /**
+     * Tests client uri from request
+     */
     @Test
-    @Description("Tests client uri from request")
     void testCreateClientHttpUri() {
         checkHostInfoResolution("0:0:0:0:0:0:0:1", "[0:0:0:0:0:0:0:1]", true);
         checkHostInfoResolution("127.0.0.1", "127.0.0.1", true);
@@ -105,8 +112,10 @@ class IpUtilTest {
         checkHostInfoResolution("[0:0:0:0:0:0:0:1]:4233", "[0:0:0:0:0:0:0:1]", true);
     }
 
+    /**
+     * Tests client uri from request
+     */
     @Test
-    @Description("Tests client uri from request")
     void testResolveClientIpFromHeader() {
         checkHostInfoResolution("0:0:0:0:0:0:0:1", "[0:0:0:0:0:0:0:1]", false);
         checkHostInfoResolution("127.0.0.1", "127.0.0.1", false);
@@ -115,8 +124,10 @@ class IpUtilTest {
         checkHostInfoResolution("[0:0:0:0:0:0:0:1]:4233", "[0:0:0:0:0:0:0:1]", false);
     }
 
+    /**
+     * Tests create http uri ipv4 and ipv6
+     */
     @Test
-    @Description("Tests create http uri ipv4 and ipv6")
     void testCreateHttpUri() {
         final String ipv4 = "10.99.99.1";
         URI httpUri = IpUtil.createHttpUri(ipv4);
@@ -131,8 +142,10 @@ class IpUtilTest {
         assertHttpUri("[" + ipv6 + "]", httpUri);
     }
 
+    /**
+     * Tests create amqp uri ipv4 and ipv6
+     */
     @Test
-    @Description("Tests create amqp uri ipv4 and ipv6")
     void testCreateAmqpUri() {
         final String ipv4 = "10.99.99.1";
         URI amqpUri = IpUtil.createAmqpUri(ipv4, "path");
@@ -158,8 +171,10 @@ class IpUtilTest {
         assertAmqpUri(ipv6Braces, amqpUri);
     }
 
+    /**
+     * Tests create invalid uri
+     */
     @Test
-    @Description("Tests create invalid uri")
     void testCreateInvalidUri() {
 
         final String host = "10.99.99.1";

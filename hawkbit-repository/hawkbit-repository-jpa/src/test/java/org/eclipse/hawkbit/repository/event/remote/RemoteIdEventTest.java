@@ -15,18 +15,16 @@ import static org.assertj.core.api.Assertions.fail;
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.eclipse.hawkbit.repository.jpa.model.JpaAction;
 import org.eclipse.hawkbit.repository.model.TenantAwareBaseEntity;
 import org.junit.jupiter.api.Test;
 
 /**
  * Test the remote entity events.
+  * <p/>
+ * Feature: Component Tests - Repository<br/>
+ * Story: Entity Id Events
  */
-@Feature("Component Tests - Repository")
-@Story("Entity Id Events")
 class RemoteIdEventTest extends AbstractRemoteEventTest {
 
     private static final long ENTITY_ID = 1L;
@@ -36,40 +34,52 @@ class RemoteIdEventTest extends AbstractRemoteEventTest {
     private static final String CONTROLLER_ID = "controller911";
     private static final String ADDRESS = "amqp://anyhost";
 
+    /**
+     * Verifies that the ds id is correct reloaded
+     */
     @Test
-    @Description("Verifies that the ds id is correct reloaded")
     void testDistributionSetDeletedEvent() {
         assertAndCreateRemoteEvent(DistributionSetDeletedEvent.class);
     }
 
+    /**
+     * Verifies that the ds tag id is correct reloaded
+     */
     @Test
-    @Description("Verifies that the ds tag id is correct reloaded")
     void testDistributionSetTagDeletedEvent() {
         assertAndCreateRemoteEvent(DistributionSetTagDeletedEvent.class);
     }
 
+    /**
+     * Verifies that the target id is correct reloaded
+     */
     @Test
-    @Description("Verifies that the target id is correct reloaded")
     void testTargetDeletedEvent() {
         final TargetDeletedEvent deletedEvent = new TargetDeletedEvent(TENANT, ENTITY_ID, CONTROLLER_ID, ADDRESS,
                 ENTITY_CLASS, NODE);
         assertEntity(deletedEvent);
     }
 
+    /**
+     * Verifies that the target tag id is correct reloaded
+     */
     @Test
-    @Description("Verifies that the target tag id is correct reloaded")
     void testTargetTagDeletedEvent() {
         assertAndCreateRemoteEvent(TargetTagDeletedEvent.class);
     }
 
+    /**
+     * Verifies that the software module id is correct reloaded
+     */
     @Test
-    @Description("Verifies that the software module id is correct reloaded")
     void testSoftwareModuleDeletedEvent() {
         assertAndCreateRemoteEvent(SoftwareModuleDeletedEvent.class);
     }
 
+    /**
+     * Verifies that the rollout id is correct reloaded
+     */
     @Test
-    @Description("Verifies that the rollout id is correct reloaded")
     void testRolloutDeletedEvent() {
         assertAndCreateRemoteEvent(RolloutDeletedEvent.class);
     }

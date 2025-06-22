@@ -11,7 +11,6 @@ package org.eclipse.hawkbit.repository.jpa;
 
 import java.util.List;
 
-import io.qameta.allure.Description;
 import org.eclipse.hawkbit.im.authentication.SpPermission;
 import org.eclipse.hawkbit.repository.RepositoryManagement;
 import org.junit.jupiter.api.Test;
@@ -34,26 +33,34 @@ public abstract class AbstractRepositoryManagementSecurityTest<T, C, U> extends 
      */
     protected abstract U getUpdateObject();
 
+    /**
+     * Tests RepositoryManagement PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests RepositoryManagement PreAuthorized method with correct and insufficient permissions.")
     void createCollectionPermissionCheck() {
         assertPermissions(() -> getRepositoryManagement().create(List.of(getCreateObject())), List.of(SpPermission.CREATE_REPOSITORY, SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests RepositoryManagement PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests RepositoryManagement PreAuthorized method with correct and insufficient permissions.")
     void createPermissionCheck() {
         assertPermissions(() -> getRepositoryManagement().create(getCreateObject()), List.of(SpPermission.CREATE_REPOSITORY, SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests RepositoryManagement PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests RepositoryManagement PreAuthorized method with correct and insufficient permissions.")
     void updatePermissionCheck() {
         assertPermissions(() -> getRepositoryManagement().update(getUpdateObject()), List.of(SpPermission.UPDATE_REPOSITORY));
     }
 
+    /**
+     * Tests RepositoryManagement PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests RepositoryManagement PreAuthorized method with correct and insufficient permissions.")
     void deletePermissionCheck() {
         assertPermissions(() -> {
             getRepositoryManagement().delete(1L);
@@ -61,49 +68,63 @@ public abstract class AbstractRepositoryManagementSecurityTest<T, C, U> extends 
             }, List.of(SpPermission.DELETE_REPOSITORY));
     }
 
+    /**
+     * Tests RepositoryManagement PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests RepositoryManagement PreAuthorized method with correct and insufficient permissions.")
-    public void countPermissionCheck() {
+     void countPermissionCheck() {
         assertPermissions(() -> getRepositoryManagement().count(), List.of(SpPermission.READ_REPOSITORY));
     }
     
 
+    /**
+     * Tests RepositoryManagement PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests RepositoryManagement PreAuthorized method with correct and insufficient permissions.")
-    public void deleteCollectionRepositoryManagement() {
+     void deleteCollectionRepositoryManagement() {
         assertPermissions(() -> {
             getRepositoryManagement().delete(List.of(1L));
             return null;
         }, List.of(SpPermission.DELETE_REPOSITORY));
     }
 
+    /**
+     * Tests RepositoryManagement PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests RepositoryManagement PreAuthorized method with correct and insufficient permissions.")
-    public void getPermissionCheck() {
+     void getPermissionCheck() {
         assertPermissions(() -> getRepositoryManagement().get(1L), List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests RepositoryManagement PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests RepositoryManagement PreAuthorized method with correct and insufficient permissions.")
-    public void getCollectionPermissionCheck() {
+     void getCollectionPermissionCheck() {
         assertPermissions(() -> getRepositoryManagement().get(List.of(1L)), List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests RepositoryManagement PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests RepositoryManagement PreAuthorized method with correct and insufficient permissions.")
-    public void existsCollectionPermissionCheck() {
+     void existsCollectionPermissionCheck() {
         assertPermissions(() -> getRepositoryManagement().exists(1L), List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests RepositoryManagement PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests RepositoryManagement PreAuthorized method with correct and insufficient permissions.")
-    public void findAllPermissionCheck() {
+     void findAllPermissionCheck() {
         assertPermissions(() -> getRepositoryManagement().findAll(Pageable.ofSize(1)), List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests RepositoryManagement PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests RepositoryManagement PreAuthorized method with correct and insufficient permissions.")
-    public void findByRsqlPermissionCheck() {
+     void findByRsqlPermissionCheck() {
         assertPermissions(() -> getRepositoryManagement().findByRsql("(name==*)", Pageable.ofSize(1)), List.of(SpPermission.READ_REPOSITORY));
     }
 

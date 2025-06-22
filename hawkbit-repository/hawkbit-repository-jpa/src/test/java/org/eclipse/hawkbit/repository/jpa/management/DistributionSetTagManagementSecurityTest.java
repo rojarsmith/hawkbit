@@ -12,9 +12,6 @@ package org.eclipse.hawkbit.repository.jpa.management;
 import java.util.List;
 import java.util.Random;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.eclipse.hawkbit.im.authentication.SpPermission;
 import org.eclipse.hawkbit.repository.RepositoryManagement;
 import org.eclipse.hawkbit.repository.builder.TagCreate;
@@ -24,8 +21,10 @@ import org.eclipse.hawkbit.repository.model.DistributionSetTag;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Pageable;
 
-@Feature("SecurityTests - DistributionSetTagManagement")
-@Story("SecurityTests DistributionSetTagManagement")
+/**
+ * Feature: SecurityTests - DistributionSetTagManagement<br/>
+ * Story: SecurityTests DistributionSetTagManagement
+ */
 class DistributionSetTagManagementSecurityTest extends AbstractRepositoryManagementSecurityTest<DistributionSetTag, TagCreate, TagUpdate> {
 
     @Override
@@ -43,21 +42,27 @@ class DistributionSetTagManagementSecurityTest extends AbstractRepositoryManagem
         return entityFactory.tag().update(1L).name("tag");
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void getByNameWitPermissionWorks() {
         assertPermissions(() -> distributionSetTagManagement.findByName("tagName"), List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void findByDistributionSetPermissionsCheck() {
         assertPermissions(() -> distributionSetTagManagement.findByDistributionSet(1L, Pageable.unpaged()),
                 List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void deleteDistributionSetTagPermissionsCheck() {
         assertPermissions(() -> {
             distributionSetTagManagement.delete("tagName");

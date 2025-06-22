@@ -21,22 +21,22 @@ import java.util.Collections;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.junit.jupiter.api.Test;
 
 /**
  * Test serializability of DDI api model 'DdiDeployment'
+  * <p/>
+ * Feature: Unit Tests - Direct Device Integration API<br/>
+ * Story: Serializability of DDI api Models
  */
-@Feature("Unit Tests - Direct Device Integration API")
-@Story("Serializability of DDI api Models")
 class DdiDeploymentTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+    /**
+     * Verify the correct serialization and deserialization of the model
+     */
     @Test
-    @Description("Verify the correct serialization and deserialization of the model")
     void shouldSerializeAndDeserializeObject() throws IOException {
         // Setup
         final DdiDeployment ddiDeployment = new DdiDeployment(FORCED, ATTEMPT, Collections.emptyList(), AVAILABLE);
@@ -51,8 +51,10 @@ class DdiDeploymentTest {
         assertThat(deserializedDdiDeployment.getMaintenanceWindow().getStatus()).isEqualTo(ddiDeployment.getMaintenanceWindow().getStatus());
     }
 
+    /**
+     * Verify the correct deserialization of a model with a additional unknown property
+     */
     @Test
-    @Description("Verify the correct deserialization of a model with a additional unknown property")
     void shouldDeserializeObjectWithUnknownProperty() throws IOException {
         // Setup
         final String serializedDdiDeployment = "{\"download\":\"forced\",\"update\":\"attempt\", " +
@@ -65,8 +67,10 @@ class DdiDeploymentTest {
         assertThat(ddiDeployment.getMaintenanceWindow().getStatus()).isEqualTo(AVAILABLE.getStatus());
     }
 
+    /**
+     * Verify that deserialization fails for known properties with a wrong datatype
+     */
     @Test
-    @Description("Verify that deserialization fails for known properties with a wrong datatype")
     void shouldFailForObjectWithWrongDataTypes() {
         // Setup
         final String serializedDdiDeployment = "{\"download\":[\"forced\"],\"update\":\"attempt\", " +

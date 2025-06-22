@@ -15,21 +15,21 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.junit.jupiter.api.Test;
 import org.springframework.util.ReflectionUtils;
 
 /**
  * Test {@link SpPermission}.
+  * <p/>
+ * Feature: Unit Tests - Security<br/>
+ * Story: Permission Test
  */
-@Feature("Unit Tests - Security")
-@Story("Permission Test")
 final class SpPermissionTest {
 
+    /**
+     * Try to double check if all permissions works as expected
+     */
     @Test
-    @Description("Try to double check if all permissions works as expected")
     void shouldReturnAllPermissions() {
         List<String> expected = new LinkedList<>();
         ReflectionUtils.doWithFields(SpPermission.class, f -> {

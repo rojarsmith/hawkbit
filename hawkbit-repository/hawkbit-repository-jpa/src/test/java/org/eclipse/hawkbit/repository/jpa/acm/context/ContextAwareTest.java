@@ -15,9 +15,6 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.eclipse.hawkbit.ContextAware;
 import org.eclipse.hawkbit.repository.autoassign.AutoAssignExecutor;
 import org.eclipse.hawkbit.repository.jpa.AbstractJpaIntegrationTest;
@@ -32,8 +29,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-@Feature("Component Tests - Context runner")
-@Story("Test Context Runner")
+/**
+ * Feature: Component Tests - Context runner<br/>
+ * Story: Test Context Runner
+ */
 class ContextAwareTest extends AbstractJpaIntegrationTest {
 
     @Autowired
@@ -51,8 +50,10 @@ class ContextAwareTest extends AbstractJpaIntegrationTest {
         reset(contextAware);
     }
 
+    /**
+     * Verifies acm context is persisted when creating Rollout
+     */
     @Test
-    @Description("Verifies acm context is persisted when creating Rollout")
     void verifyAcmContextIsPersistedInCreatedRollout() {
         final SecurityContext securityContext = SecurityContextHolder.getContext();
         assertThat(securityContext).isNotNull();
@@ -63,8 +64,10 @@ class ContextAwareTest extends AbstractJpaIntegrationTest {
                         assertThat(SECURITY_CONTEXT_SERIALIZER.deserialize(ctx)).isEqualTo(securityContext));
     }
 
+    /**
+     * Verifies acm context is reused when handling a rollout
+     */
     @Test
-    @Description("Verifies acm context is reused when handling a rollout")
     void verifyContextIsReusedWhenHandlingRollout() {
         final SecurityContext securityContext = SecurityContextHolder.getContext();
         assertThat(securityContext).isNotNull();
@@ -74,8 +77,10 @@ class ContextAwareTest extends AbstractJpaIntegrationTest {
         verify(contextAware).runInContext(eq(SECURITY_CONTEXT_SERIALIZER.serialize(securityContext)), any(Runnable.class));
     }
 
+    /**
+     * Verifies acm context is persisted when activating auto assignment
+     */
     @Test
-    @Description("Verifies acm context is persisted when activating auto assignment")
     void verifyContextIsPersistedInActiveAutoAssignment() {
         final SecurityContext securityContext = SecurityContextHolder.getContext();
         assertThat(securityContext).isNotNull();
@@ -86,8 +91,10 @@ class ContextAwareTest extends AbstractJpaIntegrationTest {
                         assertThat(SECURITY_CONTEXT_SERIALIZER.deserialize(ctx)).isEqualTo(securityContext));
     }
 
+    /**
+     * Verifies acm context is used when performing auto assign check on all target
+     */
     @Test
-    @Description("Verifies acm context is used when performing auto assign check on all target")
     void verifyContextIsReusedWhenCheckingForAutoAssignmentAllTargets() {
         final SecurityContext securityContext = SecurityContextHolder.getContext();
         assertThat(securityContext).isNotNull();
@@ -97,8 +104,10 @@ class ContextAwareTest extends AbstractJpaIntegrationTest {
         verify(contextAware).runInContext(eq(SECURITY_CONTEXT_SERIALIZER.serialize(securityContext)), any(Runnable.class));
     }
 
+    /**
+     * Verifies acm context is used when performing auto assign check on single target
+     */
     @Test
-    @Description("Verifies acm context is used when performing auto assign check on single target")
     void verifyContextIsReusedWhenCheckingForAutoAssignmentSingleTarget() {
         final SecurityContext securityContext = SecurityContextHolder.getContext();
         assertThat(securityContext).isNotNull();

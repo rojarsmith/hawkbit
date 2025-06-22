@@ -16,9 +16,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Random;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
@@ -29,8 +26,10 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 @Slf4j
-@Feature("Unit Tests - Artifact File System Repository")
-@Story("Test storing artifact binaries in the file-system")
+/**
+ * Feature: Unit Tests - Artifact File System Repository<br/>
+ * Story: Test storing artifact binaries in the file-system
+ */
 class ArtifactFilesystemRepositoryTest {
 
     private static final String TENANT = "test_tenant";
@@ -57,8 +56,10 @@ class ArtifactFilesystemRepositoryTest {
         }
     }
 
+    /**
+     * Verifies that an artifact can be successfully stored in the file-system repository
+     */
     @Test
-    @Description("Verifies that an artifact can be successfully stored in the file-system repository")
     void storeSuccessfully() throws IOException {
         final byte[] fileContent = randomBytes();
         final AbstractDbArtifact artifact = storeRandomArtifact(fileContent);
@@ -68,8 +69,10 @@ class ArtifactFilesystemRepositoryTest {
         assertThat(readContent).isEqualTo(fileContent);
     }
 
+    /**
+     * Verifies that an artifact can be successfully stored in the file-system repository
+     */
     @Test
-    @Description("Verifies that an artifact can be successfully stored in the file-system repository")
     void getStoredArtifactBasedOnSHA1Hash() throws IOException {
         final byte[] fileContent = randomBytes();
         final AbstractDbArtifact artifact = storeRandomArtifact(fileContent);
@@ -77,8 +80,10 @@ class ArtifactFilesystemRepositoryTest {
         assertThat(artifactFilesystemRepository.getArtifactBySha1(TENANT, artifact.getHashes().getSha1())).isNotNull();
     }
 
+    /**
+     * Verifies that an artifact can be deleted in the file-system repository
+     */
     @Test
-    @Description("Verifies that an artifact can be deleted in the file-system repository")
     void deleteStoredArtifactBySHA1Hash() throws IOException {
         final AbstractDbArtifact artifact = storeRandomArtifact(randomBytes());
         artifactFilesystemRepository.deleteBySha1(TENANT, artifact.getHashes().getSha1());
@@ -86,8 +91,10 @@ class ArtifactFilesystemRepositoryTest {
         assertThat(artifactFilesystemRepository.getArtifactBySha1(TENANT, artifact.getHashes().getSha1())).isNull();
     }
 
+    /**
+     * Verifies that all artifacts of a tenant can be deleted in the file-system repository
+     */
     @Test
-    @Description("Verifies that all artifacts of a tenant can be deleted in the file-system repository")
     void deleteStoredArtifactOfTenant() throws IOException {
         final AbstractDbArtifact artifact = storeRandomArtifact(randomBytes());
         artifactFilesystemRepository.deleteByTenant(TENANT);
@@ -95,8 +102,10 @@ class ArtifactFilesystemRepositoryTest {
         assertThat(artifactFilesystemRepository.getArtifactBySha1(TENANT, artifact.getHashes().getSha1())).isNull();
     }
 
+    /**
+     * Verifies that an artifact which does not exists is deleted quietly in the file-system repository
+     */
     @Test
-    @Description("Verifies that an artifact which does not exists is deleted quietly in the file-system repository")
     void deleteArtifactWhichDoesNotExistsBySHA1HashWithoutException() throws IOException {
         try {
             artifactFilesystemRepository.deleteBySha1(TENANT, "sha1HashWhichDoesNotExists");

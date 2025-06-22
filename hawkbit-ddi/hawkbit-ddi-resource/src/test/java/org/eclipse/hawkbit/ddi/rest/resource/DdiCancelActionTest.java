@@ -25,9 +25,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.eclipse.hawkbit.ddi.json.model.DdiResult;
 import org.eclipse.hawkbit.ddi.json.model.DdiStatus;
 import org.eclipse.hawkbit.ddi.rest.api.DdiRestConstants;
@@ -46,16 +43,19 @@ import org.springframework.integration.json.JsonPathUtils;
 
 /**
  * Test cancel action from the controller.
+  * <p/>
+ * Feature: Component Tests - Direct Device Integration API<br/>
+ * Story: Cancel Action Resource
  */
-@Feature("Component Tests - Direct Device Integration API")
-@Story("Cancel Action Resource")
 class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
 
     @Autowired
     ActionStatusRepository actionStatusRepository;
 
+    /**
+     * Tests that the cancel action resource can be used with CBOR.
+     */
     @Test
-    @Description("Tests that the cancel action resource can be used with CBOR.")
     void cancelActionCbor() throws Exception {
         final DistributionSet ds = testdataFactory.createDistributionSet("");
         testdataFactory.createTarget();
@@ -87,8 +87,10 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
                 .andExpect(status().isOk());
     }
 
+    /**
+     * Test of the controller can continue a started update even after a cancel command if it so desires.
+     */
     @Test
-    @Description("Test of the controller can continue a started update even after a cancel command if it so desires.")
     void rootRsCancelActionButContinueAnyway() throws Exception {
         // prepare test data
         final DistributionSet ds = testdataFactory.createDistributionSet("");
@@ -147,8 +149,10 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
 
     }
 
+    /**
+     * Test for cancel operation of a update action.
+     */
     @Test
-    @Description("Test for cancel operation of a update action.")
     void rootRsCancelAction() throws Exception {
         final DistributionSet ds = testdataFactory.createDistributionSet("");
         final Target savedTarget = testdataFactory.createTarget();
@@ -228,8 +232,10 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
 
     }
 
+    /**
+     * Tests various bad requests and if the server handles them as expected.
+     */
     @Test
-    @Description("Tests various bad requests and if the server handles them as expected.")
     void badCancelAction() throws Exception {
 
         // not allowed methods
@@ -264,8 +270,10 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
 
     }
 
+    /**
+     * Tests the feedback channel of the cancel operation.
+     */
     @Test
-    @Description("Tests the feedback channel of the cancel operation.")
     void rootRsCancelActionFeedback() throws Exception {
 
         final DistributionSet ds = testdataFactory.createDistributionSet("");
@@ -344,8 +352,10 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
         assertThat(deploymentManagement.findActiveActionsByTarget(savedTarget.getControllerId(), PAGE)).isEmpty();
     }
 
+    /**
+     * Tests the feeback chanel of for multiple open cancel operations on the same target.
+     */
     @Test
-    @Description("Tests the feeback chanel of for multiple open cancel operations on the same target.")
     void multipleCancelActionFeedback() throws Exception {
         final DistributionSet ds = testdataFactory.createDistributionSet("", true);
         final DistributionSet ds2 = testdataFactory.createDistributionSet("2", true);
@@ -475,8 +485,10 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
         assertThat(deploymentManagement.countActionsByTarget(savedTarget.getControllerId())).isEqualTo(3);
     }
 
+    /**
+     * Tests the feeback channel closing for too many feedbacks, i.e. denial of service prevention.
+     */
     @Test
-    @Description("Tests the feeback channel closing for too many feedbacks, i.e. denial of service prevention.")
     void tooMuchCancelActionFeedback() throws Exception {
         testdataFactory.createTarget();
         final DistributionSet ds = testdataFactory.createDistributionSet("");
@@ -503,8 +515,10 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
+    /**
+     * test the correct rejection of various invalid feedback requests
+     */
     @Test
-    @Description("test the correct rejection of various invalid feedback requests")
     void badCancelActionFeedback() throws Exception {
         final Action cancelAction = createCancelAction(TestdataFactory.DEFAULT_CONTROLLER_ID);
         createCancelAction("4715");

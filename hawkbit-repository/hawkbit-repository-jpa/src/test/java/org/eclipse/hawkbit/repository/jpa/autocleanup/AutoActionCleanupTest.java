@@ -17,9 +17,6 @@ import static org.eclipse.hawkbit.tenancy.configuration.TenantConfigurationPrope
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.eclipse.hawkbit.repository.jpa.AbstractJpaIntegrationTest;
 import org.eclipse.hawkbit.repository.model.Action;
 import org.eclipse.hawkbit.repository.model.Action.Status;
@@ -30,17 +27,20 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * Test class for {@link AutoActionCleanup}.
+  * <p/>
+ * Feature: Component Tests - Repository<br/>
+ * Story: Action cleanup handler
  */
-@Feature("Component Tests - Repository")
-@Story("Action cleanup handler")
 @SuppressWarnings("java:S6813") // constructor injects are not possible for test classes
 class AutoActionCleanupTest extends AbstractJpaIntegrationTest {
 
     @Autowired
     private AutoActionCleanup autoActionCleanup;
 
+    /**
+     * Verifies that running actions are not cleaned up.
+     */
     @Test
-    @Description("Verifies that running actions are not cleaned up.")
     void runningActionsAreNotCleanedUp() {
         // cleanup config for this test case
         setupCleanupConfiguration(true, 0, Action.Status.CANCELED, Action.Status.ERROR);
@@ -62,8 +62,10 @@ class AutoActionCleanupTest extends AbstractJpaIntegrationTest {
         assertThat(actionRepository.count()).isEqualTo(2);
     }
 
+    /**
+     * Verifies that nothing is cleaned up if the cleanup is disabled.
+     */
     @Test
-    @Description("Verifies that nothing is cleaned up if the cleanup is disabled.")
     void cleanupDisabled() {
         // cleanup config for this test case
         setupCleanupConfiguration(false, 0, Action.Status.CANCELED);
@@ -87,8 +89,10 @@ class AutoActionCleanupTest extends AbstractJpaIntegrationTest {
         assertThat(actionRepository.count()).isEqualTo(2);
     }
 
+    /**
+     * Verifies that canceled and failed actions are cleaned up.
+     */
     @Test
-    @Description("Verifies that canceled and failed actions are cleaned up.")
     void canceledAndFailedActionsAreCleanedUp() {
         // cleanup config for this test case
         setupCleanupConfiguration(true, 0, Action.Status.CANCELED, Action.Status.ERROR);
@@ -118,8 +122,10 @@ class AutoActionCleanupTest extends AbstractJpaIntegrationTest {
         assertThat(actionRepository.findById(action3)).isPresent();
     }
 
+    /**
+     * Verifies that canceled actions are cleaned up.
+     */
     @Test
-    @Description("Verifies that canceled actions are cleaned up.")
     void canceledActionsAreCleanedUp() {
         // cleanup config for this test case
         setupCleanupConfiguration(true, 0, Action.Status.CANCELED);
@@ -150,8 +156,10 @@ class AutoActionCleanupTest extends AbstractJpaIntegrationTest {
         assertThat(actionRepository.findById(action3)).isPresent();
     }
 
+    /**
+     * Verifies that canceled and failed actions are cleaned up once they expired.
+     */
     @Test
-    @Description("Verifies that canceled and failed actions are cleaned up once they expired.")
     @SuppressWarnings("squid:S2925")
     void canceledAndFailedActionsAreCleanedUpWhenExpired() throws InterruptedException {
         // cleanup config for this test case

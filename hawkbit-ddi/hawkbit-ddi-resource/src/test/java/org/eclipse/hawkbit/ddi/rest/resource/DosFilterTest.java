@@ -17,9 +17,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.Collections;
 import java.util.List;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.eclipse.hawkbit.repository.model.Action;
 import org.eclipse.hawkbit.repository.model.DistributionSet;
 import org.eclipse.hawkbit.repository.model.Target;
@@ -37,8 +34,10 @@ import org.springframework.web.context.WebApplicationContext;
  * Test potential DOS attack scenarios and check if the filter prevents them.
  */
 @ActiveProfiles({ "test" })
-@Feature("Component Tests - REST Security")
-@Story("Denial of Service protection filter")
+/**
+ * Feature: Component Tests - REST Security<br/>
+ * Story: Denial of Service protection filter
+ */
 class DosFilterTest extends AbstractDDiApiIntegrationTest {
 
     private static final String X_FORWARDED_FOR = HawkbitSecurityProperties.Clients.X_FORWARDED_FOR;
@@ -49,16 +48,20 @@ class DosFilterTest extends AbstractDDiApiIntegrationTest {
                 new DosFilter(null, 10, 10, "127\\.0\\.0\\.1|\\[0:0:0:0:0:0:0:1\\]", "(^192\\.168\\.)", "X-Forwarded-For"));
     }
 
+    /**
+     * Ensures that clients that are on the blacklist are forbidden
+     */
     @Test
-    @Description("Ensures that clients that are on the blacklist are forbidden")
     void blackListedClientIsForbidden() throws Exception {
         mvc.perform(get("/{tenant}/controller/v1/4711", tenantAware.getCurrentTenant())
                         .header(X_FORWARDED_FOR, "192.168.0.4 , 10.0.0.1 "))
                 .andExpect(status().isForbidden());
     }
 
+    /**
+     * Ensures that a READ DoS attempt is blocked 
+     */
     @Test
-    @Description("Ensures that a READ DoS attempt is blocked ")
     void getFloodingAttackThatIsPrevented() throws Exception {
         int requests = 0;
         MvcResult result;
@@ -76,8 +79,10 @@ class DosFilterTest extends AbstractDDiApiIntegrationTest {
         assertThat(requests).isGreaterThanOrEqualTo(10);
     }
 
+    /**
+     * Ensures that an assumed READ DoS attempt is not blocked as the client (with IPv4 address) is on a whitelist
+     */
     @Test
-    @Description("Ensures that an assumed READ DoS attempt is not blocked as the client (with IPv4 address) is on a whitelist")
     void unacceptableGetLoadButOnWhitelistIPv4() throws Exception {
         for (int i = 0; i < 100; i++) {
             mvc.perform(get("/{tenant}/controller/v1/4711", tenantAware.getCurrentTenant())
@@ -86,8 +91,10 @@ class DosFilterTest extends AbstractDDiApiIntegrationTest {
         }
     }
 
+    /**
+     * Ensures that an assumed READ DoS attempt is not blocked as the client (with IPv6 address) is on a whitelist
+     */
     @Test
-    @Description("Ensures that an assumed READ DoS attempt is not blocked as the client (with IPv6 address) is on a whitelist")
     void unacceptableGetLoadButOnWhitelistIPv6() throws Exception {
         for (int i = 0; i < 100; i++) {
             mvc.perform(get("/{tenant}/controller/v1/4711", tenantAware.getCurrentTenant())
@@ -96,8 +103,10 @@ class DosFilterTest extends AbstractDDiApiIntegrationTest {
         }
     }
 
+    /**
+     * Ensures that a relatively high number of READ requests is allowed if it is below the DoS detection threshold
+     */
     @Test
-    @Description("Ensures that a relatively high number of READ requests is allowed if it is below the DoS detection threshold")
     // No idea how to get rid of the Thread.sleep here
     @SuppressWarnings("squid:S2925")
     void acceptableGetLoad() throws Exception {
@@ -112,8 +121,10 @@ class DosFilterTest extends AbstractDDiApiIntegrationTest {
         }
     }
 
+    /**
+     * Ensures that a WRITE DoS attempt is blocked 
+     */
     @Test
-    @Description("Ensures that a WRITE DoS attempt is blocked ")
     void putPostFloddingAttackThatisPrevented() throws Exception {
         final Long actionId = prepareDeploymentBase();
         final String feedback = getJsonProceedingDeploymentActionFeedback();
@@ -135,8 +146,10 @@ class DosFilterTest extends AbstractDDiApiIntegrationTest {
         assertThat(requests).isGreaterThanOrEqualTo(10);
     }
 
+    /**
+     * Ensures that a relatively high number of WRITE requests is allowed if it is below the DoS detection threshold
+     */
     @Test
-    @Description("Ensures that a relatively high number of WRITE requests is allowed if it is below the DoS detection threshold")
     // No idea how to get rid of the Thread.sleep here
     @SuppressWarnings("squid:S2925")
     void acceptablePutPostLoad() throws Exception {

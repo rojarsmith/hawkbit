@@ -19,22 +19,22 @@ import java.util.Map;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.junit.jupiter.api.Test;
 
 /**
  * Test serializability of DDI api model 'DdiConfigData'
+  * <p/>
+ * Feature: Unit Tests - Direct Device Integration API<br/>
+ * Story: Serializability of DDI api Models
  */
-@Feature("Unit Tests - Direct Device Integration API")
-@Story("Serializability of DDI api Models")
 class DdiConfigDataTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+    /**
+     * Verify the correct serialization and deserialization of the model
+     */
     @Test
-    @Description("Verify the correct serialization and deserialization of the model")
     void shouldSerializeAndDeserializeObject() throws IOException {
         // Setup
         final Map<String, String> data = new HashMap<>();
@@ -48,8 +48,10 @@ class DdiConfigDataTest {
         assertThat(deserializedDdiConfigData.getMode()).isEqualTo(DdiUpdateMode.REPLACE);
     }
 
+    /**
+     * Verify the correct deserialization of a model with an additional unknown property
+     */
     @Test
-    @Description("Verify the correct deserialization of a model with an additional unknown property")
     void shouldDeserializeObjectWithUnknownProperty() throws IOException {
         // Setup
         final String serializedDdiConfigData = "{\"data\":{\"test\":\"data\"},\"mode\":\"replace\",\"unknownProperty\":\"test\"}";
@@ -59,8 +61,10 @@ class DdiConfigDataTest {
         assertThat(ddiConfigData.getMode()).isEqualTo(DdiUpdateMode.REPLACE);
     }
 
+    /**
+     * Verify that deserialization fails for known properties with a wrong datatype
+     */
     @Test
-    @Description("Verify that deserialization fails for known properties with a wrong datatype")
     void shouldFailForObjectWithWrongDataTypes() {
         // Setup
         final String serializedDdiConfigData = "{\"data\":{\"test\":\"data\"},\"mode\":[\"replace\"],\"unknownProperty\":\"test\"}";
@@ -70,8 +74,10 @@ class DdiConfigDataTest {
                 .isThrownBy(() -> OBJECT_MAPPER.readValue(serializedDdiConfigData, DdiConfigData.class));
     }
 
+    /**
+     * Verify the correct deserialization of a model with removed unused status property
+     */
     @Test
-    @Description("Verify the correct deserialization of a model with removed unused status property")
     void shouldDeserializeObjectWithStatusProperty() throws IOException {
         // We formerly falsely required a 'status' property object when using the
         // configData endpoint. It was removed as a requirement from code and

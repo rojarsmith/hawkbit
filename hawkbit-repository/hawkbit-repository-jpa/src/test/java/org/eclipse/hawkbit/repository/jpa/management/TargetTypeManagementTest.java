@@ -18,10 +18,6 @@ import java.util.Optional;
 
 import jakarta.validation.ConstraintViolationException;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Step;
-import io.qameta.allure.Story;
 import org.eclipse.hawkbit.repository.builder.TargetTypeCreate;
 import org.eclipse.hawkbit.repository.builder.TargetTypeUpdate;
 import org.eclipse.hawkbit.repository.event.remote.entity.TargetTypeCreatedEvent;
@@ -37,22 +33,28 @@ import org.eclipse.hawkbit.repository.test.matcher.Expect;
 import org.eclipse.hawkbit.repository.test.matcher.ExpectEvents;
 import org.junit.jupiter.api.Test;
 
-@Feature("Component Tests - Repository")
-@Story("Target Type Management")
+/**
+ * Feature: Component Tests - Repository<br/>
+ * Story: Target Type Management
+ */
 class TargetTypeManagementTest extends AbstractJpaIntegrationTest {
 
+    /**
+     * Verifies that management get access react as specified on calls for non existing entities by means 
+     * of Optional not present.
+     */
     @Test
-    @Description("Verifies that management get access react as specified on calls for non existing entities by means "
-            + "of Optional not present.")
     @ExpectEvents({ @Expect(type = TargetTypeCreatedEvent.class) })
     void nonExistingEntityAccessReturnsNotPresent() {
         assertThat(targetTypeManagement.get(NOT_EXIST_IDL)).isNotPresent();
         assertThat(targetTypeManagement.getByName(NOT_EXIST_ID)).isNotPresent();
     }
 
+    /**
+     * Verifies that management queries react as specified on calls for non existing entities 
+     *  by means of throwing EntityNotFoundException.
+     */
     @Test
-    @Description("Verifies that management queries react as specified on calls for non existing entities "
-            + " by means of throwing EntityNotFoundException.")
     @ExpectEvents({ @Expect(type = TargetTypeUpdatedEvent.class) })
     void entityQueriesReferringToNotExistingEntitiesThrowsException() {
         verifyThrownExceptionBy(() -> targetTypeManagement.delete(NOT_EXIST_IDL), "TargetType");
@@ -60,8 +62,10 @@ class TargetTypeManagementTest extends AbstractJpaIntegrationTest {
                 "TargetType");
     }
 
+    /**
+     * Verify that a target type with invalid properties cannot be created or updated
+     */
     @Test
-    @Description("Verify that a target type with invalid properties cannot be created or updated")
     void createAndUpdateTargetTypeWithInvalidFields() {
         final TargetType targetType = targetTypeManagement
                 .create(entityFactory.targetType().create()
@@ -74,7 +78,6 @@ class TargetTypeManagementTest extends AbstractJpaIntegrationTest {
         createAndUpdateTargetTypeWithInvalidName(targetType);
     }
 
-    @Step
     void createAndUpdateTargetTypeWithInvalidDescription(final TargetType targetType) {
         final TargetTypeCreate targetTypeCreateTooLong = entityFactory.targetType().create().name("a").description(randomString(TargetType.DESCRIPTION_MAX_SIZE + 1));
         assertThatExceptionOfType(ConstraintViolationException.class)
@@ -98,8 +101,10 @@ class TargetTypeManagementTest extends AbstractJpaIntegrationTest {
                 .isThrownBy(() -> targetTypeManagement.update(targetTypeUpdateInvalidHtml));
     }
 
+    /**
+     * Tests the successful assignment of compatible distribution set types to a target type
+     */
     @Test
-    @Description("Tests the successful assignment of compatible distribution set types to a target type")
     void assignCompatibleDistributionSetTypesToTargetType() {
         final TargetType targetType = targetTypeManagement
                 .create(entityFactory.targetType().create()
@@ -113,8 +118,10 @@ class TargetTypeManagementTest extends AbstractJpaIntegrationTest {
         assertThat(targetTypeWithDsTypes.get().getCompatibleDistributionSetTypes()).extracting("key").contains("testDst");
     }
 
+    /**
+     * Tests the successful removal of compatible distribution set types to a target type
+     */
     @Test
-    @Description("Tests the successful removal of compatible distribution set types to a target type")
     void unassignCompatibleDistributionSetTypesToTargetType() {
         final TargetType targetType = targetTypeManagement
                 .create(entityFactory.targetType().create()
@@ -131,15 +138,19 @@ class TargetTypeManagementTest extends AbstractJpaIntegrationTest {
         assertThat(targetTypeWithDsTypes1.get().getCompatibleDistributionSetTypes()).isEmpty();
     }
 
+    /**
+     * Ensures that all types are retrieved through repository.
+     */
     @Test
-    @Description("Ensures that all types are retrieved through repository.")
     void findAllTargetTypes() {
         testdataFactory.createTargetTypes("targettype", 10);
         assertThat(targetTypeRepository.findAll()).as("Target type size").hasSize(10);
     }
 
+    /**
+     * Ensures that a created target type is persisted in the repository as defined.
+     */
     @Test
-    @Description("Ensures that a created target type is persisted in the repository as defined.")
     void createTargetType() {
         final String name = "targettype1";
         final String key = "targettype1.key";
@@ -168,8 +179,10 @@ class TargetTypeManagementTest extends AbstractJpaIntegrationTest {
                 .isEqualTo("colour1");
     }
 
+    /**
+     * Ensures that a deleted target type is removed from the repository as defined.
+     */
     @Test
-    @Description("Ensures that a deleted target type is removed from the repository as defined.")
     void deleteTargetType() {
         // create test data
         final TargetType targetType = targetTypeManagement
@@ -181,8 +194,10 @@ class TargetTypeManagementTest extends AbstractJpaIntegrationTest {
 
     }
 
+    /**
+     * Tests the name update of a target type.
+     */
     @Test
-    @Description("Tests the name update of a target type.")
     void updateTargetType() {
         final TargetType targetType = targetTypeManagement
                 .create(entityFactory.targetType().create().name("targettype111").description("targettypedes111"));
@@ -192,16 +207,20 @@ class TargetTypeManagementTest extends AbstractJpaIntegrationTest {
         assertThat(findByName("updatedtargettype111")).as("Updated target type should be found").isPresent();
     }
 
+    /**
+     * Ensures that a target type cannot be created if one exists already with that name (expects EntityAlreadyExistsException).
+     */
     @Test
-    @Description("Ensures that a target type cannot be created if one exists already with that name (expects EntityAlreadyExistsException).")
     void failedDuplicateTargetTypeNameException() {
         final TargetTypeCreate targetTypeCreate = entityFactory.targetType().create().name("targettype123");
         targetTypeManagement.create(targetTypeCreate);
         assertThrows(EntityAlreadyExistsException.class, () -> targetTypeManagement.create(targetTypeCreate));
     }
 
+    /**
+     * Ensures that a target type cannot be updated to a name that already exists (expects EntityAlreadyExistsException).
+     */
     @Test
-    @Description("Ensures that a target type cannot be updated to a name that already exists (expects EntityAlreadyExistsException).")
     void failedDuplicateTargetTypeNameExceptionAfterUpdate() {
         targetTypeManagement.create(entityFactory.targetType().create().name("targettype1234"));
         TargetType targetType = targetTypeManagement.create(entityFactory.targetType().create().name("targettype12345"));
@@ -209,7 +228,6 @@ class TargetTypeManagementTest extends AbstractJpaIntegrationTest {
                 () -> targetTypeManagement.update(entityFactory.targetType().update(targetType.getId()).name("targettype1234")));
     }
 
-    @Step
     private void createAndUpdateTargetTypeWithInvalidColour(final TargetType targetType) {
         final TargetTypeCreate targetTypeCreateTooLong = entityFactory.targetType().create().name("a").colour(randomString(Type.COLOUR_MAX_SIZE + 1));
         assertThatExceptionOfType(ConstraintViolationException.class)
@@ -232,7 +250,6 @@ class TargetTypeManagementTest extends AbstractJpaIntegrationTest {
                 .isThrownBy(() -> targetTypeManagement.update(targetTypeUpdateInvalidHtml));
     }
 
-    @Step
     private void createTargetTypeWithInvalidKey() {
         final TargetTypeCreate targetTypeCreateTooLong = entityFactory.targetType().create().name(randomString(Type.KEY_MAX_SIZE + 1));
         assertThatExceptionOfType(ConstraintViolationException.class)
@@ -245,7 +262,6 @@ class TargetTypeManagementTest extends AbstractJpaIntegrationTest {
                 .isThrownBy(() -> targetTypeManagement.create(targetTypeCreateInvalidHtmle));
     }
 
-    @Step
     private void createAndUpdateTargetTypeWithInvalidName(final TargetType targetType) {
         final TargetTypeCreate targetTypeCreateTooLong = entityFactory.targetType().create().name(randomString(NamedEntity.NAME_MAX_SIZE + 1));
         assertThatExceptionOfType(ConstraintViolationException.class)

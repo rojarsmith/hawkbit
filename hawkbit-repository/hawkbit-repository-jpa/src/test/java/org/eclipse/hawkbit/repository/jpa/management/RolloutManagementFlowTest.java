@@ -14,9 +14,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.eclipse.hawkbit.repository.OffsetBasedPageRequest;
 import org.eclipse.hawkbit.repository.builder.DynamicRolloutGroupTemplate;
 import org.eclipse.hawkbit.repository.jpa.AbstractJpaIntegrationTest;
@@ -35,9 +32,10 @@ import org.springframework.test.context.TestPropertySource;
 
 /**
  * Junit tests for RolloutManagement.
+  * <p/>
+ * Feature: Component Tests - Repository<br/>
+ * Story: Rollout Management (Flow)
  */
-@Feature("Component Tests - Repository")
-@Story("Rollout Management (Flow)")
 @TestPropertySource(properties = { "hawkbit.server.repository.dynamicRolloutsMinInvolvePeriodMS=-1" })
 class RolloutManagementFlowTest extends AbstractJpaIntegrationTest {
 
@@ -46,8 +44,10 @@ class RolloutManagementFlowTest extends AbstractJpaIntegrationTest {
         this.approvalStrategy.setApprovalNeeded(false);
     }
 
+    /**
+     * Verifies a simple rollout flow
+     */
     @Test
-    @Description("Verifies a simple rollout flow")
     void rolloutFlow() {
         final String rolloutName = "rollout-std";
         final int amountGroups = 5; // static only
@@ -86,8 +86,10 @@ class RolloutManagementFlowTest extends AbstractJpaIntegrationTest {
         assertAndGetRunning(rollout, 1); // keep running
     }
 
+    /**
+     * Verifies a simple dynamic rollout flow
+     */
     @Test
-    @Description("Verifies a simple dynamic rollout flow")
     void dynamicRolloutFlow() {
         final String rolloutName = "dynamic-rollout-std";
         final int amountGroups = 2; // static only
@@ -200,8 +202,10 @@ class RolloutManagementFlowTest extends AbstractJpaIntegrationTest {
         assertThat(refresh(dynamic2).getStatus()).isEqualTo(RolloutGroupStatus.FINISHED);
     }
 
+    /**
+     * Verifies a simple dynamic rollout flow with a dynamic group template
+     */
     @Test
-    @Description("Verifies a simple dynamic rollout flow with a dynamic group template")
     void dynamicRolloutTemplateFlow() {
         final String rolloutName = "dynamic-template-rollout-std";
         final int amountGroups = 3; // static only
@@ -298,8 +302,10 @@ class RolloutManagementFlowTest extends AbstractJpaIntegrationTest {
         assertGroup(dynamic2, true, RolloutGroupStatus.RUNNING, 4); // assign the target created when paused
     }
 
+    /**
+     * Verifies a simple pure (no static groups) dynamic rollout flow with a dynamic group template
+     */
     @Test
-    @Description("Verifies a simple pure (no static groups) dynamic rollout flow with a dynamic group template")
     void dynamicRolloutPureFlow() {
         final String rolloutName = "pure-dynamic-rollout-std";
         final String targetPrefix = "controller-pure-dynamic-rollout-std-";
@@ -379,8 +385,10 @@ class RolloutManagementFlowTest extends AbstractJpaIntegrationTest {
         assertGroup(dynamic2, true, RolloutGroupStatus.RUNNING, 4); // assign the target created when paused
     }
 
+    /**
+     * Verifies a simple rollout flow
+     */
     @Test
-    @Description("Verifies a simple rollout flow")
     void rollout0ThresholdFlow() {
         final String rolloutName = "rollout-std-0threshold";
         final int amountGroups = 5; // static only

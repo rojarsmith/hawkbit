@@ -12,9 +12,6 @@ package org.eclipse.hawkbit.repository.jpa.management;
 import java.util.List;
 import java.util.Map;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.eclipse.hawkbit.im.authentication.SpPermission;
 import org.eclipse.hawkbit.repository.RepositoryManagement;
 import org.eclipse.hawkbit.repository.builder.DistributionSetCreate;
@@ -24,8 +21,10 @@ import org.eclipse.hawkbit.repository.model.DistributionSet;
 import org.eclipse.hawkbit.repository.model.DistributionSetFilter;
 import org.junit.jupiter.api.Test;
 
-@Feature("SecurityTests - DistributionSetManagement")
-@Story("SecurityTests DistributionSetManagement")
+/**
+ * Feature: SecurityTests - DistributionSetManagement<br/>
+ * Story: SecurityTests DistributionSetManagement
+ */
 class DistributionSetManagementSecurityTest
         extends AbstractRepositoryManagementSecurityTest<DistributionSet, DistributionSetCreate, DistributionSetUpdate> {
 
@@ -45,28 +44,36 @@ class DistributionSetManagementSecurityTest
                 .description("a new description").version("a new version").requiredMigrationStep(true);
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void assignSoftwareModulesPermissionsCheck() {
         assertPermissions(() -> distributionSetManagement.assignSoftwareModules(1L, List.of(1L)), List.of(SpPermission.UPDATE_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void assignTagPermissionsCheck() {
         assertPermissions(() -> distributionSetManagement.assignTag(List.of(1L), 1L),
                 List.of(SpPermission.UPDATE_REPOSITORY, SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests that the method throws InsufficientPermissionException when the user does not have the correct permission
+     */
     @Test
-    @Description("Tests that the method throws InsufficientPermissionException when the user does not have the correct permission")
     void unassignTagPermissionsCheck() {
         assertPermissions(() -> distributionSetManagement.unassignTag(List.of(1L), 1L),
                 List.of(SpPermission.UPDATE_REPOSITORY, SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void createMetadataPermissionsCheck() {
         assertPermissions(
                 () -> {
@@ -76,14 +83,18 @@ class DistributionSetManagementSecurityTest
                 List.of(SpPermission.UPDATE_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void getMetadataPermissiosCheck() {
         assertPermissions(() -> distributionSetManagement.getMetadata(1L), List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void updateMetadataPermissionsCheck() {
         assertPermissions(() -> {
                     distributionSetManagement.updateMetadata(1L,"key", "value");
@@ -92,8 +103,10 @@ class DistributionSetManagementSecurityTest
                 List.of(SpPermission.UPDATE_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void deleteMetadataPermissionsCheck() {
         assertPermissions(() -> {
             distributionSetManagement.deleteMetadata(1L, "key");
@@ -101,8 +114,10 @@ class DistributionSetManagementSecurityTest
         }, List.of(SpPermission.UPDATE_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void lockPermissionsCheck() {
         assertPermissions(() -> {
             distributionSetManagement.lock(1L);
@@ -110,8 +125,10 @@ class DistributionSetManagementSecurityTest
         }, List.of(SpPermission.UPDATE_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void unlockPermissionsCheck() {
         assertPermissions(() -> {
             distributionSetManagement.unlock(1L);
@@ -119,118 +136,156 @@ class DistributionSetManagementSecurityTest
         }, List.of(SpPermission.UPDATE_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void getByActionPermissionsCheck() {
         assertPermissions(() -> distributionSetManagement.findByAction(1L), List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void getWithDetailsPermissionsCheck() {
         assertPermissions(() -> distributionSetManagement.getWithDetails(1L), List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void getByNameAndVersionPermissionsCheck() {
         assertPermissions(() -> distributionSetManagement.findByNameAndVersion("name", "version"), List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void getValidAndCompletePermissionsCheck() {
         assertPermissions(() -> distributionSetManagement.getValidAndComplete(1L), List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void getValidPermissionsCheck() {
         assertPermissions(() -> distributionSetManagement.getValid(1L), List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void getOrElseThrowExceptionPermissionsCheck() {
         assertPermissions(() -> distributionSetManagement.getOrElseThrowException(1L), List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void findByCompletedPermissionsCheck() {
         assertPermissions(() -> distributionSetManagement.findByCompleted(true, PAGE), List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void countByCompletedPermissionsCheck() {
         assertPermissions(() -> distributionSetManagement.countByCompleted(true), List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void findByDistributionSetFilterPermissionsCheck() {
         assertPermissions(() -> distributionSetManagement.findByDistributionSetFilter(DistributionSetFilter.builder().build(), PAGE),
                 List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void countByDistributionSetFilterPermissionsCheck() {
         assertPermissions(() -> distributionSetManagement.countByDistributionSetFilter(DistributionSetFilter.builder().build()),
                 List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void findByTagPermissionsCheck() {
         assertPermissions(() -> distributionSetManagement.findByTag(1L, PAGE), List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void findByRsqlAndTagPermissionsCheck() {
         assertPermissions(() -> distributionSetManagement.findByRsqlAndTag("rsql", 1L, PAGE), List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void isInUsePermissionsCheck() {
         assertPermissions(() -> distributionSetManagement.isInUse(1L), List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void unassignSoftwareModulePermissionsCheck() {
         assertPermissions(() -> distributionSetManagement.unassignSoftwareModule(1L, 1L), List.of(SpPermission.UPDATE_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void countByTypeIdPermissionsCheck() {
         assertPermissions(() -> distributionSetManagement.countByTypeId(1L), List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void countRolloutsByStatusForDistributionSetPermissionsCheck() {
         assertPermissions(() -> distributionSetManagement.countRolloutsByStatusForDistributionSet(1L), List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void countActionsByStatusForDistributionSetPermissionsCheck() {
         assertPermissions(() -> distributionSetManagement.countActionsByStatusForDistributionSet(1L), List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void countAutoAssignmentsForDistributionSetPermissionsCheck() {
         assertPermissions(() -> distributionSetManagement.countAutoAssignmentsForDistributionSet(1L), List.of(SpPermission.READ_REPOSITORY));
     }
 
+    /**
+     * Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.
+     */
     @Test
-    @Description("Tests ManagementAPI PreAuthorized method with correct and insufficient permissions.")
     void invalidatePermissionsCheck() {
         distributionSetTypeManagement.create(entityFactory.distributionSetType().create().key("type").name("name"));
         assertPermissions(() -> {

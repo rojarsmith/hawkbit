@@ -11,9 +11,6 @@ package org.eclipse.hawkbit.repository.jpa.rsql;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.eclipse.hawkbit.repository.TagFields;
 import org.eclipse.hawkbit.repository.builder.TagCreate;
 import org.eclipse.hawkbit.repository.jpa.AbstractJpaIntegrationTest;
@@ -24,8 +21,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
-@Feature("Component Tests - Repository")
-@Story("RSQL filter target and distribution set tags")
+/**
+ * Feature: Component Tests - Repository<br/>
+ * Story: RSQL filter target and distribution set tags
+ */
 class RSQLTagFieldsTest extends AbstractJpaIntegrationTest {
 
     @BeforeEach
@@ -39,8 +38,10 @@ class RSQLTagFieldsTest extends AbstractJpaIntegrationTest {
         }
     }
 
+    /**
+     * Test filter target tag by name
+     */
     @Test
-    @Description("Test filter target tag by name")
     void testFilterTargetTagByParameterName() {
         assertRSQLQueryTarget(TagFields.NAME.name() + "==''", 0);
         assertRSQLQueryTarget(TagFields.NAME.name() + "!=''", 5);
@@ -52,8 +53,10 @@ class RSQLTagFieldsTest extends AbstractJpaIntegrationTest {
         assertRSQLQueryTarget(TagFields.NAME.name() + "=out=(1,notexist)", 4);
     }
 
+    /**
+     * Test filter target tag by description
+     */
     @Test
-    @Description("Test filter target tag by description")
     void testFilterTargetTagByParameterDescription() {
         assertRSQLQueryTarget(TagFields.DESCRIPTION.name() + "==''", 0);
         assertRSQLQueryTarget(TagFields.DESCRIPTION.name() + "!=''", 5);
@@ -65,8 +68,10 @@ class RSQLTagFieldsTest extends AbstractJpaIntegrationTest {
         assertRSQLQueryTarget(TagFields.DESCRIPTION.name() + "=out=(1,notexist)", 4);
     }
 
+    /**
+     * Test filter target tag by colour
+     */
     @Test
-    @Description("Test filter target tag by colour")
     void testFilterTargetTagByParameterColour() {
         assertRSQLQueryTarget(TagFields.COLOUR.name() + "==''", 0);
         assertRSQLQueryTarget(TagFields.COLOUR.name() + "!=''", 5);
@@ -78,8 +83,10 @@ class RSQLTagFieldsTest extends AbstractJpaIntegrationTest {
         assertRSQLQueryTarget(TagFields.COLOUR.name() + "=out=(red,notexist)", 2);
     }
 
+    /**
+     * Test filter distribution set tag by name
+     */
     @Test
-    @Description("Test filter distribution set tag by name")
     void testFilterDistributionSetTagByParameterName() {
         assertRSQLQueryDistributionSet(TagFields.NAME.name() + "==''", 0);
         assertRSQLQueryDistributionSet(TagFields.NAME.name() + "!=''", 5);
@@ -91,8 +98,10 @@ class RSQLTagFieldsTest extends AbstractJpaIntegrationTest {
         assertRSQLQueryDistributionSet(TagFields.NAME.name() + "=out=(1,2)", 3);
     }
 
+    /**
+     * Test filter distribution set by description
+     */
     @Test
-    @Description("Test filter distribution set by description")
     void testFilterDistributionSetTagByParameterDescription() {
         assertRSQLQueryDistributionSet(TagFields.DESCRIPTION.name() + "==''", 0);
         assertRSQLQueryDistributionSet(TagFields.DESCRIPTION.name() + "!=''", 5);
@@ -104,8 +113,10 @@ class RSQLTagFieldsTest extends AbstractJpaIntegrationTest {
         assertRSQLQueryDistributionSet(TagFields.DESCRIPTION.name() + "=out=(1,2)", 3);
     }
 
+    /**
+     * Test filter distribution set by colour
+     */
     @Test
-    @Description("Test filter distribution set by colour")
     void testFilterDistributionSetTagByParameterColour() {
         assertRSQLQueryDistributionSet(TagFields.COLOUR.name() + "==''", 0);
         assertRSQLQueryDistributionSet(TagFields.COLOUR.name() + "!=''", 5);

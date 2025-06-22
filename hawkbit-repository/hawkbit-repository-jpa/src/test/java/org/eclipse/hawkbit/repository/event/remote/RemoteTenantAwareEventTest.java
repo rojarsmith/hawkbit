@@ -13,9 +13,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.List;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.eclipse.hawkbit.repository.jpa.model.JpaAction;
 import org.eclipse.hawkbit.repository.model.Action;
 import org.eclipse.hawkbit.repository.model.Action.ActionType;
@@ -24,15 +21,19 @@ import org.eclipse.hawkbit.repository.model.ActionProperties;
 import org.eclipse.hawkbit.repository.model.DistributionSet;
 import org.junit.jupiter.api.Test;
 
-@Feature("Component Tests - Repository")
-@Story("RemoteTenantAwareEvent Tests")
+/**
+ * Feature: Component Tests - Repository<br/>
+ * Story: RemoteTenantAwareEvent Tests
+ */
 class RemoteTenantAwareEventTest extends AbstractRemoteEventTest {
 
     private static final String TENANT_DEFAULT = "DEFAULT";
     private static final String APPLICATION_ID_DEFAULT = "Node";
 
+    /**
+     * Verifies that a testMultiActionAssignEvent can be properly serialized and deserialized
+     */
     @Test
-    @Description("Verifies that a testMultiActionAssignEvent can be properly serialized and deserialized")
     void testMultiActionAssignEvent() {
         final List<String> controllerIds = List.of("id0", "id1", "id2", "id3", "id4loooooooooooooooooooooooooooooooooooonnnnnnnnnnnnnnnnnng");
         final List<Action> actions = controllerIds.stream().map(this::createAction).toList();
@@ -49,8 +50,10 @@ class RemoteTenantAwareEventTest extends AbstractRemoteEventTest {
         assertThat(remoteAssignEventJackson.getControllerIds()).containsExactlyElementsOf(controllerIds);
     }
 
+    /**
+     * Verifies that a MultiActionCancelEvent can be properly serialized and deserialized
+     */
     @Test
-    @Description("Verifies that a MultiActionCancelEvent can be properly serialized and deserialized")
     void testMultiActionCancelEvent() {
         final List<String> controllerIds = List.of("id0", "id1", "id2", "id3", "id4loooooooooooooooooooooooooooooooooooonnnnnnnnnnnnnnnnnng");
         final List<Action> actions = controllerIds.stream().map(this::createAction).toList();
@@ -67,8 +70,10 @@ class RemoteTenantAwareEventTest extends AbstractRemoteEventTest {
         assertThat(remoteCancelEventJackson.getControllerIds()).containsExactlyElementsOf(controllerIds);
     }
 
+    /**
+     * Verifies that a DownloadProgressEvent can be properly serialized and deserialized
+     */
     @Test
-    @Description("Verifies that a DownloadProgressEvent can be properly serialized and deserialized")
     void reloadDownloadProgressByRemoteEvent() {
         final DownloadProgressEvent downloadProgressEvent = new DownloadProgressEvent(TENANT_DEFAULT, 1L, 3L,
                 APPLICATION_ID_DEFAULT);
@@ -80,8 +85,10 @@ class RemoteTenantAwareEventTest extends AbstractRemoteEventTest {
         assertThat(downloadProgressEvent).isEqualTo(remoteEventJackson);
     }
 
+    /**
+     * Verifies that a TargetAssignDistributionSetEvent can be properly serialized and deserialized
+     */
     @Test
-    @Description("Verifies that a TargetAssignDistributionSetEvent can be properly serialized and deserialized")
     void testTargetAssignDistributionSetEvent() {
 
         final DistributionSet dsA = testdataFactory.createDistributionSet("");
@@ -107,8 +114,10 @@ class RemoteTenantAwareEventTest extends AbstractRemoteEventTest {
         assertTargetAssignDistributionSetEvent(action, remoteEventJackson);
     }
 
+    /**
+     * Verifies that a TargetAssignDistributionSetEvent can be properly serialized and deserialized
+     */
     @Test
-    @Description("Verifies that a TargetAssignDistributionSetEvent can be properly serialized and deserialized")
     void testCancelTargetAssignmentEvent() {
 
         final DistributionSet dsA = testdataFactory.createDistributionSet("");

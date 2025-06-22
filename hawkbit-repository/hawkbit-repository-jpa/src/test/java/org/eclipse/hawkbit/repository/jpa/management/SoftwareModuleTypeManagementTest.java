@@ -17,9 +17,6 @@ import java.util.List;
 
 import jakarta.validation.ConstraintViolationException;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 import org.eclipse.hawkbit.repository.builder.SoftwareModuleTypeCreate;
 import org.eclipse.hawkbit.repository.event.remote.entity.SoftwareModuleCreatedEvent;
 import org.eclipse.hawkbit.repository.exception.EntityAlreadyExistsException;
@@ -30,13 +27,17 @@ import org.eclipse.hawkbit.repository.test.matcher.Expect;
 import org.eclipse.hawkbit.repository.test.matcher.ExpectEvents;
 import org.junit.jupiter.api.Test;
 
-@Feature("Component Tests - Repository")
-@Story("Software Module Management")
+/**
+ * Feature: Component Tests - Repository<br/>
+ * Story: Software Module Management
+ */
 class SoftwareModuleTypeManagementTest extends AbstractJpaIntegrationTest {
 
+    /**
+     * Verifies that management get access reacts as specfied on calls for non existing entities by means 
+     * of Optional not present.
+     */
     @Test
-    @Description("Verifies that management get access reacts as specfied on calls for non existing entities by means "
-            + "of Optional not present.")
     @ExpectEvents({ @Expect(type = SoftwareModuleCreatedEvent.class, count = 0) })
     void nonExistingEntityAccessReturnsNotPresent() {
 
@@ -45,9 +46,11 @@ class SoftwareModuleTypeManagementTest extends AbstractJpaIntegrationTest {
         assertThat(softwareModuleTypeManagement.findByName(NOT_EXIST_ID)).isNotPresent();
     }
 
+    /**
+     * Verifies that management queries react as specfied on calls for non existing entities 
+     *  by means of throwing EntityNotFoundException.
+     */
     @Test
-    @Description("Verifies that management queries react as specfied on calls for non existing entities "
-            + " by means of throwing EntityNotFoundException.")
     @ExpectEvents({ @Expect(type = SoftwareModuleCreatedEvent.class, count = 0) })
     void entityQueriesReferringToNotExistingEntitiesThrowsException() {
         verifyThrownExceptionBy(() -> softwareModuleTypeManagement.delete(NOT_EXIST_IDL), "SoftwareModuleType");
@@ -57,8 +60,10 @@ class SoftwareModuleTypeManagementTest extends AbstractJpaIntegrationTest {
                 "SoftwareModuleType");
     }
 
+    /**
+     * Calling update without changing fields results in no recorded change in the repository including unchanged audit fields.
+     */
     @Test
-    @Description("Calling update without changing fields results in no recorded change in the repository including unchanged audit fields.")
     void updateNothingResultsInUnchangedRepositoryForType() {
         final SoftwareModuleType created = softwareModuleTypeManagement
                 .create(entityFactory.softwareModuleType().create().key("test-key").name("test-name"));
@@ -71,8 +76,10 @@ class SoftwareModuleTypeManagementTest extends AbstractJpaIntegrationTest {
                 .isEqualTo(created.getOptLockRevision());
     }
 
+    /**
+     * Calling update for changed fields results in change in the repository.
+     */
     @Test
-    @Description("Calling update for changed fields results in change in the repository.")
     void updateSoftwareModuleTypeFieldsToNewValue() {
         final SoftwareModuleType created = softwareModuleTypeManagement
                 .create(entityFactory.softwareModuleType().create().key("test-key").name("test-name"));
@@ -86,8 +93,10 @@ class SoftwareModuleTypeManagementTest extends AbstractJpaIntegrationTest {
         assertThat(updated.getColour()).as("Updated vendor is").isEqualTo("changed");
     }
 
+    /**
+     * Create Software Module Types call fails when called for existing entities.
+     */
     @Test
-    @Description("Create Software Module Types call fails when called for existing entities.")
     void createModuleTypesCallFailsForExistingTypes() {
         final List<SoftwareModuleTypeCreate> created = Arrays.asList(
                 entityFactory.softwareModuleType().create().key("test-key").name("test-name"),
@@ -98,8 +107,10 @@ class SoftwareModuleTypeManagementTest extends AbstractJpaIntegrationTest {
                 .isThrownBy(() -> softwareModuleTypeManagement.create(created));
     }
 
+    /**
+     * Tests the successfull deletion of software module types. Both unused (hard delete) and used ones (soft delete).
+     */
     @Test
-    @Description("Tests the successfull deletion of software module types. Both unused (hard delete) and used ones (soft delete).")
     void deleteAssignedAndUnassignedSoftwareModuleTypes() {
         assertThat(softwareModuleTypeManagement.findAll(PAGE)).hasSize(3).contains(osType, runtimeType, appType);
 
@@ -134,8 +145,10 @@ class SoftwareModuleTypeManagementTest extends AbstractJpaIntegrationTest {
                 softwareModuleTypeRepository.findById(type.getId()).get());
     }
 
+    /**
+     * Checks that software module typeis found based on given name.
+     */
     @Test
-    @Description("Checks that software module typeis found based on given name.")
     void findSoftwareModuleTypeByName() {
         testdataFactory.createSoftwareModuleOs();
         final SoftwareModuleType found = softwareModuleTypeManagement
@@ -146,8 +159,10 @@ class SoftwareModuleTypeManagementTest extends AbstractJpaIntegrationTest {
         assertThat(softwareModuleTypeManagement.findByName("thename")).as("Type with given name").contains(found);
     }
 
+    /**
+     * Verifies that it is not possible to create a type that alrady exists.
+     */
     @Test
-    @Description("Verifies that it is not possible to create a type that alrady exists.")
     void createSoftwareModuleTypeFailsWithExistingEntity() {
         final SoftwareModuleTypeCreate create = entityFactory.softwareModuleType().create().key("thetype").name("thename");
         softwareModuleTypeManagement.create(create);
@@ -157,8 +172,10 @@ class SoftwareModuleTypeManagementTest extends AbstractJpaIntegrationTest {
                         .create(create));
     }
 
+    /**
+     * Verifies that it is not possible to create a list of types where one already exists.
+     */
     @Test
-    @Description("Verifies that it is not possible to create a list of types where one already exists.")
     void createSoftwareModuleTypesFailsWithExistingEntity() {
         softwareModuleTypeManagement.create(entityFactory.softwareModuleType().create().key("thetype").name("thename"));
         final List<SoftwareModuleTypeCreate> creates = List.of(
@@ -169,8 +186,10 @@ class SoftwareModuleTypeManagementTest extends AbstractJpaIntegrationTest {
                 .isThrownBy(() -> softwareModuleTypeManagement.create(creates));
     }
 
+    /**
+     * Verifies that the creation of a softwareModuleType is failing because of invalid max assignment
+     */
     @Test
-    @Description("Verifies that the creation of a softwareModuleType is failing because of invalid max assignment")
     void createSoftwareModuleTypesFailsWithInvalidMaxAssignment() {
         final SoftwareModuleTypeCreate create = entityFactory.softwareModuleType().create().key("type").name("name").maxAssignments(0);
         assertThatExceptionOfType(ConstraintViolationException.class)
@@ -178,8 +197,10 @@ class SoftwareModuleTypeManagementTest extends AbstractJpaIntegrationTest {
                 .isThrownBy(() -> softwareModuleTypeManagement.create(create));
     }
 
+    /**
+     * Verifies that multiple types are created as requested.
+     */
     @Test
-    @Description("Verifies that multiple types are created as requested.")
     void createMultipleSoftwareModuleTypes() {
         final List<SoftwareModuleType> created = softwareModuleTypeManagement
                 .create(Arrays.asList(entityFactory.softwareModuleType().create().key("thetype").name("thename"),
