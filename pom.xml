@@ -17,7 +17,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.1</version>
+        <version>3.5.3</version>
     </parent>
 
     <groupId>org.eclipse.hawkbit</groupId>
@@ -49,7 +49,7 @@
         <java.client.version>17</java.client.version>
 
         <!-- must be the same as the parent version -->
-        <spring.boot.version>3.5.1</spring.boot.version>
+        <spring.boot.version>3.5.3</spring.boot.version>
         <spring.cloud.version>2025.0.0</spring.cloud.version>
         <springdoc-openapi.version>2.8.9</springdoc-openapi.version>
         <spring.plugin.core.version>3.0.0</spring.plugin.core.version>
@@ -66,7 +66,7 @@
 
         <!-- Misc libraries versions - START -->
         <cron-utils.version>9.2.1</cron-utils.version>
-        <jsoup.version>1.20.1</jsoup.version>
+        <jsoup.version>1.21.1</jsoup.version>
         <javax.el-api.version>3.0.0</javax.el-api.version>
         <rsql-parser.version>2.1.0</rsql-parser.version>
         <commons-io.version>2.19.0</commons-io.version>
@@ -81,11 +81,10 @@
 
         <!-- Maven Plugin versions - START -->
         <maven.enforcer.plugin.version>3.5.0</maven.enforcer.plugin.version>
-        <flatten.maven.plugin.version>1.7.0</flatten.maven.plugin.version>
+        <flatten.maven.plugin.version>1.7.1</flatten.maven.plugin.version>
         <maven.site.plugin.version>3.21.0</maven.site.plugin.version>
 
         <maven.surefire.plugin.version>3.5.3</maven.surefire.plugin.version>
-        <maven.failsafe.plugin.version>3.5.3</maven.failsafe.plugin.version>
         <jacoco.maven.plugin.version>0.8.13</jacoco.maven.plugin.version>
 
         <license.tool.plugin.version>1.1.0</license.tool.plugin.version>
@@ -97,8 +96,6 @@
         <!-- Test - START -->
         <surefire.forkcount>1</surefire.forkcount>
         <surefire.jvm.args/>
-        <failsafe.forkcount>${surefire.forkcount}</failsafe.forkcount>
-        <failsafe.jvm.args>-Xmx1024m</failsafe.jvm.args>
         <!-- Test - END -->
 
         <!-- Sonar - START -->
@@ -108,12 +105,10 @@
         <sonar.qualitygate.timeout>600</sonar.qualitygate.timeout>
         <sonar.links.homepage>https://www.eclipse.org/hawkbit</sonar.links.homepage>
         <sonar.links.ci>https://github.com/eclipse-hawkbit/hawkbit/actions</sonar.links.ci>
-        <sonar.exclusions>
-            **/src/test/**,
-            **/src/main/java/org/eclipse/hawkbit/repository/test/**,
-            **/src/main/java/org/eclipse/hawkbit/rabbitmq/test/**
-        </sonar.exclusions>
         <sonar.coverage.exclusions>
+            **/*Configuration.java,
+            **/*Properties.java,
+            **/*Exception.java,
             **/src/test/**,
             **/src/main/java/org/eclipse/hawkbit/repository/test/**,
             **/src/main/java/org/eclipse/hawkbit/rabbitmq/test/**,
@@ -538,39 +533,13 @@
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>${maven.surefire.plugin.version}</version>
                     <configuration>
-                        <!-- Bugfix for OpenJDK 8u181, see https://issues.apache.org/jira/browse/SUREFIRE-1588 -->
-                        <useSystemClassLoader>false</useSystemClassLoader>
                         <reuseForks>true</reuseForks>
                         <forkCount>${surefire.forkcount}</forkCount>
                         <argLine>${jacoco.agent.args} ${surefire.jvm.args}</argLine>
-                        <includes>
-                            <include>**/*Tests.java</include>
-                            <include>**/*Test.java</include>
-                            <include>**/*IT.java</include>
-                        </includes>
                         <excludes>
                             <exclude>**/Abstract*.java</exclude>
                         </excludes>
                     </configuration>
-                </plugin>
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-failsafe-plugin</artifactId>
-                    <version>${maven.failsafe.plugin.version}</version>
-                    <configuration>
-                        <reuseForks>false</reuseForks>
-                        <forkCount>${failsafe.forkcount}</forkCount>
-                        <argLine>${jacoco.agent.integration.args} ${failsafe.jvm.args}</argLine>
-                    </configuration>
-                    <executions>
-                        <execution>
-                            <id>integration-test</id>
-                            <phase>integration-test</phase>
-                            <goals>
-                                <goal>integration-test</goal>
-                            </goals>
-                        </execution>
-                    </executions>
                 </plugin>
             </plugins>
         </pluginManagement>
@@ -711,7 +680,7 @@
                             <executions>
                                 <execution>
                                     <id>generate-surefire-report</id>
-                                    <phase>package</phase>
+                                    <phase>verify</phase>
                                     <goals>
                                         <goal>report</goal>
                                     </goals>
