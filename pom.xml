@@ -60,7 +60,7 @@
         <!-- Spring boot version overrides - END -->
 
         <!-- Eclipselink - START -->
-        <eclipselink.version>4.0.6</eclipselink.version>
+        <eclipselink.version>4.0.7</eclipselink.version>
         <eclipselink.maven.plugin.version>3.0.2</eclipselink.maven.plugin.version>
         <!-- Eclipselink - END -->
 
@@ -75,7 +75,7 @@
         <io-protostuff.version>1.8.0</io-protostuff.version>
         <!-- test -->
         <rabbitmq.http-client.version>5.4.0</rabbitmq.http-client.version>
-        <classgraph.version>4.8.179</classgraph.version>
+        <classgraph.version>4.8.180</classgraph.version>
         <awaitility.version>4.3.0</awaitility.version>
         <!-- Misc libraries versions - END -->
 
@@ -129,6 +129,8 @@
         <dash.review.summary>${project.build.directory}/.3rd-party/DEPENDENCIES_REVIEW</dash.review.summary>
         <excludeGroupIds>org.eclipse,org.junit</excludeGroupIds>
         <!-- Dash tool integration - END -->
+
+        <skipPublishing>false</skipPublishing>
     </properties>
 
     <developers>
@@ -633,16 +635,19 @@
             </activation>
             <build>
                 <plugins>
+                    <!-- This enables javadoc packaging for sonatype central publishing - javadoc is required for releases with hard versions-->
                     <plugin>
-                        <groupId>org.sonatype.central</groupId>
-                        <artifactId>central-publishing-maven-plugin</artifactId>
-                        <version>${central.publishing.maven.plugin.version}</version>
-                        <extensions>true</extensions>
-                        <configuration>
-                            <publishingServerId>central</publishingServerId>
-                            <autoPublish>true</autoPublish>
-                            <waitUntil>published</waitUntil>
-                        </configuration>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>javadoc-jar</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
                     </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
@@ -658,8 +663,24 @@
                             </execution>
                         </executions>
                     </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>${central.publishing.maven.plugin.version}</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <autoPublish>true</autoPublish>
+                            <waitUntil>published</waitUntil>
+                            <skipPublishing>${skipPublishing}</skipPublishing>
+                        </configuration>
+                    </plugin>
                 </plugins>
             </build>
+
+            <modules>
+                <module>hawkbit-test-report</module>
+            </modules>
         </profile>
         <profile>
             <id>generateTestReport</id>
