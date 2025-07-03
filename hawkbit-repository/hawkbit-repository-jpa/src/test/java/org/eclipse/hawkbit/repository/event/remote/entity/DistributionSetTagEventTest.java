@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Test the remote entity events.
-  * <p/>
+ * <p/>
  * Feature: Component Tests - Repository<br/>
  * Story: Test DistributionSetTagCreatedEvent and DistributionSetTagUpdateEvent
  */
@@ -40,5 +40,4 @@ class DistributionSetTagEventTest extends AbstractRemoteEntityEventTest<Distribu
     protected DistributionSetTag createEntity() {
         return distributionSetTagManagement.create(entityFactory.tag().create().name("tag1"));
     }
-
 }

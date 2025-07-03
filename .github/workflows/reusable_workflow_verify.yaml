@@ -3,6 +3,10 @@ name: Verify (Reusable Workflow)
 on:
   workflow_call:
     inputs:
+      repository:
+        description: 'The repository to checkout, e.g. eclipse-hawkbit/hawkbit'
+        type: string
+        default: 'eclipse-hawkbit/hawkbit'
       ref:
         description: 'The branch, tag or SHA to checkout, e.g. master'
         type: string
@@ -28,8 +32,15 @@ jobs:
           - 5672:5672
 
     steps:
+      - name: Parameters
+        run: |
+          echo "Repository: ${{ inputs.repository }},"
+          echo "Ref: ${{ inputs.ref }},"
+          echo "Maven Properties: ${{ inputs.maven_properties }}"
+
       - uses: actions/checkout@v4
         with:
+          repository: ${{ inputs.repository }}
           ref: ${{ inputs.ref }}
 
       - name: Set up JDK

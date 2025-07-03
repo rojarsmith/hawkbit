@@ -10,7 +10,6 @@
 package org.eclipse.hawkbit.rabbitmq.test;
 
 import java.time.Duration;
-import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 import lombok.extern.slf4j.Slf4j;
@@ -28,8 +27,6 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.junit.RabbitAvailable;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cloud.stream.binder.test.TestChannelBinderConfiguration;
-import org.springframework.context.annotation.Import;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.annotation.DirtiesContext.ClassMode;
 import org.springframework.test.context.ContextConfiguration;
@@ -37,13 +34,10 @@ import org.springframework.test.context.ContextConfiguration;
 @Slf4j
 @RabbitAvailable
 @ContextConfiguration(classes = { RepositoryApplicationConfiguration.class, AmqpTestConfiguration.class, TestConfiguration.class })
-@Import(TestChannelBinderConfiguration.class)
 // Dirty context is necessary to create a new vhost and recreate all necessary beans after every test class.
 @DirtiesContext(classMode = ClassMode.AFTER_CLASS)
 @SuppressWarnings("java:S6813") // constructor injects are not possible for test classes
 public abstract class AbstractAmqpIntegrationTest extends AbstractIntegrationTest {
-
-    private static final Duration TIMEOUT = Duration.ofSeconds(5);
 
     @Autowired
     private ConnectionFactory connectionFactory;
@@ -63,8 +57,12 @@ public abstract class AbstractAmqpIntegrationTest extends AbstractIntegrationTes
         return dmfClient;
     }
 
-    protected ConditionFactory createConditionFactory() {
-        return Awaitility.await().atMost(TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+    private static final Duration AT_LEAST = Duration.ofMillis(Integer.getInteger("hawkbit.it.amqp.await.atLeastMs", 100));
+    private static final Duration POLL_INTERVAL = Duration.ofMillis(Integer.getInteger("hawkbit.it.amqp.await.pollIntervalMs", 200));
+    private static final Duration TIMEOUT = Duration.ofMillis(Integer.getInteger("hawkbit.it.amqp.await.timeoutMs", 5000));
+    @Override
+    protected ConditionFactory await() {
+        return Awaitility.await().atLeast(AT_LEAST).pollInterval(POLL_INTERVAL).atMost(TIMEOUT);
     }
 
     protected Message createMessage(final Object payload, final MessageProperties messageProperties) {
@@ -75,28 +73,12 @@ public abstract class AbstractAmqpIntegrationTest extends AbstractIntegrationTes
         return getDmfClient().getMessageConverter().toMessage(payload, messageProperties);
     }
 
-    protected int getQueueMessageCount(final String queueName) {
-        final Properties queueProps = rabbitAdmin.getQueueProperties(queueName);
-        if (queueProps != null && queueProps.containsKey(RabbitAdmin.QUEUE_MESSAGE_COUNT)) {
-            return Integer.parseInt(queueProps.get(RabbitAdmin.QUEUE_MESSAGE_COUNT).toString());
-        }
-        final int fallbackCount = 0;
-        log.warn(
-                "Cannot determine the queue message count for queue '{}' (queue properties {}). Returning queue message count {}.",
-                queueName, queueProps, fallbackCount);
-        return fallbackCount;
-    }
-
     protected RabbitAdmin getRabbitAdmin() {
         return rabbitAdmin;
     }
 
     protected String getVirtualHost() {
         return connectionFactory.getVirtualHost();
-    }
-
-    protected int getPort() {
-        return connectionFactory.getPort();
     }
 
     private RabbitTemplate createDmfClient() {

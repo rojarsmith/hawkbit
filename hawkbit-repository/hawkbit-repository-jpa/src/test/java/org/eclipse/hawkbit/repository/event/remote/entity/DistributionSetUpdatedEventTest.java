@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Test the remote entity events.
-  * <p/>
+ * <p/>
  * Feature: Component Tests - Repository<br/>
  * Story: Test DistributionSetUpdateEvent
  */
@@ -29,10 +29,8 @@ class DistributionSetUpdatedEventTest extends AbstractRemoteEntityEventTest<Dist
     }
 
     @Override
-    protected RemoteEntityEvent<?> createRemoteEvent(final DistributionSet baseEntity,
-            final Class<? extends RemoteEntityEvent<?>> eventType) {
-
-        return new DistributionSetUpdatedEvent(baseEntity, "1", true);
+    protected RemoteEntityEvent<?> createRemoteEvent(final DistributionSet baseEntity, final Class<? extends RemoteEntityEvent<?>> eventType) {
+        return new DistributionSetUpdatedEvent(baseEntity, true);
     }
 
     @Override
@@ -40,5 +38,4 @@ class DistributionSetUpdatedEventTest extends AbstractRemoteEntityEventTest<Dist
         return distributionSetManagement.create(entityFactory.distributionSet().create()
                 .name("incomplete").version("2").description("incomplete").type("os"));
     }
-
 }
