@@ -9,9 +9,7 @@
  */
 package org.eclipse.hawkbit.mgmt.rest.resource;
 
-import java.io.Serializable;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -22,10 +20,10 @@ import org.eclipse.hawkbit.mgmt.json.model.system.MgmtSystemTenantConfigurationV
 import org.eclipse.hawkbit.mgmt.rest.api.MgmtTenantManagementRestApi;
 import org.eclipse.hawkbit.mgmt.rest.resource.mapper.MgmtTenantManagementMapper;
 import org.eclipse.hawkbit.repository.SystemManagement;
-import org.eclipse.hawkbit.repository.TenantConfigurationManagement;
+import org.eclipse.hawkbit.repository.exception.EntityNotFoundException;
 import org.eclipse.hawkbit.repository.exception.InsufficientPermissionException;
 import org.eclipse.hawkbit.repository.exception.TenantConfigurationValidatorException;
-import org.eclipse.hawkbit.repository.model.TenantConfigurationValue;
+import org.eclipse.hawkbit.repository.helper.TenantConfigHelper;
 import org.eclipse.hawkbit.tenancy.configuration.TenantConfigurationProperties;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -38,22 +36,19 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class MgmtTenantManagementResource implements MgmtTenantManagementRestApi {
 
-    private final TenantConfigurationManagement tenantConfigurationManagement;
     private final TenantConfigurationProperties tenantConfigurationProperties;
     private final SystemManagement systemManagement;
 
     MgmtTenantManagementResource(
-            final TenantConfigurationManagement tenantConfigurationManagement,
             final TenantConfigurationProperties tenantConfigurationProperties,
             final SystemManagement systemManagement) {
-        this.tenantConfigurationManagement = tenantConfigurationManagement;
         this.tenantConfigurationProperties = tenantConfigurationProperties;
         this.systemManagement = systemManagement;
     }
 
     @Override
     public ResponseEntity<Map<String, MgmtSystemTenantConfigurationValue>> getTenantConfiguration() {
-        // Load and Construct default Tenant Configuration
+        // Load and Construct default AccessContext Configuration
         final Map<String, MgmtSystemTenantConfigurationValue> tenantConfigurationValueMap = new HashMap<>();
         tenantConfigurationProperties.getConfigurationKeys().forEach(key -> {
             try {
@@ -74,80 +69,62 @@ public class MgmtTenantManagementResource implements MgmtTenantManagementRestApi
     }
 
     @Override
-    @AuditLog(entity = "TenantConfiguration", type = AuditLog.Type.DELETE, description = "Delete Tenant Configuration Value")
-    public ResponseEntity<Void> deleteTenantConfigurationValue(final String keyName) {
-        //Default DistributionSet Type cannot be deleted as is part of TenantMetadata
-        if (isDefaultDistributionSetTypeKey(keyName)) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        tenantConfigurationManagement.deleteConfiguration(keyName);
-
-        log.debug("{} config value deleted, return status {}", keyName, HttpStatus.OK);
-        return ResponseEntity.ok().build();
-    }
-
-    @Override
     public ResponseEntity<MgmtSystemTenantConfigurationValue> getTenantConfigurationValue(final String keyName) {
         return ResponseEntity.ok(loadTenantConfigurationValueBy(keyName));
     }
 
     @Override
-    @AuditLog(entity = "TenantConfiguration", type = AuditLog.Type.UPDATE, description = "Update Tenant Configuration Value")
-    public ResponseEntity<MgmtSystemTenantConfigurationValue> updateTenantConfigurationValue(
-            final String keyName, final MgmtSystemTenantConfigurationValueRequest configurationValueRest) {
-        Serializable configurationValue = configurationValueRest.getValue();
-        final MgmtSystemTenantConfigurationValue responseUpdatedValue;
+    @AuditLog(entity = "TenantConfiguration", type = AuditLog.Type.UPDATE, description = "Update AccessContext Configuration Value")
+    public void updateTenantConfigurationValue(final String keyName, final MgmtSystemTenantConfigurationValueRequest configurationValueRest) {
+        final Object configurationValue = configurationValueRest.getValue();
         if (isDefaultDistributionSetTypeKey(keyName)) {
-            responseUpdatedValue = updateDefaultDsType(configurationValue);
+            updateDefaultDsType(configurationValue);
         } else {
-            final TenantConfigurationValue<? extends Serializable> updatedTenantConfigurationValue = tenantConfigurationManagement
+            TenantConfigHelper
+                    .getTenantConfigurationManagement()
                     .addOrUpdateConfiguration(keyName, configurationValueRest.getValue());
-            responseUpdatedValue = MgmtTenantManagementMapper.toResponseTenantConfigurationValue(keyName, updatedTenantConfigurationValue);
         }
-
-        return ResponseEntity.ok(responseUpdatedValue);
     }
 
     @Override
-    @AuditLog(entity = "TenantConfiguration", type = AuditLog.Type.UPDATE, description = "Update Tenant Configuration")
-    public ResponseEntity<List<MgmtSystemTenantConfigurationValue>> updateTenantConfiguration(
-            final Map<String, Serializable> configurationValueMap) {
+    @AuditLog(entity = "TenantConfiguration", type = AuditLog.Type.UPDATE, description = "Update AccessContext Configuration")
+    public void updateTenantConfiguration(final Map<String, Object> configurationValueMap) {
         final boolean containsNull = configurationValueMap.keySet().stream().anyMatch(Objects::isNull);
 
         if (containsNull) {
-            return ResponseEntity.badRequest().build();
+            throw new IllegalArgumentException();
         }
 
-        //Try update TenantMetadata first
-        final Serializable defaultDsTypeValueUpdate = configurationValueMap.remove(MgmtTenantManagementMapper.DEFAULT_DISTRIBUTION_SET_TYPE_KEY);
+        // try update TenantMetadata first
+        final Object defaultDsTypeValueUpdate = configurationValueMap.remove(MgmtTenantManagementMapper.DEFAULT_DISTRIBUTION_SET_TYPE_KEY);
         Long oldDefaultDsType = null;
         MgmtSystemTenantConfigurationValue updatedDefaultDsType = null;
         if (defaultDsTypeValueUpdate != null) {
             oldDefaultDsType = systemManagement.getTenantMetadata().getDefaultDsType().getId();
             updatedDefaultDsType = updateDefaultDsType(defaultDsTypeValueUpdate);
         }
-        //try update TenantConfiguration, in case of Error -> rollback TenantMetadata
-        final Map<String, TenantConfigurationValue<Serializable>> tenantConfigurationValues;
+        // try update TenantConfiguration, in case of Error -> rollback TenantMetadata
         try {
-            tenantConfigurationValues = tenantConfigurationManagement.addOrUpdateConfiguration(configurationValueMap);
+            TenantConfigHelper.getTenantConfigurationManagement().addOrUpdateConfiguration(configurationValueMap);
         } catch (Exception ex) {
-            //if DefaultDsType was updated, rollback it in case of TenantConfiguration update.
+            // if DefaultDsType was updated, rollback it in case of TenantConfiguration update.
             if (updatedDefaultDsType != null) {
                 systemManagement.updateTenantMetadata(oldDefaultDsType);
             }
             throw ex;
         }
+    }
 
-        final List<MgmtSystemTenantConfigurationValue> tenantConfigurationListUpdated = new java.util.ArrayList<>(
-                tenantConfigurationValues.entrySet().stream()
-                        .map(entry -> MgmtTenantManagementMapper.toResponseTenantConfigurationValue(entry.getKey(), entry.getValue()))
-                        .toList());
-        if (updatedDefaultDsType != null) {
-            tenantConfigurationListUpdated.add(updatedDefaultDsType);
+    @Override
+    @AuditLog(entity = "TenantConfiguration", type = AuditLog.Type.DELETE, description = "Delete AccessContext Configuration Value")
+    public void deleteTenantConfigurationValue(final String keyName) {
+        // Default DistributionSet Type cannot be deleted as is part of TenantMetadata
+        if (isDefaultDistributionSetTypeKey(keyName)) {
+            throw new EntityNotFoundException("Configuration key not found", keyName);
         }
 
-        return ResponseEntity.ok(tenantConfigurationListUpdated);
+        TenantConfigHelper.getTenantConfigurationManagement().deleteConfiguration(keyName);
+        log.debug("{} config value deleted", keyName);
     }
 
     private static boolean isDefaultDistributionSetTypeKey(String keyName) {
@@ -155,18 +132,18 @@ public class MgmtTenantManagementResource implements MgmtTenantManagementRestApi
     }
 
     private MgmtSystemTenantConfigurationValue loadTenantConfigurationValueBy(final String keyName) {
-        //Check if requested key is TenantConfiguration or TenantMetadata, load it and return it as rest response
+        // Check if requested key is TenantConfiguration or TenantMetadata, load it and return it as rest response
         final MgmtSystemTenantConfigurationValue response;
         if (isDefaultDistributionSetTypeKey(keyName)) {
             response = MgmtTenantManagementMapper.toResponseDefaultDsType(systemManagement.getTenantMetadata().getDefaultDsType().getId());
         } else {
             response = MgmtTenantManagementMapper.toResponseTenantConfigurationValue(
-                    keyName, tenantConfigurationManagement.getConfigurationValue(keyName));
+                    keyName, TenantConfigHelper.getTenantConfigurationManagement().getConfigurationValue(keyName));
         }
         return response;
     }
 
-    private MgmtSystemTenantConfigurationValue updateDefaultDsType(Serializable defaultDsType) {
+    private MgmtSystemTenantConfigurationValue updateDefaultDsType(final Object defaultDsType) {
         final long updateDefaultDsType;
         try {
             updateDefaultDsType = ((Number) defaultDsType).longValue();

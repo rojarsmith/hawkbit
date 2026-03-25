@@ -24,15 +24,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 import com.jayway.jsonpath.JsonPath;
+import org.eclipse.hawkbit.auth.SpRole;
 import org.eclipse.hawkbit.mgmt.rest.api.MgmtRestConstants;
+import org.eclipse.hawkbit.mgmt.rest.api.MgmtSoftwareModuleTypeRestApi;
+import org.eclipse.hawkbit.repository.SoftwareModuleManagement;
+import org.eclipse.hawkbit.repository.SoftwareModuleTypeManagement;
 import org.eclipse.hawkbit.repository.model.NamedEntity;
 import org.eclipse.hawkbit.repository.model.SoftwareModuleType;
 import org.eclipse.hawkbit.repository.test.util.WithUser;
-import org.eclipse.hawkbit.rest.util.JsonBuilder;
 import org.eclipse.hawkbit.rest.util.MockMvcResultPrinter;
 import org.json.JSONObject;
 import org.junit.jupiter.api.Test;
@@ -51,7 +53,7 @@ public class MgmtSoftwareModuleTypeResourceTest extends AbstractManagementApiInt
      * Checks the correct behaviour of /rest/v1/softwaremoduletypes GET requests.
      */
     @Test
-    @WithUser(principal = "uploadTester", allSpPermissions = true)
+    @WithUser(principal = "uploadTester", authorities = SpRole.TENANT_ADMIN)
     public void getSoftwareModuleTypes() throws Exception {
         final SoftwareModuleType testType = createTestType();
 
@@ -97,13 +99,14 @@ public class MgmtSoftwareModuleTypeResourceTest extends AbstractManagementApiInt
      * Handles the GET request of retrieving all software module types within SP with parameters. In this case the first 10 result in ascending order by name where the name starts with 'a'.
      */
     @Test
-    @WithUser(principal = "uploadTester", allSpPermissions = true)
+    @WithUser(principal = "uploadTester", authorities = SpRole.TENANT_ADMIN)
     public void getSoftwareModuleTypesWithParameters() throws Exception {
         final SoftwareModuleType testType = testdataFactory.findOrCreateSoftwareModuleType("test123");
         softwareModuleTypeManagement
-                .update(entityFactory.softwareModuleType().update(testType.getId()).description("Desc1234").colour("rgb(106,178,83)"));
+                .update(SoftwareModuleTypeManagement.Update.builder().id(testType.getId()).description("Desc1234").colour("rgb(106,178,83)")
+                        .build());
 
-        mvc.perform(get(MgmtRestConstants.SOFTWAREMODULETYPE_V1_REQUEST_MAPPING + "?limit=10&sort=name:ASC&offset=0&q=name==a")
+        mvc.perform(get(MgmtSoftwareModuleTypeRestApi.SOFTWAREMODULETYPES_V1 + "?limit=10&sort=name:ASC&offset=0&q=name==a")
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk());
@@ -113,7 +116,7 @@ public class MgmtSoftwareModuleTypeResourceTest extends AbstractManagementApiInt
      * Checks the correct behaviour of /rest/v1/softwaremoduletypes GET requests with sorting by MAXASSIGNMENTS field.
      */
     @Test
-    @WithUser(principal = "uploadTester", allSpPermissions = true)
+    @WithUser(principal = "uploadTester", authorities = SpRole.TENANT_ADMIN)
     public void getSoftwareModuleTypesSortedByMaxAssignments() throws Exception {
         final SoftwareModuleType testType = createTestType();
 
@@ -157,22 +160,21 @@ public class MgmtSoftwareModuleTypeResourceTest extends AbstractManagementApiInt
      * Checks the correct behaviour of /rest/v1/softwaremoduletypes POST requests when max assignment is smaller than 1
      */
     @Test
-    @WithUser(principal = "uploadTester", allSpPermissions = true)
+    @WithUser(principal = "uploadTester", authorities = SpRole.TENANT_ADMIN)
     public void createSoftwareModuleTypesInvalidAssignmentBadRequest() throws Exception {
 
-        final List<SoftwareModuleType> types = new ArrayList<>();
-        types.add(entityFactory.softwareModuleType().create().key("test-1").name("TestName-1").maxAssignments(-1)
-                .build());
+        final List<SoftwareModuleTypeManagement.Create> types = new ArrayList<>();
+        types.add(SoftwareModuleTypeManagement.Create.builder().key("test-1").name("TestName-1").maxAssignments(-1).build());
 
-        mvc.perform(post("/rest/v1/softwaremoduletypes").content(JsonBuilder.softwareModuleTypes(types))
+        mvc.perform(post("/rest/v1/softwaremoduletypes").content(toJson(types))
                         .contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isBadRequest());
 
         types.clear();
-        types.add(entityFactory.softwareModuleType().create().key("test0").name("TestName0").maxAssignments(0).build());
+        types.add(SoftwareModuleTypeManagement.Create.builder().key("test0").name("TestName0").maxAssignments(0).build());
 
-        mvc.perform(post("/rest/v1/softwaremoduletypes").content(JsonBuilder.softwareModuleTypes(types))
+        mvc.perform(post("/rest/v1/softwaremoduletypes").content(toJson(types))
                         .contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isBadRequest());
@@ -182,19 +184,19 @@ public class MgmtSoftwareModuleTypeResourceTest extends AbstractManagementApiInt
      * Checks the correct behaviour of /rest/v1/softwaremoduletypes POST requests.
      */
     @Test
-    @WithUser(principal = "uploadTester", allSpPermissions = true)
+    @WithUser(principal = "uploadTester", authorities = SpRole.TENANT_ADMIN)
     public void createSoftwareModuleTypes() throws Exception {
 
-        final List<SoftwareModuleType> types = Arrays.asList(
-                entityFactory.softwareModuleType().create().key("test1").name("TestName1").description("Desc1")
+        final List<SoftwareModuleTypeManagement.Create> types = Arrays.asList(
+                SoftwareModuleTypeManagement.Create.builder().key("test1").name("TestName1").description("Desc1")
                         .colour("col1‚").maxAssignments(1).build(),
-                entityFactory.softwareModuleType().create().key("test2").name("TestName2").description("Desc2")
+                SoftwareModuleTypeManagement.Create.builder().key("test2").name("TestName2").description("Desc2")
                         .colour("col2‚").maxAssignments(2).build(),
-                entityFactory.softwareModuleType().create().key("test3").name("TestName3").description("Desc3")
+                SoftwareModuleTypeManagement.Create.builder().key("test3").name("TestName3").description("Desc3")
                         .colour("col3‚").maxAssignments(3).build());
 
         final MvcResult mvcResult = mvc
-                .perform(post("/rest/v1/softwaremoduletypes").content(JsonBuilder.softwareModuleTypes(types))
+                .perform(post("/rest/v1/softwaremoduletypes").content(toJson(types))
                         .contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isCreated())
@@ -223,9 +225,9 @@ public class MgmtSoftwareModuleTypeResourceTest extends AbstractManagementApiInt
 
         assertThat((Object) JsonPath.compile("[0]_links.self.href").read(mvcResult.getResponse().getContentAsString()))
                 .hasToString("http://localhost/rest/v1/softwaremoduletypes/" + created1.getId());
-        assertThat((Object)JsonPath.compile("[1]_links.self.href").read(mvcResult.getResponse().getContentAsString()))
+        assertThat((Object) JsonPath.compile("[1]_links.self.href").read(mvcResult.getResponse().getContentAsString()))
                 .hasToString("http://localhost/rest/v1/softwaremoduletypes/" + created2.getId());
-        assertThat((Object)JsonPath.compile("[2]_links.self.href").read(mvcResult.getResponse().getContentAsString()))
+        assertThat((Object) JsonPath.compile("[2]_links.self.href").read(mvcResult.getResponse().getContentAsString()))
                 .hasToString("http://localhost/rest/v1/softwaremoduletypes/" + created3.getId());
 
         assertThat(softwareModuleTypeManagement.count()).isEqualTo(6);
@@ -235,7 +237,7 @@ public class MgmtSoftwareModuleTypeResourceTest extends AbstractManagementApiInt
      * Checks the correct behaviour of /rest/v1/softwaremoduletypes/{ID} GET requests.
      */
     @Test
-    @WithUser(principal = "uploadTester", allSpPermissions = true)
+    @WithUser(principal = "uploadTester", authorities = SpRole.TENANT_ADMIN)
     public void getSoftwareModuleType() throws Exception {
         final SoftwareModuleType testType = createTestType();
 
@@ -258,7 +260,7 @@ public class MgmtSoftwareModuleTypeResourceTest extends AbstractManagementApiInt
      * Checks the correct behaviour of /rest/v1/softwaremoduletypes/{ID} DELETE requests (hard delete scenario).
      */
     @Test
-    @WithUser(principal = "uploadTester", allSpPermissions = true)
+    @WithUser(principal = "uploadTester", authorities = SpRole.TENANT_ADMIN)
     public void deleteSoftwareModuleTypeUnused() throws Exception {
         final SoftwareModuleType testType = createTestType();
 
@@ -266,7 +268,7 @@ public class MgmtSoftwareModuleTypeResourceTest extends AbstractManagementApiInt
 
         mvc.perform(delete("/rest/v1/softwaremoduletypes/{smId}", testType.getId()))
                 .andDo(MockMvcResultPrinter.print())
-                .andExpect(status().isOk());
+                .andExpect(status().isNoContent());
 
         assertThat(softwareModuleTypeManagement.count()).isEqualTo(3);
     }
@@ -275,7 +277,7 @@ public class MgmtSoftwareModuleTypeResourceTest extends AbstractManagementApiInt
      * Ensures that module type deletion request to API on an entity that does not exist results in NOT_FOUND.
      */
     @Test
-     void deleteSoftwareModuleTypeThatDoesNotExistLeadsToNotFound() throws Exception {
+    void deleteSoftwareModuleTypeThatDoesNotExistLeadsToNotFound() throws Exception {
         mvc.perform(delete("/rest/v1/softwaremoduletypes/1234"))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isNotFound());
@@ -285,11 +287,10 @@ public class MgmtSoftwareModuleTypeResourceTest extends AbstractManagementApiInt
      * Checks the correct behaviour of /rest/v1/softwaremoduletypes/{ID} DELETE requests (soft delete scenario).
      */
     @Test
-    @WithUser(principal = "uploadTester", allSpPermissions = true)
+    @WithUser(principal = "uploadTester", authorities = SpRole.TENANT_ADMIN)
     public void deleteSoftwareModuleTypeUsed() throws Exception {
         final SoftwareModuleType testType = createTestType();
-        softwareModuleManagement
-                .create(entityFactory.softwareModule().create().type(testType).name("name").version("version"));
+        softwareModuleManagement.create(SoftwareModuleManagement.Create.builder().type(testType).name("name").version("version").build());
 
         assertThat(softwareModuleTypeManagement.count()).isEqualTo(4);
 
@@ -300,7 +301,7 @@ public class MgmtSoftwareModuleTypeResourceTest extends AbstractManagementApiInt
 
         mvc.perform(delete("/rest/v1/softwaremoduletypes/{smtId}", testType.getId()))
                 .andDo(MockMvcResultPrinter.print())
-                .andExpect(status().isOk());
+                .andExpect(status().isNoContent());
 
         mvc.perform(get("/rest/v1/softwaremoduletypes/{smtId}", testType.getId()))
                 .andDo(MockMvcResultPrinter.print())
@@ -314,7 +315,7 @@ public class MgmtSoftwareModuleTypeResourceTest extends AbstractManagementApiInt
      * Checks the correct behaviour of /rest/v1/softwaremoduletypes/{ID} PUT requests.
      */
     @Test
-     void updateSoftwareModuleTypeColourDescriptionAndNameUntouched() throws Exception {
+    void updateSoftwareModuleTypeColourDescriptionAndNameUntouched() throws Exception {
         final SoftwareModuleType testType = createTestType();
 
         final String body = new JSONObject().put("id", testType.getId()).put("description", "foobardesc")
@@ -336,7 +337,7 @@ public class MgmtSoftwareModuleTypeResourceTest extends AbstractManagementApiInt
      * Tests the update of the deletion flag. It is verfied that the software module type can't be marked as deleted through update operation.
      */
     @Test
-     void updateSoftwareModuleTypeDeletedFlag() throws Exception {
+    void updateSoftwareModuleTypeDeletedFlag() throws Exception {
         SoftwareModuleType testType = createTestType();
 
         final String body = new JSONObject().put("id", testType.getId()).put("deleted", true).toString();
@@ -349,7 +350,7 @@ public class MgmtSoftwareModuleTypeResourceTest extends AbstractManagementApiInt
                 .andExpect(jsonPath("$.lastModifiedAt", equalTo(testType.getLastModifiedAt())))
                 .andExpect(jsonPath("$.deleted", equalTo(false)));
 
-        testType = softwareModuleTypeManagement.get(testType.getId()).get();
+        testType = softwareModuleTypeManagement.find(testType.getId()).get();
         assertThat(testType.getLastModifiedAt()).isEqualTo(testType.getLastModifiedAt());
         assertThat(testType.isDeleted()).isFalse();
     }
@@ -358,9 +359,9 @@ public class MgmtSoftwareModuleTypeResourceTest extends AbstractManagementApiInt
      * Checks the correct behaviour of /rest/v1/softwaremoduletypes GET requests with paging.
      */
     @Test
-     void getSoftwareModuleTypesWithoutAddtionalRequestParameters() throws Exception {
+    void getSoftwareModuleTypesWithoutAddtionalRequestParameters() throws Exception {
         final int types = 3;
-        mvc.perform(get(MgmtRestConstants.SOFTWAREMODULETYPE_V1_REQUEST_MAPPING))
+        mvc.perform(get(MgmtSoftwareModuleTypeRestApi.SOFTWAREMODULETYPES_V1))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(MgmtTargetResourceTest.JSON_PATH_PAGED_LIST_TOTAL, equalTo(types)))
@@ -372,10 +373,10 @@ public class MgmtSoftwareModuleTypeResourceTest extends AbstractManagementApiInt
      * Checks the correct behaviour of /rest/v1/softwaremoduletypes GET requests with paging.
      */
     @Test
-     void getSoftwareModuleTypesWithPagingLimitRequestParameter() throws Exception {
+    void getSoftwareModuleTypesWithPagingLimitRequestParameter() throws Exception {
         final int types = 3;
         final int limitSize = 1;
-        mvc.perform(get(MgmtRestConstants.SOFTWAREMODULETYPE_V1_REQUEST_MAPPING)
+        mvc.perform(get(MgmtSoftwareModuleTypeRestApi.SOFTWAREMODULETYPES_V1)
                         .param(MgmtRestConstants.REQUEST_PARAMETER_PAGING_LIMIT, String.valueOf(limitSize)))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
@@ -388,11 +389,11 @@ public class MgmtSoftwareModuleTypeResourceTest extends AbstractManagementApiInt
      * Checks the correct behaviour of /rest/v1/softwaremoduletypes GET requests with paging.
      */
     @Test
-     void getSoftwareModuleTypesWithPagingLimitAndOffsetRequestParameter() throws Exception {
+    void getSoftwareModuleTypesWithPagingLimitAndOffsetRequestParameter() throws Exception {
         final int types = 3;
         final int offsetParam = 2;
         final int expectedSize = types - offsetParam;
-        mvc.perform(get(MgmtRestConstants.SOFTWAREMODULETYPE_V1_REQUEST_MAPPING)
+        mvc.perform(get(MgmtSoftwareModuleTypeRestApi.SOFTWAREMODULETYPES_V1)
                         .param(MgmtRestConstants.REQUEST_PARAMETER_PAGING_OFFSET, String.valueOf(offsetParam))
                         .param(MgmtRestConstants.REQUEST_PARAMETER_PAGING_LIMIT, String.valueOf(types)))
                 .andDo(MockMvcResultPrinter.print())
@@ -406,10 +407,13 @@ public class MgmtSoftwareModuleTypeResourceTest extends AbstractManagementApiInt
      * Ensures that the server is behaving as expected on invalid requests (wrong media type, wrong ID etc.).
      */
     @Test
-     void invalidRequestsOnSoftwaremoduleTypesResource() throws Exception {
+    void invalidRequestsOnSoftwareModuleTypesResource() throws Exception {
         final SoftwareModuleType testType = createTestType();
 
-        final List<SoftwareModuleType> types = Collections.singletonList(testType);
+        final List<SoftwareModuleTypeManagement.Create> types = List.of(SoftwareModuleTypeManagement.Create.builder()
+                .key(testType.getKey())
+                .name(testType.getName())
+                .build());
 
         // SM does not exist
         mvc.perform(get("/rest/v1/softwaremoduletypes/12345678"))
@@ -437,18 +441,17 @@ public class MgmtSoftwareModuleTypeResourceTest extends AbstractManagementApiInt
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isBadRequest());
 
-        final SoftwareModuleType toLongName = entityFactory.softwareModuleType().create()
+        final SoftwareModuleTypeManagement.Create toLongName = SoftwareModuleTypeManagement.Create.builder()
                 .key("test123")
                 .name(randomString(NamedEntity.NAME_MAX_SIZE + 1))
                 .build();
-        mvc.perform(
-                        post("/rest/v1/softwaremoduletypes").content(JsonBuilder.softwareModuleTypes(Collections.singletonList(toLongName)))
-                                .contentType(MediaType.APPLICATION_JSON))
+        mvc.perform(post("/rest/v1/softwaremoduletypes").content(toJson(List.of(toLongName)))
+                        .contentType(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isBadRequest());
 
         // unsupported media type
-        mvc.perform(post("/rest/v1/softwaremoduletypes").content(JsonBuilder.softwareModuleTypes(types))
+        mvc.perform(post("/rest/v1/softwaremoduletypes").content(toJson(types))
                         .contentType(MediaType.APPLICATION_OCTET_STREAM))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isUnsupportedMediaType());
@@ -468,11 +471,11 @@ public class MgmtSoftwareModuleTypeResourceTest extends AbstractManagementApiInt
      * Search erquest of software module types.
      */
     @Test
-     void searchSoftwareModuleTypeRsql() throws Exception {
-        softwareModuleTypeManagement.create(entityFactory.softwareModuleType().create().key("test123")
-                .name("TestName123").description("Desc123").maxAssignments(5));
-        softwareModuleTypeManagement.create(entityFactory.softwareModuleType().create().key("test1234")
-                .name("TestName1234").description("Desc1234").maxAssignments(5));
+    void searchSoftwareModuleTypeRsql() throws Exception {
+        softwareModuleTypeManagement.create(SoftwareModuleTypeManagement.Create.builder().key("test123")
+                .name("TestName123").description("Desc123").maxAssignments(5).build());
+        softwareModuleTypeManagement.create(SoftwareModuleTypeManagement.Create.builder().key("test1234")
+                .name("TestName1234").description("Desc1234").maxAssignments(5).build());
 
         final String rsqlFindLikeDs1OrDs2 = "name==TestName123,name==TestName1234";
 
@@ -487,10 +490,9 @@ public class MgmtSoftwareModuleTypeResourceTest extends AbstractManagementApiInt
     }
 
     private SoftwareModuleType createTestType() {
-        SoftwareModuleType testType = softwareModuleTypeManagement.create(entityFactory.softwareModuleType().create()
-                .key("test123").name("TestName123").description("Desc123").colour("colour").maxAssignments(5));
-        testType = softwareModuleTypeManagement
-                .update(entityFactory.softwareModuleType().update(testType.getId()).description("Desc1234"));
-        return testType;
+        final SoftwareModuleType testType = softwareModuleTypeManagement.create(SoftwareModuleTypeManagement.Create.builder()
+                .key("test123").name("TestName123").description("Desc123").colour("colour").maxAssignments(5).build());
+        return softwareModuleTypeManagement
+                .update(SoftwareModuleTypeManagement.Update.builder().id(testType.getId()).description("Desc1234").build());
     }
 }

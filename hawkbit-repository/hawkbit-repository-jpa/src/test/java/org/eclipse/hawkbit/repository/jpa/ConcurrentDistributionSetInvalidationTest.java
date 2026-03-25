@@ -10,23 +10,26 @@
 package org.eclipse.hawkbit.repository.jpa;
 
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.eclipse.hawkbit.context.AccessContext.asSystemAsTenant;
 import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 
 import java.time.Duration;
-import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.awaitility.Awaitility;
+import org.eclipse.hawkbit.context.AccessContext;
+import org.eclipse.hawkbit.repository.RolloutManagement.Create;
 import org.eclipse.hawkbit.repository.exception.StopRolloutException;
 import org.eclipse.hawkbit.repository.jpa.model.JpaRolloutGroup;
 import org.eclipse.hawkbit.repository.jpa.repository.RolloutGroupRepository;
 import org.eclipse.hawkbit.repository.model.Action.ActionType;
+import org.eclipse.hawkbit.repository.model.ActionCancellationType;
 import org.eclipse.hawkbit.repository.model.DistributionSet;
 import org.eclipse.hawkbit.repository.model.DistributionSetInvalidation;
-import org.eclipse.hawkbit.repository.model.DistributionSetInvalidation.CancelationType;
 import org.eclipse.hawkbit.repository.model.Rollout;
 import org.eclipse.hawkbit.repository.model.RolloutGroup.RolloutGroupErrorAction;
 import org.eclipse.hawkbit.repository.model.RolloutGroup.RolloutGroupErrorCondition;
@@ -58,26 +61,19 @@ class ConcurrentDistributionSetInvalidationTest extends AbstractJpaIntegrationTe
     void verifyInvalidateDistributionSetWithLargeRolloutThrowsException() {
         final DistributionSet distributionSet = testdataFactory.createDistributionSet();
         final Rollout rollout = createRollout(distributionSet);
-        final String tenant = tenantAware.getCurrentTenant();
+        final String tenant = AccessContext.tenant();
 
-        // run in new Thread so that the invalidation can be executed in
-        // parallel
-        new Thread(() -> systemSecurityContext.runAsSystemAsTenant(() -> {
-            rolloutHandler.handleAll();
-            return 0;
-        }, tenant)).start();
+        // run in new Thread so that the invalidation can be executed in parallel
+        new Thread(() -> asSystemAsTenant(tenant, rolloutHandler::handleAll)).start();
 
         // wait until at least one RolloutGroup is created, as this means that the thread has started and has acquired the lock
         Awaitility.await()
                 .pollInterval(Duration.ofMillis(100))
                 .atMost(Duration.ofSeconds(5))
-                .until(() -> tenantAware.runAsTenant(
-                        tenant,
-                        () -> systemSecurityContext.runAsSystem(
-                                () -> rolloutGroupManagement.findByRollout(rollout.getId(), PAGE).getSize() > 0)));
+                .until(() -> asSystemAsTenant(tenant, () -> rolloutGroupManagement.findByRollout(rollout.getId(), PAGE).getSize() > 0));
 
         final DistributionSetInvalidation distributionSetInvalidation = new DistributionSetInvalidation(
-                Collections.singletonList(distributionSet.getId()), CancelationType.SOFT, true);
+                List.of(distributionSet.getId()), ActionCancellationType.SOFT);
         assertThatExceptionOfType(StopRolloutException.class)
                 .as("Invalidation of distributionSet should throw an exception")
                 .isThrownBy(() -> distributionSetInvalidationManagement.invalidateDistributionSet(distributionSetInvalidation));
@@ -92,9 +88,10 @@ class ConcurrentDistributionSetInvalidationTest extends AbstractJpaIntegrationTe
                 .errorCondition(RolloutGroupErrorCondition.THRESHOLD, "80")
                 .errorAction(RolloutGroupErrorAction.PAUSE, null).build();
 
-        return rolloutManagement.create(entityFactory.rollout().create()
+        return rolloutManagement.create(Create.builder()
                         .name("verifyInvalidateDistributionSetWithLargeRolloutThrowsException").description("desc")
-                        .targetFilterQuery("name==*").distributionSetId(distributionSet).actionType(ActionType.FORCED),
+                        .targetFilterQuery("name==*").distributionSet(distributionSet).actionType(ActionType.FORCED)
+                        .build(),
                 quotaManagement.getMaxRolloutGroupsPerRollout(), false, conditions);
     }
 
@@ -122,5 +119,4 @@ class ConcurrentDistributionSetInvalidationTest extends AbstractJpaIntegrationTe
             return slowGroupRepo;
         }
     }
-
 }

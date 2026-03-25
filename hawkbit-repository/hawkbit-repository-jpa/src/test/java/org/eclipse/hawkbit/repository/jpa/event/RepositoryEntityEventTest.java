@@ -16,6 +16,9 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import org.assertj.core.api.Assertions;
+import org.eclipse.hawkbit.repository.SoftwareModuleManagement;
+import org.eclipse.hawkbit.repository.TargetManagement;
+import org.eclipse.hawkbit.repository.TargetTypeManagement;
 import org.eclipse.hawkbit.repository.event.TenantAwareEvent;
 import org.eclipse.hawkbit.repository.event.remote.DistributionSetDeletedEvent;
 import org.eclipse.hawkbit.repository.event.remote.RolloutDeletedEvent;
@@ -78,7 +81,7 @@ class RepositoryEntityEventTest extends AbstractJpaIntegrationTest {
     @Test
     void targetUpdateEventIsPublished() throws InterruptedException {
         final Target createdTarget = testdataFactory.createTarget("12345");
-        targetManagement.update(entityFactory.target().update(createdTarget.getControllerId()).name("updateName"));
+        targetManagement.update(TargetManagement.Update.builder().id(createdTarget.getId()).name("updateName").build());
 
         final TargetUpdatedEvent targetUpdatedEvent = eventListener.waitForEvent(TargetUpdatedEvent.class);
         assertThat(targetUpdatedEvent).isNotNull();
@@ -92,7 +95,7 @@ class RepositoryEntityEventTest extends AbstractJpaIntegrationTest {
     void targetDeletedEventIsPublished() throws InterruptedException {
         final Target createdTarget = testdataFactory.createTarget("12345");
 
-        targetManagement.deleteByControllerID("12345");
+        targetManagement.deleteByControllerId("12345");
 
         final TargetDeletedEvent targetDeletedEvent = eventListener.waitForEvent(TargetDeletedEvent.class);
         assertThat(targetDeletedEvent).isNotNull();
@@ -117,8 +120,7 @@ class RepositoryEntityEventTest extends AbstractJpaIntegrationTest {
     @Test
     void targetTypeUpdatedEventIsPublished() throws InterruptedException {
         final TargetType createdTargetType = testdataFactory.findOrCreateTargetType("targettype");
-        targetTypeManagement
-                .update(entityFactory.targetType().update(createdTargetType.getId()).name("updatedtargettype"));
+        targetTypeManagement.update(TargetTypeManagement.Update.builder().id(createdTargetType.getId()).name("updatedtargettype").build());
 
         final TargetTypeUpdatedEvent targetTypeUpdatedEvent = eventListener.waitForEvent(TargetTypeUpdatedEvent.class);
         assertThat(targetTypeUpdatedEvent).isNotNull();
@@ -148,12 +150,11 @@ class RepositoryEntityEventTest extends AbstractJpaIntegrationTest {
         final String successCondition = "50";
         final String errorCondition = "80";
         final String rolloutName = "rolloutTest";
-        final String targetPrefixName = rolloutName;
         final DistributionSet distributionSet = testdataFactory.createDistributionSet("dsFor" + rolloutName);
-        testdataFactory.createTargets(amountTargetsForRollout, targetPrefixName + "-", targetPrefixName);
+        testdataFactory.createTargets(amountTargetsForRollout, rolloutName + "-", rolloutName);
 
-        final Rollout createdRollout = testdataFactory.createRolloutByVariables(rolloutName, "desc", amountGroups,
-                "controllerId==" + targetPrefixName + "-*", distributionSet, successCondition, errorCondition);
+        final Rollout createdRollout = testdataFactory.createRolloutByVariables(
+                rolloutName, "desc", amountGroups,"controllerId==" + rolloutName + "-*", distributionSet, successCondition, errorCondition);
 
         rolloutManagement.delete(createdRollout.getId());
         rolloutHandler.handleAll();
@@ -211,7 +212,7 @@ class RepositoryEntityEventTest extends AbstractJpaIntegrationTest {
     void softwareModuleUpdateEventIsPublished() throws InterruptedException {
         final SoftwareModule softwareModule = testdataFactory.createSoftwareModuleApp();
         softwareModuleManagement
-                .update(entityFactory.softwareModule().update(softwareModule.getId()).description("New"));
+                .update(SoftwareModuleManagement.Update.builder().id(softwareModule.getId()).description("New").build());
 
         final SoftwareModuleUpdatedEvent softwareModuleUpdatedEvent = eventListener
                 .waitForEvent(SoftwareModuleUpdatedEvent.class);
@@ -267,5 +268,4 @@ class RepositoryEntityEventTest extends AbstractJpaIntegrationTest {
             return null;
         }
     }
-
 }

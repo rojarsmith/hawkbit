@@ -14,3 +14,9 @@ updates:
     # Check daily
     schedule:
       interval: "daily"
+  # Enable version updates for github actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    # Check daily
+    schedule:
+      interval: "daily"

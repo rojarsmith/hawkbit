@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.util.Collections;
 import java.util.List;
-import java.util.Random;
+import java.util.Optional;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
@@ -32,13 +32,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.cbor.CBORFactory;
 import com.fasterxml.jackson.dataformat.cbor.CBORGenerator;
 import com.fasterxml.jackson.dataformat.cbor.CBORParser;
+import org.eclipse.hawkbit.context.AccessContext;
 import org.eclipse.hawkbit.ddi.json.model.DdiActionFeedback;
 import org.eclipse.hawkbit.ddi.json.model.DdiAssignedVersion;
 import org.eclipse.hawkbit.ddi.json.model.DdiConfirmationFeedback;
 import org.eclipse.hawkbit.ddi.json.model.DdiProgress;
 import org.eclipse.hawkbit.ddi.json.model.DdiResult;
 import org.eclipse.hawkbit.ddi.json.model.DdiStatus;
-import org.eclipse.hawkbit.repository.jpa.RepositoryApplicationConfiguration;
+import org.eclipse.hawkbit.repository.jpa.JpaRepositoryConfiguration;
 import org.eclipse.hawkbit.repository.jpa.model.JpaDistributionSet;
 import org.eclipse.hawkbit.repository.model.Action;
 import org.eclipse.hawkbit.repository.model.Artifact;
@@ -55,7 +56,7 @@ import org.springframework.test.web.servlet.ResultMatcher;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
 @ContextConfiguration(
-        classes = { DdiApiConfiguration.class, RestConfiguration.class, RepositoryApplicationConfiguration.class, TestConfiguration.class })
+        classes = { DdiApiConfiguration.class, RestConfiguration.class, JpaRepositoryConfiguration.class, TestConfiguration.class })
 @TestPropertySource(locations = "classpath:/ddi-test.properties")
 public abstract class AbstractDDiApiIntegrationTest extends AbstractRestIntegrationTest {
 
@@ -79,7 +80,6 @@ public abstract class AbstractDDiApiIntegrationTest extends AbstractRestIntegrat
 
     protected static final int ARTIFACT_SIZE = 5 * 1024;
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final Random RND = new Random();
 
     /**
      * Convert JSON to a CBOR equivalent.
@@ -132,7 +132,7 @@ public abstract class AbstractDDiApiIntegrationTest extends AbstractRestIntegrat
 
     protected ResultActions putInstalledBase(final String controllerId, final String content, final ResultMatcher statusMatcher)
             throws Exception {
-        return mvc.perform(put(INSTALLED_BASE_ROOT, tenantAware.getCurrentTenant(), controllerId)
+        return mvc.perform(put(INSTALLED_BASE_ROOT, AccessContext.tenant(), controllerId)
                         .content(content.getBytes()).contentType(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(statusMatcher);
@@ -142,7 +142,7 @@ public abstract class AbstractDDiApiIntegrationTest extends AbstractRestIntegrat
             final MediaType mediaType, final String controllerId,
             final Long actionId, final byte[] content, final ResultMatcher statusMatcher) throws Exception {
         return mvc
-                .perform(post(DEPLOYMENT_FEEDBACK, tenantAware.getCurrentTenant(), controllerId, actionId)
+                .perform(post(DEPLOYMENT_FEEDBACK, AccessContext.tenant(), controllerId, actionId)
                         .content(content).contentType(mediaType).accept(mediaType))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(statusMatcher);
@@ -158,7 +158,7 @@ public abstract class AbstractDDiApiIntegrationTest extends AbstractRestIntegrat
             final MediaType mediaType, final String controllerId,
             final Long actionId, final byte[] content, final ResultMatcher statusMatcher) throws Exception {
         return mvc
-                .perform(post(CANCEL_FEEDBACK, tenantAware.getCurrentTenant(), controllerId, actionId).content(content)
+                .perform(post(CANCEL_FEEDBACK, AccessContext.tenant(), controllerId, actionId).content(content)
                         .contentType(mediaType).accept(mediaType))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(statusMatcher);
@@ -166,7 +166,7 @@ public abstract class AbstractDDiApiIntegrationTest extends AbstractRestIntegrat
 
     protected ResultActions performGet(final String url, final MediaType mediaType, final ResultMatcher statusMatcher, final String... values)
             throws Exception {
-        return mvc.perform(MockMvcRequestBuilders.get(url, values).accept(mediaType)
+        return mvc.perform(MockMvcRequestBuilders.get(url, (Object[]) values).accept(mediaType)
                         .with(new RequestOnHawkbitDefaultPortPostProcessor()))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(statusMatcher)
@@ -178,7 +178,7 @@ public abstract class AbstractDDiApiIntegrationTest extends AbstractRestIntegrat
             final DistributionSet ds, final Artifact artifact, final Artifact artifactSignature, final Long actionId,
             final Long osModuleId, final String downloadType, final String updateType) throws Exception {
         final ResultActions resultActions = performGet(DEPLOYMENT_BASE, mediaType, status().isOk(),
-                tenantAware.getCurrentTenant(), controllerId, actionId.toString());
+                AccessContext.tenant(), controllerId, actionId.toString());
         return verifyBasePayload(
                 "$.deployment", resultActions, controllerId, ds, artifact, artifactSignature, actionId, osModuleId, downloadType, updateType);
     }
@@ -195,18 +195,18 @@ public abstract class AbstractDDiApiIntegrationTest extends AbstractRestIntegrat
             final DistributionSet ds, final Artifact artifact, final Artifact artifactSignature, final Long actionId,
             final Long osModuleId, final Action.ActionType actionType) throws Exception {
         final ResultActions resultActions = performGet(INSTALLED_BASE, mediaType, status().isOk(),
-                tenantAware.getCurrentTenant(), controllerId, actionId.toString());
+                AccessContext.tenant(), controllerId, actionId.toString());
         return verifyBasePayload("$.deployment", resultActions, controllerId, ds, artifact, artifactSignature, actionId, osModuleId,
                 getDownloadAndUploadType(actionType), getDownloadAndUploadType(actionType));
     }
 
     protected String installedBaseLink(final String controllerId, final String actionId) {
-        return HTTP_LOCALHOST + tenantAware.getCurrentTenant() + "/controller/v1/" +
+        return HTTP_LOCALHOST + AccessContext.tenant() + "/controller/v1/" +
                 controllerId + "/installedBase/" + actionId;
     }
 
     protected String deploymentBaseLink(final String controllerId, final String actionId) {
-        return HTTP_LOCALHOST + tenantAware.getCurrentTenant() + "/controller/v1/" +
+        return HTTP_LOCALHOST + AccessContext.tenant() + "/controller/v1/" +
                 controllerId + "/deploymentBase/" + actionId;
     }
 
@@ -276,14 +276,12 @@ public abstract class AbstractDDiApiIntegrationTest extends AbstractRestIntegrat
     }
 
     protected String getJsonClosedDeploymentActionFeedback() throws JsonProcessingException {
-        return getJsonActionFeedback(
-                DdiStatus.ExecutionStatus.CLOSED, DdiResult.FinalResult.NONE, Collections.singletonList("closed"));
+        return getJsonActionFeedback(DdiStatus.ExecutionStatus.CLOSED, DdiResult.FinalResult.NONE, Collections.singletonList("closed"));
     }
 
     protected String getJsonActionFeedback(
             final DdiStatus.ExecutionStatus executionStatus, final DdiResult.FinalResult finalResult) throws JsonProcessingException {
-        return getJsonActionFeedback(
-                executionStatus, finalResult, Collections.singletonList(randomString(1000)));
+        return getJsonActionFeedback(executionStatus, finalResult, Collections.singletonList(randomString(1000)));
     }
 
     protected String getJsonActionFeedback(
@@ -322,7 +320,7 @@ public abstract class AbstractDDiApiIntegrationTest extends AbstractRestIntegrat
             final Long osModuleId, final String downloadType, final String updateType) throws Exception {
         final ResultActions resultActions = performGet(
                 CONFIRMATION_BASE_ACTION, mediaType, status().isOk(),
-                tenantAware.getCurrentTenant(), controllerId, actionId.toString());
+                AccessContext.tenant(), controllerId, actionId.toString());
         return verifyBasePayload(
                 "$.confirmation", resultActions, controllerId, ds, artifact, artifactSignature, actionId, osModuleId,
                 downloadType, updateType);
@@ -353,13 +351,13 @@ public abstract class AbstractDDiApiIntegrationTest extends AbstractRestIntegrat
                 .andExpect(jsonPath(prefix + ".download", equalTo(downloadType)))
                 .andExpect(jsonPath(prefix + ".update", equalTo(updateType)))
                 .andExpect(jsonPath(prefix + ".chunks[?(@.part=='jvm')].name",
-                        contains(ds.findFirstModuleByType(runtimeType).get().getName())))
+                        contains(findFirstModuleByType(ds, runtimeType).orElseThrow().getName())))
                 .andExpect(jsonPath(prefix + ".chunks[?(@.part=='jvm')].version",
-                        contains(ds.findFirstModuleByType(runtimeType).get().getVersion())))
+                        contains(findFirstModuleByType(ds, runtimeType).orElseThrow().getVersion())))
                 .andExpect(jsonPath(prefix + ".chunks[?(@.part=='os')].name",
-                        contains(ds.findFirstModuleByType(osType).get().getName())))
+                        contains(findFirstModuleByType(ds, osType).orElseThrow().getName())))
                 .andExpect(jsonPath(prefix + ".chunks[?(@.part=='os')].version",
-                        contains(ds.findFirstModuleByType(osType).get().getVersion())))
+                        contains(findFirstModuleByType(ds, osType).orElseThrow().getVersion())))
                 .andExpect(jsonPath(prefix + ".chunks[?(@.part=='os')].artifacts[0].size", contains(ARTIFACT_SIZE)))
                 .andExpect(jsonPath(prefix + ".chunks[?(@.part=='os')].artifacts[0].filename",
                         contains(artifact.getFilename())))
@@ -370,11 +368,11 @@ public abstract class AbstractDDiApiIntegrationTest extends AbstractRestIntegrat
                 .andExpect(jsonPath(prefix + ".chunks[?(@.part=='os')].artifacts[0].hashes.sha256",
                         contains(artifact.getSha256Hash())))
                 .andExpect(jsonPath(prefix + ".chunks[?(@.part=='os')].artifacts[0]._links.download-http.href",
-                        contains(HTTP_LOCALHOST + tenantAware.getCurrentTenant() + "/controller/v1/" + controllerId +
-                                "/softwaremodules/" + osModuleId + "/artifacts/" + artifact.getFilename() + "/download")))
+                        contains(HTTP_LOCALHOST + AccessContext.tenant() + "/controller/v1/" + controllerId +
+                                "/softwaremodules/" + osModuleId + "/artifacts/" + artifact.getFilename())))
                 .andExpect(jsonPath(prefix + ".chunks[?(@.part=='os')].artifacts[0]._links.md5sum-http.href",
-                        contains(HTTP_LOCALHOST + tenantAware.getCurrentTenant() + "/controller/v1/" + controllerId +
-                                "/softwaremodules/" + osModuleId + "/artifacts/" + artifact.getFilename() + "/download.MD5SUM")))
+                        contains(HTTP_LOCALHOST + AccessContext.tenant() + "/controller/v1/" + controllerId +
+                                "/softwaremodules/" + osModuleId + "/artifacts/" + artifact.getFilename() + ".MD5SUM")))
                 .andExpect(jsonPath(prefix + ".chunks[?(@.part=='os')].artifacts[1].size", contains(ARTIFACT_SIZE)))
                 .andExpect(jsonPath(prefix + ".chunks[?(@.part=='os')].artifacts[1].filename",
                         contains(artifactSignature.getFilename())))
@@ -385,15 +383,19 @@ public abstract class AbstractDDiApiIntegrationTest extends AbstractRestIntegrat
                 .andExpect(jsonPath(prefix + ".chunks[?(@.part=='os')].artifacts[1].hashes.sha256",
                         contains(artifactSignature.getSha256Hash())))
                 .andExpect(jsonPath(prefix + ".chunks[?(@.part=='os')].artifacts[1]._links.download-http.href",
-                        contains(HTTP_LOCALHOST + tenantAware.getCurrentTenant() + "/controller/v1/" + controllerId +
-                                "/softwaremodules/" + osModuleId + "/artifacts/" + artifactSignature.getFilename() + "/download")))
+                        contains(HTTP_LOCALHOST + AccessContext.tenant() + "/controller/v1/" + controllerId +
+                                "/softwaremodules/" + osModuleId + "/artifacts/" + artifactSignature.getFilename())))
                 .andExpect(jsonPath(prefix + ".chunks[?(@.part=='os')].artifacts[1]._links.md5sum-http.href",
-                        contains(HTTP_LOCALHOST + tenantAware.getCurrentTenant() + "/controller/v1/" + controllerId +
-                                "/softwaremodules/" + osModuleId + "/artifacts/" + artifactSignature.getFilename() + "/download.MD5SUM")))
+                        contains(HTTP_LOCALHOST + AccessContext.tenant() + "/controller/v1/" + controllerId +
+                                "/softwaremodules/" + osModuleId + "/artifacts/" + artifactSignature.getFilename() + ".MD5SUM")))
                 .andExpect(jsonPath(prefix + ".chunks[?(@.part=='bApp')].version",
-                        contains(ds.findFirstModuleByType(appType).get().getVersion())))
+                        contains(findFirstModuleByType(ds, appType).orElseThrow().getVersion())))
                 .andExpect(jsonPath(prefix + ".chunks[?(@.part=='bApp')].metadata").doesNotExist())
                 .andExpect(jsonPath(prefix + ".chunks[?(@.part=='bApp')].name")
-                        .value(ds.findFirstModuleByType(appType).get().getName()));
+                        .value(findFirstModuleByType(ds, appType).orElseThrow().getName()));
+    }
+
+    protected Optional<DistributionSet> findDsByAction(final long actionId) {
+        return deploymentManagement.findAction(actionId).map(Action::getDistributionSet);
     }
 }

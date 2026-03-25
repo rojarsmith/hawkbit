@@ -32,23 +32,21 @@ import org.eclipse.hawkbit.mgmt.rest.resource.mapper.MgmtRolloutMapper;
 import org.eclipse.hawkbit.mgmt.rest.resource.mapper.MgmtTargetMapper;
 import org.eclipse.hawkbit.mgmt.rest.resource.util.PagingUtility;
 import org.eclipse.hawkbit.repository.DistributionSetManagement;
-import org.eclipse.hawkbit.repository.EntityFactory;
 import org.eclipse.hawkbit.repository.RolloutGroupManagement;
 import org.eclipse.hawkbit.repository.RolloutManagement;
+import org.eclipse.hawkbit.repository.RolloutManagement.Create;
+import org.eclipse.hawkbit.repository.RolloutManagement.GroupCreate;
 import org.eclipse.hawkbit.repository.TargetFilterQueryManagement;
-import org.eclipse.hawkbit.repository.TenantConfigurationManagement;
-import org.eclipse.hawkbit.repository.builder.RolloutCreate;
-import org.eclipse.hawkbit.repository.builder.RolloutGroupCreate;
 import org.eclipse.hawkbit.repository.exception.EntityNotFoundException;
 import org.eclipse.hawkbit.repository.exception.RSQLParameterSyntaxException;
+import org.eclipse.hawkbit.repository.helper.TenantConfigHelper;
 import org.eclipse.hawkbit.repository.model.DistributionSet;
 import org.eclipse.hawkbit.repository.model.Rollout;
 import org.eclipse.hawkbit.repository.model.RolloutGroup;
 import org.eclipse.hawkbit.repository.model.RolloutGroupConditionBuilder;
 import org.eclipse.hawkbit.repository.model.RolloutGroupConditions;
 import org.eclipse.hawkbit.repository.model.Target;
-import org.eclipse.hawkbit.security.SystemSecurityContext;
-import org.eclipse.hawkbit.utils.TenantConfigHelper;
+import org.eclipse.hawkbit.repository.model.TargetFilterQuery;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -64,23 +62,17 @@ public class MgmtRolloutResource implements MgmtRolloutRestApi {
 
     private final RolloutManagement rolloutManagement;
     private final RolloutGroupManagement rolloutGroupManagement;
-    private final DistributionSetManagement distributionSetManagement;
-    private final TargetFilterQueryManagement targetFilterQueryManagement;
-    private final EntityFactory entityFactory;
-    private final TenantConfigHelper tenantConfigHelper;
+    private final DistributionSetManagement<? extends DistributionSet> distributionSetManagement;
+    private final TargetFilterQueryManagement<? extends TargetFilterQuery> targetFilterQueryManagement;
 
     MgmtRolloutResource(
             final RolloutManagement rolloutManagement, final RolloutGroupManagement rolloutGroupManagement,
-            final DistributionSetManagement distributionSetManagement,
-            final TargetFilterQueryManagement targetFilterQueryManagement, final EntityFactory entityFactory,
-            final SystemSecurityContext systemSecurityContext,
-            final TenantConfigurationManagement tenantConfigurationManagement) {
+            final DistributionSetManagement<? extends DistributionSet> distributionSetManagement,
+            final TargetFilterQueryManagement<? extends TargetFilterQuery> targetFilterQueryManagement) {
         this.rolloutManagement = rolloutManagement;
         this.rolloutGroupManagement = rolloutGroupManagement;
         this.distributionSetManagement = distributionSetManagement;
         this.targetFilterQueryManagement = targetFilterQueryManagement;
-        this.entityFactory = entityFactory;
-        this.tenantConfigHelper = TenantConfigHelper.usingContext(systemSecurityContext, tenantConfigurationManagement);
     }
 
     @Override
@@ -98,7 +90,7 @@ public class MgmtRolloutResource implements MgmtRolloutRestApi {
                     : rolloutManagement.findByRsqlWithDetailedStatus(rsqlParam, false, pageable);
             rest = MgmtRolloutMapper.toResponseRolloutWithDetails(rollouts.getContent());
         } else {
-             rollouts = rsqlParam == null
+            rollouts = rsqlParam == null
                     ? rolloutManagement.findAll(false, pageable)
                     : rolloutManagement.findByRsql(rsqlParam, false, pageable);
             rest = MgmtRolloutMapper.toResponseRollout(rollouts.getContent());
@@ -108,10 +100,7 @@ public class MgmtRolloutResource implements MgmtRolloutRestApi {
 
     @Override
     public ResponseEntity<MgmtRolloutResponseBody> getRollout(final Long rolloutId) {
-        final Rollout findRolloutById = rolloutManagement.getWithDetailedStatus(rolloutId)
-                .orElseThrow(() -> new EntityNotFoundException(Rollout.class, rolloutId));
-
-        return ResponseEntity.ok(MgmtRolloutMapper.toResponseRollout(findRolloutById, true));
+        return ResponseEntity.ok(MgmtRolloutMapper.toResponseRollout(rolloutManagement.getWithDetailedStatus(rolloutId), true));
     }
 
     @Override
@@ -123,11 +112,10 @@ public class MgmtRolloutResource implements MgmtRolloutRestApi {
             throw new RSQLParameterSyntaxException("Cannot create a Rollout with an empty target query filter!");
         }
         targetFilterQueryManagement.verifyTargetFilterQuerySyntax(targetFilterQuery);
-        final DistributionSet distributionSet = distributionSetManagement
-                .getValidAndComplete(rolloutRequestBody.getDistributionSetId());
+        final DistributionSet distributionSet = distributionSetManagement.getValidAndComplete(rolloutRequestBody.getDistributionSetId());
         final RolloutGroupConditions rolloutGroupConditions = MgmtRolloutMapper.fromRequest(rolloutRequestBody, true);
-        final RolloutCreate create = MgmtRolloutMapper.fromRequest(entityFactory, rolloutRequestBody, distributionSet);
-        final boolean confirmationFlowActive = tenantConfigHelper.isConfirmationFlowEnabled();
+        final Create create = MgmtRolloutMapper.fromRequest(rolloutRequestBody, distributionSet);
+        final boolean confirmationFlowActive = TenantConfigHelper.isUserConfirmationFlowEnabled();
 
         final Rollout rollout;
         if (rolloutRequestBody.getGroups() != null) {
@@ -135,24 +123,21 @@ public class MgmtRolloutResource implements MgmtRolloutRestApi {
                 throw new ValidationException("Dynamic rollouts are not supported with groups");
             }
             if (rolloutRequestBody.getAmountGroups() != null) {
-                throw new ValidationException("Either 'amountGroups' or 'groups' must be defined in the request");
+                throw new ValidationException("If 'group' is set the 'amountGroups' must not be set in the request");
             }
-            final List<RolloutGroupCreate> rolloutGroups = rolloutRequestBody.getGroups().stream()
-                    .map(mgmtRolloutGroup -> {
-                        final boolean confirmationRequired = isConfirmationRequiredForGroup(mgmtRolloutGroup,
-                                rolloutRequestBody).orElse(confirmationFlowActive);
-                        return MgmtRolloutMapper.fromRequest(entityFactory, mgmtRolloutGroup)
-                                .confirmationRequired(confirmationRequired);
-                    }).toList();
+            final List<GroupCreate> rolloutGroups = rolloutRequestBody.getGroups().stream()
+                    .map(mgmtRolloutGroup -> MgmtRolloutMapper.fromRequest(
+                            mgmtRolloutGroup,
+                            isConfirmationRequiredForGroup(mgmtRolloutGroup, rolloutRequestBody).orElse(confirmationFlowActive)))
+                    .toList();
             rollout = rolloutManagement.create(create, rolloutGroups, rolloutGroupConditions);
-        } else if (rolloutRequestBody.getAmountGroups() != null) {
+        } else {
+            final int amountGroup = Optional.ofNullable(rolloutRequestBody.getAmountGroups()).orElse(1);
             final boolean confirmationRequired = rolloutRequestBody.getConfirmationRequired() == null
                     ? confirmationFlowActive
                     : rolloutRequestBody.getConfirmationRequired();
-            rollout = rolloutManagement.create(create, rolloutRequestBody.getAmountGroups(), confirmationRequired,
+            rollout = rolloutManagement.create(create, amountGroup, confirmationRequired,
                     rolloutGroupConditions, MgmtRolloutMapper.fromRequest(rolloutRequestBody.getDynamicGroupTemplate()));
-        } else {
-            throw new ValidationException("Either 'amountGroups' or 'groups' must be defined in the request");
         }
 
         return ResponseEntity.status(HttpStatus.CREATED).body(MgmtRolloutMapper.toResponseRollout(rollout, true));
@@ -160,48 +145,55 @@ public class MgmtRolloutResource implements MgmtRolloutRestApi {
 
     @Override
     public ResponseEntity<MgmtRolloutResponseBody> update(final Long rolloutId, final MgmtRolloutRestRequestBodyPut rolloutUpdateBody) {
-        final Rollout updated = rolloutManagement.update(MgmtRolloutMapper.fromRequest(entityFactory, rolloutUpdateBody, rolloutId));
+        final Rollout updated = rolloutManagement.update(MgmtRolloutMapper.fromRequest(rolloutUpdateBody, rolloutId));
         return ResponseEntity.ok(MgmtRolloutMapper.toResponseRollout(updated, true));
     }
 
     @Override
     public ResponseEntity<Void> approve(final Long rolloutId, final String remark) {
         rolloutManagement.approveOrDeny(rolloutId, Rollout.ApprovalDecision.APPROVED, remark);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
     @Override
     public ResponseEntity<Void> deny(final Long rolloutId, final String remark) {
         rolloutManagement.approveOrDeny(rolloutId, Rollout.ApprovalDecision.DENIED, remark);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
     @Override
     @AuditLog(entity = "Rollout", type = AuditLog.Type.UPDATE, description = "Start Rollout")
     public ResponseEntity<Void> start(final Long rolloutId) {
         this.rolloutManagement.start(rolloutId);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
     @Override
     @AuditLog(entity = "Rollout", type = AuditLog.Type.UPDATE, description = "Pause Rollout")
     public ResponseEntity<Void> pause(final Long rolloutId) {
         this.rolloutManagement.pauseRollout(rolloutId);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    @AuditLog(entity = "Rollout", type = AuditLog.Type.UPDATE, description = "Stop Rollout")
+    public ResponseEntity<Void> stop(Long rolloutId) {
+        this.rolloutManagement.stop(rolloutId);
+        return ResponseEntity.noContent().build();
     }
 
     @Override
     @AuditLog(entity = "Rollout", type = AuditLog.Type.DELETE, description = "Delete Rollout")
     public ResponseEntity<Void> delete(final Long rolloutId) {
         this.rolloutManagement.delete(rolloutId);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
     @Override
     @AuditLog(entity = "Rollout", type = AuditLog.Type.UPDATE, description = "Resume Rollout")
     public ResponseEntity<Void> resume(final Long rolloutId) {
         this.rolloutManagement.resumeRollout(rolloutId);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
     @Override
@@ -228,7 +220,7 @@ public class MgmtRolloutResource implements MgmtRolloutRestApi {
         }
 
         final List<MgmtRolloutGroupResponseBody> rest = MgmtRolloutMapper.toResponseRolloutGroup(
-                rolloutGroups.getContent(), tenantConfigHelper.isConfirmationFlowEnabled(), isFullMode);
+                rolloutGroups.getContent(), TenantConfigHelper.isUserConfirmationFlowEnabled(), isFullMode);
         return ResponseEntity.ok(new PagedList<>(rest, rolloutGroups.getTotalElements()));
     }
 
@@ -236,14 +228,13 @@ public class MgmtRolloutResource implements MgmtRolloutRestApi {
     public ResponseEntity<MgmtRolloutGroupResponseBody> getRolloutGroup(final Long rolloutId, final Long groupId) {
         findRolloutOrThrowException(rolloutId);
 
-        final RolloutGroup rolloutGroup = rolloutGroupManagement.getWithDetailedStatus(groupId)
-                .orElseThrow(() -> new EntityNotFoundException(RolloutGroup.class, rolloutId));
+        final RolloutGroup rolloutGroup = rolloutGroupManagement.getWithDetailedStatus(groupId);
         if (!Objects.equals(rolloutId, rolloutGroup.getRollout().getId())) {
             throw new EntityNotFoundException(RolloutGroup.class, groupId);
         }
 
         return ResponseEntity.ok(MgmtRolloutMapper.toResponseRolloutGroup(
-                rolloutGroup, true, tenantConfigHelper.isConfirmationFlowEnabled()));
+                rolloutGroup, true, TenantConfigHelper.isUserConfirmationFlowEnabled()));
     }
 
     @Override
@@ -258,7 +249,7 @@ public class MgmtRolloutResource implements MgmtRolloutRestApi {
         } else {
             rolloutGroupTargets = this.rolloutGroupManagement.findTargetsOfRolloutGroupByRsql(groupId, rsqlParam, pageable);
         }
-        final List<MgmtTarget> rest = MgmtTargetMapper.toResponse(rolloutGroupTargets.getContent(), tenantConfigHelper);
+        final List<MgmtTarget> rest = MgmtTargetMapper.toResponse(rolloutGroupTargets.getContent());
         return ResponseEntity.ok(new PagedList<>(rest, rolloutGroupTargets.getTotalElements()));
     }
 
@@ -266,13 +257,12 @@ public class MgmtRolloutResource implements MgmtRolloutRestApi {
     @AuditLog(entity = "Rollout", type = AuditLog.Type.UPDATE, description = "Trigger Next Rollout Group")
     public ResponseEntity<Void> triggerNextGroup(final Long rolloutId) {
         rolloutManagement.triggerNextGroup(rolloutId);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
     @Override
     public ResponseEntity<MgmtRolloutResponseBody> retryRollout(final Long rolloutId) {
-        final Rollout rolloutForRetry = rolloutManagement.get(rolloutId)
-                .orElseThrow(() -> new EntityNotFoundException(Rollout.class, rolloutId));
+        final Rollout rolloutForRetry = rolloutManagement.get(rolloutId);
         if (rolloutForRetry.isDeleted()) {
             throw new EntityNotFoundException(Rollout.class, rolloutId);
         }
@@ -281,7 +271,7 @@ public class MgmtRolloutResource implements MgmtRolloutRestApi {
             throw new ValidationException("Rollout must be finished in order to be retried!");
         }
 
-        final RolloutCreate create = MgmtRolloutMapper.fromRetriedRollout(entityFactory, rolloutForRetry);
+        final Create create = MgmtRolloutMapper.fromRetriedRollout(rolloutForRetry);
         final RolloutGroupConditions groupConditions = new RolloutGroupConditionBuilder().withDefaults().build();
 
         final Rollout retriedRollout = rolloutManagement.create(create, 1, false, groupConditions, null);

@@ -9,24 +9,28 @@
  */
 package org.eclipse.hawkbit.repository.jpa.management;
 
+import static org.eclipse.hawkbit.repository.jpa.executor.AfterTransactionCommitExecutor.afterCommit;
+
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 
 import jakarta.persistence.criteria.JoinType;
 
 import lombok.extern.slf4j.Slf4j;
+import org.eclipse.hawkbit.context.AccessContext;
 import org.eclipse.hawkbit.repository.QuotaManagement;
 import org.eclipse.hawkbit.repository.RepositoryConstants;
 import org.eclipse.hawkbit.repository.RepositoryProperties;
 import org.eclipse.hawkbit.repository.event.EventPublisherHolder;
 import org.eclipse.hawkbit.repository.event.remote.CancelTargetAssignmentEvent;
 import org.eclipse.hawkbit.repository.event.remote.entity.TargetUpdatedEvent;
+import org.eclipse.hawkbit.repository.exception.AssignmentQuotaExceededException;
 import org.eclipse.hawkbit.repository.jpa.configuration.Constants;
-import org.eclipse.hawkbit.repository.jpa.executor.AfterTransactionCommitExecutor;
+import org.eclipse.hawkbit.repository.jpa.management.JpaDeploymentManagement.MaxAssignmentsExceededInfo;
 import org.eclipse.hawkbit.repository.jpa.model.AbstractJpaBaseEntity_;
 import org.eclipse.hawkbit.repository.jpa.model.JpaAction;
 import org.eclipse.hawkbit.repository.jpa.model.JpaActionStatus;
@@ -57,41 +61,39 @@ import org.springframework.util.StringUtils;
 public abstract class AbstractDsAssignmentStrategy {
 
     protected final TargetRepository targetRepository;
-    protected final AfterTransactionCommitExecutor afterCommit;
     protected final ActionRepository actionRepository;
 
     private final ActionStatusRepository actionStatusRepository;
     private final QuotaManagement quotaManagement;
-    private final BooleanSupplier multiAssignmentsConfig;
     private final BooleanSupplier confirmationFlowConfig;
     private final RepositoryProperties repositoryProperties;
+    private final Consumer<MaxAssignmentsExceededInfo> maxAssignmentExceededHandler;
 
     @SuppressWarnings("java:S107")
     AbstractDsAssignmentStrategy(
             final TargetRepository targetRepository,
-            final AfterTransactionCommitExecutor afterCommit,
             final ActionRepository actionRepository, final ActionStatusRepository actionStatusRepository,
-            final QuotaManagement quotaManagement, final BooleanSupplier multiAssignmentsConfig,
-            final BooleanSupplier confirmationFlowConfig, final RepositoryProperties repositoryProperties) {
+            final QuotaManagement quotaManagement, final BooleanSupplier confirmationFlowConfig,
+            final RepositoryProperties repositoryProperties,
+            final Consumer<MaxAssignmentsExceededInfo> maxAssignmentExceededHandler) {
         this.targetRepository = targetRepository;
-        this.afterCommit = afterCommit;
         this.actionRepository = actionRepository;
         this.actionStatusRepository = actionStatusRepository;
         this.quotaManagement = quotaManagement;
-        this.multiAssignmentsConfig = multiAssignmentsConfig;
         this.confirmationFlowConfig = confirmationFlowConfig;
         this.repositoryProperties = repositoryProperties;
+        this.maxAssignmentExceededHandler = maxAssignmentExceededHandler;
     }
 
     public JpaAction createTargetAction(
-            final String initiatedBy, final TargetWithActionType targetWithActionType,
+            final TargetWithActionType targetWithActionType,
             final List<JpaTarget> targets, final JpaDistributionSet set) {
         final Optional<JpaTarget> optTarget = targets.stream()
                 .filter(t -> t.getControllerId().equals(targetWithActionType.getControllerId())).findFirst();
 
         // create the action
         return optTarget.map(target -> {
-            assertActionsPerTargetQuota(target, 1);
+            assertActionsPerTargetQuota(target);
             final JpaAction actionForTarget = new JpaAction();
             actionForTarget.setActionType(targetWithActionType.getActionType());
             actionForTarget.setForcedTime(targetWithActionType.getForceTime());
@@ -105,7 +107,7 @@ public abstract class AbstractDsAssignmentStrategy {
             actionForTarget.setMaintenanceWindowSchedule(targetWithActionType.getMaintenanceSchedule());
             actionForTarget.setMaintenanceWindowDuration(targetWithActionType.getMaintenanceWindowDuration());
             actionForTarget.setMaintenanceWindowTimeZone(targetWithActionType.getMaintenanceWindowTimeZone());
-            actionForTarget.setInitiatedBy(initiatedBy);
+            actionForTarget.setInitiatedBy(AccessContext.actor());
             return actionForTarget;
         }).orElseGet(() -> {
             log.warn("Cannot find target for targetWithActionType '{}'.", targetWithActionType.getControllerId());
@@ -116,7 +118,7 @@ public abstract class AbstractDsAssignmentStrategy {
     public JpaActionStatus createActionStatus(final JpaAction action, final String actionMessage) {
         final JpaActionStatus actionStatus = new JpaActionStatus();
         actionStatus.setAction(action);
-        actionStatus.setOccurredAt(action.getCreatedAt());
+        actionStatus.setTimestamp(action.getCreatedAt());
 
         if (StringUtils.hasText(actionMessage)) {
             actionStatus.addMessage(actionMessage);
@@ -128,7 +130,7 @@ public abstract class AbstractDsAssignmentStrategy {
     }
 
     protected void sendTargetUpdatedEvent(final JpaTarget target) {
-        afterCommit.afterCommit(() -> EventPublisherHolder.getInstance().getEventPublisher().publishEvent(new TargetUpdatedEvent(target)));
+        afterCommit(() -> EventPublisherHolder.getInstance().getEventPublisher().publishEvent(new TargetUpdatedEvent(target)));
     }
 
     /**
@@ -139,7 +141,7 @@ public abstract class AbstractDsAssignmentStrategy {
      *
      * @param targetsIds to override {@link Action}s
      */
-    protected List<Long> overrideObsoleteUpdateActions(final Collection<Long> targetsIds) {
+    protected void overrideObsoleteUpdateActions(final Collection<Long> targetsIds) {
         // Figure out if there are potential target/action combinations that
         // need to be considered for cancellation
         final List<JpaAction> activeActions = actionRepository.findAll((root, query, cb) -> {
@@ -152,22 +154,18 @@ public abstract class AbstractDsAssignmentStrategy {
             );
         });
 
-        final List<Long> targetIds = activeActions.stream().map(action -> {
+        activeActions.forEach(action -> {
             action.setStatus(Status.CANCELING);
 
             // document that the status has been retrieved
             actionStatusRepository.save(new JpaActionStatus(action, Status.CANCELING, System.currentTimeMillis(),
                     RepositoryConstants.SERVER_MESSAGE_PREFIX + "cancel obsolete action due to new update"));
             actionRepository.save(action);
-
-            return action.getTarget().getId();
-        }).toList();
+        });
 
         if (!activeActions.isEmpty()) {
             cancelAssignDistributionSetEvent(Collections.unmodifiableList(activeActions));
         }
-
-        return targetIds;
     }
 
     /**
@@ -178,7 +176,7 @@ public abstract class AbstractDsAssignmentStrategy {
      *
      * @param targetsIds to override {@link Action}s
      */
-    protected List<Long> closeObsoleteUpdateActions(final Collection<Long> targetsIds) {
+    protected void closeObsoleteUpdateActions(final Collection<Long> targetsIds) {
         // Figure out if there are potential target/action combinations that
         // need to be considered for cancellation
         final List<JpaAction> activeActions = actionRepository.findAll((root, query, cb) -> {
@@ -190,7 +188,7 @@ public abstract class AbstractDsAssignmentStrategy {
             );
         });
 
-        return activeActions.stream().map(action -> {
+        activeActions.forEach(action -> {
             action.setStatus(Status.CANCELED);
             action.setActive(false);
 
@@ -198,10 +196,7 @@ public abstract class AbstractDsAssignmentStrategy {
             actionStatusRepository.save(new JpaActionStatus(action, Status.CANCELED, System.currentTimeMillis(),
                     RepositoryConstants.SERVER_MESSAGE_PREFIX + "close obsolete action due to new update"));
             actionRepository.save(action);
-
-            return action.getTarget().getId();
-        }).toList();
-
+        });
     }
 
     /**
@@ -211,12 +206,7 @@ public abstract class AbstractDsAssignmentStrategy {
      * @param action the action of the assignment
      */
     protected void cancelAssignDistributionSetEvent(final Action action) {
-        afterCommit.afterCommit(() -> EventPublisherHolder.getInstance().getEventPublisher()
-                .publishEvent(new CancelTargetAssignmentEvent(action)));
-    }
-
-    protected boolean isMultiAssignmentsEnabled() {
-        return multiAssignmentsConfig.getAsBoolean();
+        afterCommit(() -> EventPublisherHolder.getInstance().getEventPublisher().publishEvent(new CancelTargetAssignmentEvent(action)));
     }
 
     protected boolean isConfirmationFlowEnabled() {
@@ -232,10 +222,6 @@ public abstract class AbstractDsAssignmentStrategy {
      */
     abstract List<JpaTarget> findTargetsForAssignment(final List<String> controllerIDs, final long distributionSetId);
 
-    /**
-     * @param set
-     * @param targets
-     */
     abstract void sendTargetUpdatedEvents(final DistributionSet set, final List<JpaTarget> targets);
 
     /**
@@ -243,10 +229,8 @@ public abstract class AbstractDsAssignmentStrategy {
      *
      * @param distributionSet to set
      * @param targetIds to change
-     * @param currentUser for auditing
      */
-    abstract void setAssignedDistributionSetAndTargetStatus(final JpaDistributionSet distributionSet,
-            final List<List<Long>> targetIds, final String currentUser);
+    abstract void setAssignedDistributionSetAndTargetStatus(final JpaDistributionSet distributionSet, final List<List<Long>> targetIds);
 
     /**
      * Cancels actions that can be canceled (i.e.
@@ -255,9 +239,8 @@ public abstract class AbstractDsAssignmentStrategy {
      * such actions existed.
      *
      * @param targetIds to cancel actions for
-     * @return {@link Set} of {@link Target#getId()}s
      */
-    abstract Set<Long> cancelActiveActions(List<List<Long>> targetIds);
+    abstract void cancelActiveActions(List<List<Long>> targetIds);
 
     /**
      * Cancels actions that can be canceled (i.e.
@@ -269,16 +252,13 @@ public abstract class AbstractDsAssignmentStrategy {
      */
     abstract void closeActiveActions(List<List<Long>> targetIds);
 
-    abstract void sendDeploymentEvents(final DistributionSetAssignmentResult assignmentResult);
-
     abstract void sendDeploymentEvents(final List<DistributionSetAssignmentResult> assignmentResults);
 
     private static String getActionMessage(final Action action) {
         final RolloutGroup rolloutGroup = action.getRolloutGroup();
         if (rolloutGroup != null) {
             final Rollout rollout = rolloutGroup.getRollout();
-            return String.format("Initiated by Rollout Group '%s' [Rollout %s:%s]", rolloutGroup.getName(),
-                    rollout.getName(), rollout.getId());
+            return String.format("Initiated by Rollout Group '%s' [Rollout %s:%s]", rolloutGroup.getName(), rollout.getName(), rollout.getId());
         }
         return String.format("Assignment initiated by user '%s'", action.getInitiatedBy());
     }
@@ -288,12 +268,16 @@ public abstract class AbstractDsAssignmentStrategy {
             return;
         }
         final String tenant = actions.get(0).getTenant();
-        afterCommit.afterCommit(() -> EventPublisherHolder.getInstance().getEventPublisher()
-                .publishEvent(new CancelTargetAssignmentEvent(tenant, actions)));
+        afterCommit(() -> EventPublisherHolder.getInstance().getEventPublisher().publishEvent(
+                new CancelTargetAssignmentEvent(tenant, actions)));
     }
 
-    private void assertActionsPerTargetQuota(final Target target, final int requested) {
+    private void assertActionsPerTargetQuota(final Target target) {
         final int quota = quotaManagement.getMaxActionsPerTarget();
-        QuotaHelper.assertAssignmentQuota(target.getId(), requested, quota, Action.class, Target.class, actionRepository::countByTargetId);
+        try {
+            QuotaHelper.assertAssignmentQuota(target.getId(), 1, quota, Action.class, Target.class, actionRepository::countByTargetId);
+        } catch (AssignmentQuotaExceededException e) {
+            maxAssignmentExceededHandler.accept(new MaxAssignmentsExceededInfo(target.getId(), 1, e));
+        }
     }
 }

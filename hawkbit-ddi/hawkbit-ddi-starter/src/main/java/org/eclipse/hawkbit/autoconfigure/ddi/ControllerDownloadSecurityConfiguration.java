@@ -12,21 +12,17 @@ package org.eclipse.hawkbit.autoconfigure.ddi;
 import java.util.List;
 
 import lombok.extern.slf4j.Slf4j;
-import org.eclipse.hawkbit.ddi.rest.api.DdiRestConstants;
+import org.eclipse.hawkbit.context.Mdc;
+import org.eclipse.hawkbit.ddi.rest.api.DdiRootControllerRestApi;
 import org.eclipse.hawkbit.repository.ControllerManagement;
-import org.eclipse.hawkbit.repository.TenantConfigurationManagement;
 import org.eclipse.hawkbit.rest.SecurityManagedConfiguration;
 import org.eclipse.hawkbit.rest.security.DosFilter;
-import org.eclipse.hawkbit.security.DdiSecurityProperties;
 import org.eclipse.hawkbit.security.HawkbitSecurityProperties;
-import org.eclipse.hawkbit.security.MdcHandler;
-import org.eclipse.hawkbit.security.SystemSecurityContext;
 import org.eclipse.hawkbit.security.controller.AuthenticationFilters;
+import org.eclipse.hawkbit.security.controller.DdiSecurityProperties;
 import org.eclipse.hawkbit.security.controller.GatewayTokenAuthenticator;
 import org.eclipse.hawkbit.security.controller.SecurityHeaderAuthenticator;
 import org.eclipse.hawkbit.security.controller.SecurityTokenAuthenticator;
-import org.eclipse.hawkbit.tenancy.TenantAware;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -48,26 +44,18 @@ import org.springframework.security.web.access.intercept.AuthorizationFilter;
 class ControllerDownloadSecurityConfiguration {
 
     private static final String DDI_DL_ANT_MATCHER =
-            DdiRestConstants.BASE_V1_REQUEST_MAPPING + "/{controllerId}/softwaremodules/{softwareModuleId}/artifacts/*";
+            DdiRootControllerRestApi.CONTROLLER_V1 + "/{controllerId}/softwaremodules/{softwareModuleId}/artifacts/*";
 
     private final ControllerManagement controllerManagement;
-    private final TenantConfigurationManagement tenantConfigurationManagement;
-    private final TenantAware tenantAware;
     private final DdiSecurityProperties ddiSecurityConfiguration;
     private final HawkbitSecurityProperties securityProperties;
-    private final SystemSecurityContext systemSecurityContext;
 
-    @Autowired
-    ControllerDownloadSecurityConfiguration(final ControllerManagement controllerManagement,
-            final TenantConfigurationManagement tenantConfigurationManagement, final TenantAware tenantAware,
-            final DdiSecurityProperties ddiSecurityConfiguration,
-            final HawkbitSecurityProperties securityProperties, final SystemSecurityContext systemSecurityContext) {
+    ControllerDownloadSecurityConfiguration(
+            final ControllerManagement controllerManagement,
+            final DdiSecurityProperties ddiSecurityConfiguration, final HawkbitSecurityProperties securityProperties) {
         this.controllerManagement = controllerManagement;
-        this.tenantConfigurationManagement = tenantConfigurationManagement;
-        this.tenantAware = tenantAware;
         this.ddiSecurityConfiguration = ddiSecurityConfiguration;
         this.securityProperties = securityProperties;
-        this.systemSecurityContext = systemSecurityContext;
     }
 
     /**
@@ -95,18 +83,13 @@ class ControllerDownloadSecurityConfiguration {
                 .anonymous(AbstractHttpConfigurer::disable)
                 .csrf(AbstractHttpConfigurer::disable)
                 .addFilterBefore(new AuthenticationFilters.SecurityHeaderAuthenticationFilter(
-                        new SecurityHeaderAuthenticator(
-                                tenantConfigurationManagement, tenantAware, systemSecurityContext,
-                                ddiSecurityConfiguration.getRp().getCnHeader(), ddiSecurityConfiguration.getRp().getSslIssuerHashHeader()),
+                        new SecurityHeaderAuthenticator(ddiSecurityConfiguration.getRp()),
                         ddiSecurityConfiguration), AuthorizationFilter.class)
                 .addFilterBefore(new AuthenticationFilters.SecurityTokenAuthenticationFilter(
-                        new SecurityTokenAuthenticator(
-                                tenantConfigurationManagement, tenantAware, systemSecurityContext,
-                                controllerManagement),
+                        new SecurityTokenAuthenticator(controllerManagement),
                         ddiSecurityConfiguration), AuthorizationFilter.class)
                 .addFilterBefore(new AuthenticationFilters.GatewayTokenAuthenticationFilter(
-                        new GatewayTokenAuthenticator(
-                                tenantConfigurationManagement, tenantAware, systemSecurityContext),
+                        new GatewayTokenAuthenticator(),
                         ddiSecurityConfiguration), AuthorizationFilter.class)
                 .exceptionHandling(configurer -> configurer.authenticationEntryPoint(
                         (request, response, authException) -> response.setStatus(HttpStatus.UNAUTHORIZED.value())))
@@ -116,7 +99,7 @@ class ControllerDownloadSecurityConfiguration {
             http.redirectToHttps(Customizer.withDefaults());
         }
 
-        MdcHandler.Filter.addMdcFilter(http);
+        Mdc.Filter.addMdcFilter(http);
 
         return http.build();
     }

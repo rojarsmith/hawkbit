@@ -10,11 +10,14 @@
 package org.eclipse.hawkbit.mgmt.rest.resource;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.eclipse.hawkbit.mgmt.rest.api.MgmtDistributionSetRestApi.DISTRIBUTIONSETS_V1;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -28,7 +31,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,14 +39,23 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import com.jayway.jsonpath.JsonPath;
+import org.eclipse.hawkbit.auth.SpRole;
 import org.eclipse.hawkbit.exception.SpServerError;
+import org.eclipse.hawkbit.mgmt.json.model.MgmtId;
 import org.eclipse.hawkbit.mgmt.json.model.distributionset.MgmtActionType;
+import org.eclipse.hawkbit.mgmt.json.model.distributionset.MgmtDistributionSetRequestBodyPost;
+import org.eclipse.hawkbit.mgmt.json.model.distributionset.MgmtDistributionSetRequestBodyPut;
+import org.eclipse.hawkbit.mgmt.json.model.softwaremodule.MgmtSoftwareModuleAssignment;
 import org.eclipse.hawkbit.mgmt.rest.api.MgmtRestConstants;
 import org.eclipse.hawkbit.mgmt.rest.resource.util.ResourceUtility;
+import org.eclipse.hawkbit.repository.DistributionSetManagement;
+import org.eclipse.hawkbit.repository.DistributionSetManagement.Update;
+import org.eclipse.hawkbit.repository.Identifiable;
+import org.eclipse.hawkbit.repository.TargetFilterQueryManagement.Create;
+import org.eclipse.hawkbit.repository.TargetManagement;
 import org.eclipse.hawkbit.repository.exception.AssignmentQuotaExceededException;
 import org.eclipse.hawkbit.repository.exception.EntityNotFoundException;
 import org.eclipse.hawkbit.repository.jpa.repository.ActionRepository;
-import org.eclipse.hawkbit.repository.jpa.specifications.ActionSpecifications;
 import org.eclipse.hawkbit.repository.model.Action;
 import org.eclipse.hawkbit.repository.model.Action.Status;
 import org.eclipse.hawkbit.repository.model.DistributionSet;
@@ -59,7 +70,6 @@ import org.eclipse.hawkbit.repository.model.TargetUpdateStatus;
 import org.eclipse.hawkbit.repository.test.util.TestdataFactory;
 import org.eclipse.hawkbit.repository.test.util.WithUser;
 import org.eclipse.hawkbit.rest.json.model.ExceptionInfo;
-import org.eclipse.hawkbit.rest.util.JsonBuilder;
 import org.eclipse.hawkbit.rest.util.MockMvcResultPrinter;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -91,7 +101,7 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
     void getSoftwareModules() throws Exception {
         // Create DistributionSet with three software modules
         final DistributionSet set = testdataFactory.createDistributionSet("SMTest");
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + set.getId() + "/assignedSM"))
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/" + set.getId() + "/assignedSM"))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.size", equalTo(set.getModules().size())));
@@ -105,19 +115,19 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         final DistributionSet set = testdataFactory.createUpdatedDistributionSet();
 
         // post assignment
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + set.getId() + "/assignedSM")
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/" + set.getId() + "/assignedSM")
                         .param("offset", "1").param("limit", "2").param("sort", "version:DESC").param("q", "name==one*")
-                        .accept(MediaType.APPLICATION_JSON))
+                        .accept(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON));
+                .andExpect(content().contentType(APPLICATION_JSON));
     }
 
     /**
      * This test verifies the deletion of a assigned Software Module of a Distribution Set can not be achieved when that Distribution Set has been assigned or installed to a target.
      */
     @Test
-    void deleteFailureWhenDistributionSetInUse() throws Exception {
+    void failToDeleteWhenDistributionSetInUse() throws Exception {
         // create DisSet
         final DistributionSet disSet = testdataFactory.createDistributionSetWithNoSoftwareModules("Eris", "560a");
         final List<Long> smIDs = new ArrayList<>();
@@ -128,10 +138,10 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
             smList.put(new JSONObject().put("id", smID));
         }
         // post assignment
-        mvc.perform(post(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + disSet.getId() + "/assignedSM")
-                        .contentType(MediaType.APPLICATION_JSON).content(smList.toString()))
+        mvc.perform(post(DISTRIBUTIONSETS_V1 + "/" + disSet.getId() + "/assignedSM")
+                        .contentType(APPLICATION_JSON).content(smList.toString()))
                 .andDo(MockMvcResultPrinter.print())
-                .andExpect(status().isOk());
+                .andExpect(status().isNoContent());
 
         // create targets and assign DisSet to target
         final String[] knownTargetIds = new String[] { "1", "2" };
@@ -141,29 +151,27 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
             list.put(new JSONObject().put("id", Long.valueOf(targetId)));
         }
         assignDistributionSet(disSet.getId(), knownTargetIds[0]);
-        mvc.perform(
-                        post(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + disSet.getId() + "/assignedTargets")
-                                .contentType(MediaType.APPLICATION_JSON).content(list.toString()))
+        mvc.perform(post(DISTRIBUTIONSETS_V1 + "/" + disSet.getId() + "/assignedTargets")
+                        .contentType(APPLICATION_JSON).content(list.toString()))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.assigned", equalTo(knownTargetIds.length - 1)))
                 .andExpect(jsonPath("$.alreadyAssigned", equalTo(1)))
                 .andExpect(jsonPath("$.total", equalTo(knownTargetIds.length)));
 
-        // try to delete the Software Module from DistSet that has been assigned
-        // to the target.
-        mvc.perform(delete(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + disSet.getId() + "/assignedSM/"
-                        + smIDs.get(0)).contentType(MediaType.APPLICATION_JSON))
+        // try to delete the Software Module from DistSet that has been assigned to the target - hence locked.
+        mvc.perform(delete(DISTRIBUTIONSETS_V1 + "/" + disSet.getId() + "/assignedSM/" + smIDs.get(0))
+                        .contentType(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode", equalTo(SpServerError.SP_REPO_ENTITY_READ_ONLY.getKey())));
+                .andExpect(status().isLocked())
+                .andExpect(jsonPath("$.errorCode", equalTo(SpServerError.SP_LOCKED.getKey())));
     }
 
     /**
      * This test verifies that the assignment of a Software Module to a Distribution Set can not be achieved when that Distribution Set has been assigned or installed to a target.
      */
     @Test
-    void assignmentFailureWhenAssigningToUsedDistributionSet() throws Exception {
+    void failToAssignWhenAssigningToUsedDistributionSet() throws Exception {
         // create DisSet
         final DistributionSet disSet = testdataFactory.createDistributionSetWithNoSoftwareModules("Mars", "686,980");
         final List<Long> smIDs = new ArrayList<>();
@@ -174,18 +182,18 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
             smList.put(new JSONObject().put("id", smID));
         }
         // post assignment
-        mvc.perform(post(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + disSet.getId() + "/assignedSM")
-                        .contentType(MediaType.APPLICATION_JSON).content(smList.toString()))
+        mvc.perform(post(DISTRIBUTIONSETS_V1 + "/" + disSet.getId() + "/assignedSM")
+                        .contentType(APPLICATION_JSON).content(smList.toString()))
                 .andDo(MockMvcResultPrinter.print())
-                .andExpect(status().isOk());
+                .andExpect(status().isNoContent());
 
         // create Targets
         final String[] knownTargetIds = new String[] { "1", "2" };
         final JSONArray list = createTargetAndJsonArray(null, null, null, null, null, knownTargetIds);
         // assign DisSet to target and test assignment
         assignDistributionSet(disSet.getId(), knownTargetIds[0]);
-        mvc.perform(post(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + disSet.getId() + "/assignedTargets")
-                        .contentType(MediaType.APPLICATION_JSON).content(list.toString()))
+        mvc.perform(post(DISTRIBUTIONSETS_V1 + "/" + disSet.getId() + "/assignedTargets")
+                        .contentType(APPLICATION_JSON).content(list.toString()))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.assigned", equalTo(knownTargetIds.length - 1)))
@@ -197,11 +205,12 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         final JSONArray smList2 = new JSONArray();
         smList2.put(new JSONObject().put("id", sm2.getId()));
 
-        mvc.perform(post(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + disSet.getId() + "/assignedSM")
-                        .contentType(MediaType.APPLICATION_JSON).content(smList2.toString()))
+        // fail because locked
+        mvc.perform(post(DISTRIBUTIONSETS_V1 + "/" + disSet.getId() + "/assignedSM")
+                        .contentType(APPLICATION_JSON).content(smList2.toString()))
                 .andDo(MockMvcResultPrinter.print())
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.errorCode", equalTo(SpServerError.SP_REPO_ENTITY_READ_ONLY.getKey())));
+                .andExpect(status().isLocked())
+                .andExpect(jsonPath("$.errorCode", equalTo(SpServerError.SP_LOCKED.getKey())));
     }
 
     /**
@@ -212,7 +221,7 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         // create DisSet
         final DistributionSet disSet = testdataFactory.createDistributionSetWithNoSoftwareModules("Jupiter", "398,88");
         // Test if size is 0
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + disSet.getId() + "/assignedSM"))
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/" + disSet.getId() + "/assignedSM"))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.size", equalTo(disSet.getModules().size())));
@@ -221,12 +230,12 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
                 testdataFactory.createSoftwareModuleApp().getId());
 
         // post assignment
-        mvc.perform(post(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + disSet.getId() + "/assignedSM")
-                        .contentType(MediaType.APPLICATION_JSON).content(JsonBuilder.ids(smIDs)))
+        mvc.perform(post(DISTRIBUTIONSETS_V1 + "/" + disSet.getId() + "/assignedSM")
+                        .contentType(APPLICATION_JSON).content(toJson(smIDs.stream().map(MgmtId::new).toList())))
                 .andDo(MockMvcResultPrinter.print())
-                .andExpect(status().isOk());
+                .andExpect(status().isNoContent());
         // Test if size is 3
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + disSet.getId() + "/assignedSM"))
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/" + disSet.getId() + "/assignedSM"))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.size", equalTo(smIDs.size())));
@@ -239,42 +248,40 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         }
 
         // post assignment
-        final String jsonIDs = JsonBuilder.ids(moduleIDs.subList(0, maxSoftwareModules - smIDs.size()));
-        mvc.perform(post(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + disSet.getId() + "/assignedSM")
-                        .contentType(MediaType.APPLICATION_JSON).content(jsonIDs))
+        final String jsonIDs = toJson(moduleIDs.subList(0, maxSoftwareModules - smIDs.size()).stream().map(MgmtId::new).toList());
+        mvc.perform(post(DISTRIBUTIONSETS_V1 + "/" + disSet.getId() + "/assignedSM")
+                        .contentType(APPLICATION_JSON).content(jsonIDs))
                 .andDo(MockMvcResultPrinter.print())
-                .andExpect(status().isOk());
+                .andExpect(status().isNoContent());
         // test if size corresponds with quota
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + disSet.getId()
-                        + "/assignedSM?limit={limit}", maxSoftwareModules * 2))
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/" + disSet.getId() + "/assignedSM?limit={limit}", maxSoftwareModules * 2))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.size", equalTo(maxSoftwareModules)));
 
         // post one more to cause the quota to be exceeded
-        mvc.perform(post(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + disSet.getId() + "/assignedSM")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(JsonBuilder.ids(Collections.singletonList(moduleIDs.get(moduleIDs.size() - 1)))))
+        mvc.perform(post(DISTRIBUTIONSETS_V1 + "/" + disSet.getId() + "/assignedSM")
+                        .contentType(APPLICATION_JSON)
+                        .content(toJson(Stream.of(moduleIDs.get(moduleIDs.size() - 1)).map(MgmtId::new).toList())))
                 .andDo(MockMvcResultPrinter.print())
-                .andExpect(status().isForbidden())
+                .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.exceptionClass", equalTo(AssignmentQuotaExceededException.class.getName())))
                 .andExpect(jsonPath("$.errorCode", equalTo(SpServerError.SP_QUOTA_EXCEEDED.getKey())));
 
         // verify quota is also enforced for bulk uploads
         final DistributionSet disSet2 = testdataFactory.createDistributionSetWithNoSoftwareModules("Saturn", "4.0");
-        mvc.perform(post(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + disSet2.getId() + "/assignedSM")
-                        .contentType(MediaType.APPLICATION_JSON).content(JsonBuilder.ids(moduleIDs)))
+        mvc.perform(post(DISTRIBUTIONSETS_V1 + "/" + disSet2.getId() + "/assignedSM")
+                        .contentType(APPLICATION_JSON).content(toJson(moduleIDs.stream().map(MgmtId::new).toList())))
                 .andDo(MockMvcResultPrinter.print())
-                .andExpect(status().isForbidden())
+                .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.exceptionClass", equalTo(AssignmentQuotaExceededException.class.getName())))
                 .andExpect(jsonPath("$.errorCode", equalTo(SpServerError.SP_QUOTA_EXCEEDED.getKey())));
 
         // verify size is still 0
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + disSet2.getId() + "/assignedSM"))
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/" + disSet2.getId() + "/assignedSM"))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.size", equalTo(0)));
-
     }
 
     /**
@@ -285,17 +292,16 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         // Create DistributionSet with three software modules
         final DistributionSet set = testdataFactory.createDistributionSet("Venus");
         int amountOfSM = set.getModules().size();
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + set.getId() + "/assignedSM"))
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/" + set.getId() + "/assignedSM"))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.size", equalTo(amountOfSM)));
         // test the removal of all software modules one by one
-        for (final Iterator<SoftwareModule> iter = set.getModules().iterator(); iter.hasNext(); ) {
-            final Long smId = iter.next().getId();
-            mvc.perform(delete(
-                            MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + set.getId() + "/assignedSM/" + smId))
-                    .andExpect(status().isOk());
-            mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + set.getId() + "/assignedSM"))
+        for (final SoftwareModule softwareModule : set.getModules()) {
+            final Long smId = softwareModule.getId();
+            mvc.perform(delete(DISTRIBUTIONSETS_V1 + "/" + set.getId() + "/assignedSM/" + smId))
+                    .andExpect(status().isNoContent());
+            mvc.perform(get(DISTRIBUTIONSETS_V1 + "/" + set.getId() + "/assignedSM"))
                     .andDo(MockMvcResultPrinter.print())
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.size", equalTo(--amountOfSM)));
@@ -315,9 +321,8 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         // assign already one target to DS
         assignDistributionSet(createdDs.getId(), knownTargetIds[0]);
 
-        mvc.perform(post(
-                        MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + createdDs.getId() + "/assignedTargets")
-                        .contentType(MediaType.APPLICATION_JSON).content(list.toString()))
+        mvc.perform(post(DISTRIBUTIONSETS_V1 + "/" + createdDs.getId() + "/assignedTargets")
+                        .contentType(APPLICATION_JSON).content(list.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.assigned", equalTo(knownTargetIds.length - 1)))
                 .andExpect(jsonPath("$.alreadyAssigned", equalTo(1)))
@@ -345,9 +350,8 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
             list.put(new JSONObject().put("id", targetId).put("type", "forced"));
         }
 
-        mvc.perform(post(
-                        MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + createdDs.getId() + "/assignedTargets")
-                        .contentType(MediaType.APPLICATION_JSON).content(list.toString()))
+        mvc.perform(post(DISTRIBUTIONSETS_V1 + "/" + createdDs.getId() + "/assignedTargets")
+                        .contentType(APPLICATION_JSON).content(list.toString()))
                 .andExpect(status().isOk());
         // we just need to make sure that no error 500 is returned
     }
@@ -359,10 +363,8 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
     void createDsFromAlreadyMarkedAsDeletedType() throws Exception {
         final SoftwareModule softwareModule = testdataFactory.createSoftwareModule("exampleKey");
         final DistributionSetType type = testdataFactory.findOrCreateDistributionSetType(
-                "testKey", "testType", Collections.singletonList(softwareModule.getType()),
-                Collections.singletonList(softwareModule.getType()));
-        final DistributionSet ds = testdataFactory.createDistributionSet("dsName", "dsVersion", type,
-                Collections.singletonList(softwareModule));
+                "testKey", "testType", List.of(softwareModule.getType()), List.of());
+        final DistributionSet ds = testdataFactory.createDistributionSet("dsName", "dsVersion", type, List.of(softwareModule));
         final Target target = testdataFactory.createTarget("exampleControllerId");
 
         assignDistributionSet(ds, target);
@@ -371,7 +373,7 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         distributionSetTypeManagement.delete(type.getId());
 
         // check if the ds type is marked as deleted
-        final Optional<DistributionSetType> opt = distributionSetTypeManagement.findByKey(type.getKey());
+        final Optional<? extends DistributionSetType> opt = distributionSetTypeManagement.findByKey(type.getKey());
         if (opt.isEmpty()) {
             throw new AssertionError("The Optional object of distribution set type should not be empty!");
         }
@@ -379,13 +381,13 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         Assert.isTrue(reloaded.isDeleted(), "Distribution Set Type not marked as deleted!");
 
         //request for ds creation of type which is already marked as deleted - should return bad request
-        final DistributionSet generated = testdataFactory.generateDistributionSet(
+        final DistributionSetManagement.Create generated = testdataFactory.generateDistributionSet(
                 "stanTest", "2", reloaded, Collections.singletonList(softwareModule));
         final MvcResult mvcResult = mvc
                 .perform(post("/rest/v1/distributionsets")
-                        .content(JsonBuilder.distributionSets(Collections.singletonList(generated)))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .accept(MediaType.APPLICATION_JSON))
+                        .content(toJson(toMgmtDistributionSetPost(List.of(generated))))
+                        .contentType(APPLICATION_JSON)
+                        .accept(APPLICATION_JSON))
                 .andExpect(status().isBadRequest())
                 .andReturn();
 
@@ -408,13 +410,13 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
             try {
                 payload.put(new JSONObject().put("id", trg.getId()));
             } catch (final JSONException e) {
-                e.printStackTrace();
+                throw new IllegalStateException(e);
             }
         });
 
-        mvc.perform(post(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + ds.getId() + "/assignedTargets")
-                        .contentType(MediaType.APPLICATION_JSON).content(payload.toString()))
-                .andExpect(status().isForbidden());
+        mvc.perform(post(DISTRIBUTIONSETS_V1 + "/" + ds.getId() + "/assignedTargets")
+                        .contentType(APPLICATION_JSON).content(payload.toString()))
+                .andExpect(status().isTooManyRequests());
 
         assertThat(targetManagement.findByAssignedDistributionSet(ds.getId(), PAGE).getContent()).isEmpty();
     }
@@ -424,7 +426,6 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
      */
     @Test
     void changeDistributionSetAssignmentForTargetUntilQuotaIsExceeded() throws Exception {
-
         // create one target
         final Target testTarget = testdataFactory.createTarget("trg1");
         final int maxActions = quotaManagement.getMaxActionsPerTarget();
@@ -442,9 +443,9 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         // assign our test target to another distribution set and verify that
         // the 'max actions per target' quota is exceeded
         final String json = new JSONArray().put(new JSONObject().put("id", testTarget.getControllerId())).toString();
-        mvc.perform(post(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + ds3.getId() + "/assignedTargets")
-                        .contentType(MediaType.APPLICATION_JSON).content(json))
-                .andExpect(status().isForbidden());
+        mvc.perform(post(DISTRIBUTIONSETS_V1 + "/" + ds3.getId() + "/assignedTargets")
+                        .contentType(APPLICATION_JSON).content(json))
+                .andExpect(status().isTooManyRequests());
     }
 
     /**
@@ -459,15 +460,15 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
             try {
                 list.put(new JSONObject().put("id", target.getControllerId()));
             } catch (final JSONException e) {
-                e.printStackTrace();
+                throw new IllegalStateException(e);
             }
         });
 
         // assign already one target to DS
         assignDistributionSet(createdDs.getId(), targets.get(0).getControllerId());
 
-        mvc.perform(post(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + createdDs.getId()
-                        + "/assignedTargets?offline=true").contentType(MediaType.APPLICATION_JSON).content(list.toString()))
+        mvc.perform(post(DISTRIBUTIONSETS_V1 + "/" + createdDs.getId()
+                        + "/assignedTargets?offline=true").contentType(APPLICATION_JSON).content(list.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.assigned", equalTo(targets.size() - 1)))
                 .andExpect(jsonPath("$.alreadyAssigned", equalTo(1)))
@@ -492,9 +493,8 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         // assign already one target to DS
         assignDistributionSet(createdDs.getId(), knownTargetIds[0]);
 
-        mvc.perform(post(
-                        MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + createdDs.getId() + "/assignedTargets")
-                        .contentType(MediaType.APPLICATION_JSON).content(list.toString()))
+        mvc.perform(post(DISTRIBUTIONSETS_V1 + "/" + createdDs.getId() + "/assignedTargets")
+                        .contentType(APPLICATION_JSON).content(list.toString()))
                 .andExpect(status().isBadRequest());
     }
 
@@ -511,9 +511,8 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         // assign already one target to DS
         assignDistributionSet(createdDs.getId(), knownTargetIds[0]);
 
-        mvc.perform(post(
-                        MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + createdDs.getId() + "/assignedTargets")
-                        .contentType(MediaType.APPLICATION_JSON).content(list.toString()))
+        mvc.perform(post(DISTRIBUTIONSETS_V1 + "/" + createdDs.getId() + "/assignedTargets")
+                        .contentType(APPLICATION_JSON).content(list.toString()))
                 .andExpect(status().isBadRequest());
     }
 
@@ -531,9 +530,8 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         // assign already one target to DS
         assignDistributionSet(createdDs.getId(), knownTargetIds[0]);
 
-        mvc.perform(post(
-                        MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + createdDs.getId() + "/assignedTargets")
-                        .contentType(MediaType.APPLICATION_JSON).content(list.toString()))
+        mvc.perform(post(DISTRIBUTIONSETS_V1 + "/" + createdDs.getId() + "/assignedTargets")
+                        .contentType(APPLICATION_JSON).content(list.toString()))
                 .andExpect(status().isOk());
     }
 
@@ -551,9 +549,8 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         // assign already one target to DS
         assignDistributionSet(createdDs.getId(), knownTargetIds[0]);
 
-        mvc.perform(post(
-                        MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + createdDs.getId() + "/assignedTargets")
-                        .contentType(MediaType.APPLICATION_JSON).content(list.toString()))
+        mvc.perform(post(DISTRIBUTIONSETS_V1 + "/" + createdDs.getId() + "/assignedTargets")
+                        .contentType(APPLICATION_JSON).content(list.toString()))
                 .andExpect(status().isBadRequest());
     }
 
@@ -580,9 +577,8 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         // assign already one target to DS
         assignDistributionSet(createdDs.getId(), knownTargetIds[0]);
 
-        mvc.perform(post(
-                        MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + createdDs.getId() + "/assignedTargets")
-                        .contentType(MediaType.APPLICATION_JSON).content(list.toString()))
+        mvc.perform(post(DISTRIBUTIONSETS_V1 + "/" + createdDs.getId() + "/assignedTargets")
+                        .contentType(APPLICATION_JSON).content(list.toString()))
                 .andExpect(status().isOk());
     }
 
@@ -599,9 +595,8 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
 
         assignTargetJson.put(new JSONObject().put("id", "notexistingtarget").put("type", "forced"));
 
-        mvc.perform(post(
-                        MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + createdDs.getId() + "/assignedTargets")
-                        .contentType(MediaType.APPLICATION_JSON).content(assignTargetJson.toString()))
+        mvc.perform(post(DISTRIBUTIONSETS_V1 + "/" + createdDs.getId() + "/assignedTargets")
+                        .contentType(APPLICATION_JSON).content(assignTargetJson.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.alreadyAssigned", equalTo(1)))
                 .andExpect(jsonPath("$.assigned", equalTo(2)))
@@ -619,7 +614,7 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         testdataFactory.createTarget(knownTargetId);
         assignDistributionSet(createdDs.getId(), knownTargetId);
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + createdDs.getId() + "/assignedTargets"))
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/" + createdDs.getId() + "/assignedTargets"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.size", equalTo(1)))
                 .andExpect(jsonPath("$.content[0].controllerId", equalTo(knownTargetId)));
@@ -635,12 +630,12 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         assignDistributionSet(set, testdataFactory.createTargets(5, "targetMisc", "Test targets for query"))
                 .getAssignedEntity();
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + set.getId() + "/assignedTargets")
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/" + set.getId() + "/assignedTargets")
                         .param("offset", "1").param("limit", "2").param("sort", "name:DESC")
-                        .param("q", "controllerId==target*").accept(MediaType.APPLICATION_JSON))
+                        .param("q", "controllerId==target*").accept(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON));
+                .andExpect(content().contentType(APPLICATION_JSON));
 
     }
 
@@ -650,8 +645,7 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
     @Test
     void getAssignedTargetsOfDistributionSetIsEmpty() throws Exception {
         final DistributionSet createdDs = testdataFactory.createDistributionSet();
-        mvc.perform(get(
-                        MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + createdDs.getId() + "/assignedTargets"))
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/" + createdDs.getId() + "/assignedTargets"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.size", equalTo(0)))
                 .andExpect(jsonPath("$.total", equalTo(0)));
@@ -675,8 +669,7 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         testdataFactory.sendUpdateActionStatusToTargets(Collections.singletonList(createTarget), Status.FINISHED,
                 Collections.singletonList("some message"));
 
-        mvc.perform(get(
-                        MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + createdDs.getId() + "/installedTargets"))
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/" + createdDs.getId() + "/installedTargets"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.size", equalTo(1)))
                 .andExpect(jsonPath("$.content[0].controllerId", equalTo(knownTargetId)));
@@ -694,12 +687,12 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
                 .map(Action::getTarget).toList();
         testdataFactory.sendUpdateActionStatusToTargets(targets, Status.FINISHED, "some message");
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + set.getId() + "/installedTargets")
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/" + set.getId() + "/installedTargets")
                         .param("offset", "1").param("limit", "2").param("sort", "name:DESC")
-                        .param("q", "controllerId==target*").accept(MediaType.APPLICATION_JSON))
+                        .param("q", "controllerId==target*").accept(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON));
+                .andExpect(content().contentType(APPLICATION_JSON));
     }
 
     /**
@@ -711,15 +704,14 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         final String knownFilterName = "a";
         final DistributionSet createdDs = testdataFactory.createDistributionSet();
 
-        targetFilterQueryManagement.create(entityFactory.targetFilterQuery().create().name(knownFilterName)
-                .query("name==y").autoAssignDistributionSet(createdDs.getId()));
+        targetFilterQueryManagement.create(
+                Create.builder().name(knownFilterName).query("name==y").autoAssignDistributionSet(createdDs).build());
 
         // create some dummy target filter queries
-        targetFilterQueryManagement.create(entityFactory.targetFilterQuery().create().name("b").query("name==y"));
-        targetFilterQueryManagement.create(entityFactory.targetFilterQuery().create().name("c").query("name==y"));
+        targetFilterQueryManagement.create(Create.builder().name("b").query("name==y").build());
+        targetFilterQueryManagement.create(Create.builder().name("c").query("name==y").build());
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + createdDs.getId()
-                        + "/autoAssignTargetFilters"))
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/" + createdDs.getId() + "/autoAssignTargetFilters"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.size", equalTo(1)))
                 .andExpect(jsonPath("$.content[0].name", equalTo(knownFilterName)));
@@ -731,16 +723,14 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
     @Test
     void ggetAutoAssignTargetFiltersOfDistributionSetWithParameters() throws Exception {
         final DistributionSet set = testdataFactory.createUpdatedDistributionSet();
-        targetFilterQueryManagement.create(entityFactory.targetFilterQuery().create().name("filter1").query("name==a")
-                .autoAssignDistributionSet(set));
+        targetFilterQueryManagement.create(Create.builder().name("filter1").query("name==a").autoAssignDistributionSet(set).build());
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + set.getId() + "/autoAssignTargetFilters")
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/" + set.getId() + "/autoAssignTargetFilters")
                         .param("offset", "1").param("limit", "2").param("sort", "name:DESC").param("q", "name==*1")
-                        .accept(MediaType.APPLICATION_JSON))
+                        .accept(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON));
-
+                .andExpect(content().contentType(APPLICATION_JSON));
     }
 
     /**
@@ -752,8 +742,8 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         final DistributionSet createdDs = testdataFactory.createDistributionSet();
         final String invalidQuery = "unknownField=le=42";
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + createdDs.getId()
-                        + "/autoAssignTargetFilters").param(MgmtRestConstants.REQUEST_PARAMETER_SEARCH, invalidQuery))
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/" + createdDs.getId() + "/autoAssignTargetFilters")
+                        .param(MgmtRestConstants.REQUEST_PARAMETER_SEARCH, invalidQuery))
                 .andExpect(status().isBadRequest());
     }
 
@@ -768,8 +758,8 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
 
         prepareTestFilters(filterNamePrefix, createdDs);
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + createdDs.getId()
-                        + "/autoAssignTargetFilters").param(MgmtRestConstants.REQUEST_PARAMETER_SEARCH, query))
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/" + createdDs.getId() + "/autoAssignTargetFilters")
+                        .param(MgmtRestConstants.REQUEST_PARAMETER_SEARCH, query))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.size", equalTo(2)))
                 .andExpect(jsonPath("$.content[0].name", equalTo(filterNamePrefix + "1")))
@@ -787,8 +777,8 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
 
         prepareTestFilters(filterNamePrefix, createdDs);
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + createdDs.getId()
-                        + "/autoAssignTargetFilters").param(MgmtRestConstants.REQUEST_PARAMETER_SEARCH, query))
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/" + createdDs.getId() + "/autoAssignTargetFilters")
+                        .param(MgmtRestConstants.REQUEST_PARAMETER_SEARCH, query))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.size", equalTo(0)));
     }
@@ -800,7 +790,7 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
     void getDistributionSetsWithoutAdditionalRequestParameters() throws Exception {
         final int sets = 5;
         createDistributionSetsAlphabetical(sets);
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING))
+        mvc.perform(get(DISTRIBUTIONSETS_V1))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(MgmtTargetResourceTest.JSON_PATH_PAGED_LIST_TOTAL, equalTo(sets)))
@@ -816,8 +806,7 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         final int sets = 5;
         final int limitSize = 1;
         createDistributionSetsAlphabetical(sets);
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING)
-                        .param(MgmtRestConstants.REQUEST_PARAMETER_PAGING_LIMIT, String.valueOf(limitSize)))
+        mvc.perform(get(DISTRIBUTIONSETS_V1).param(MgmtRestConstants.REQUEST_PARAMETER_PAGING_LIMIT, String.valueOf(limitSize)))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(MgmtTargetResourceTest.JSON_PATH_PAGED_LIST_TOTAL, equalTo(sets)))
@@ -834,7 +823,7 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         final int offsetParam = 2;
         final int expectedSize = sets - offsetParam;
         createDistributionSetsAlphabetical(sets);
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING)
+        mvc.perform(get(DISTRIBUTIONSETS_V1)
                         .param(MgmtRestConstants.REQUEST_PARAMETER_PAGING_OFFSET, String.valueOf(offsetParam))
                         .param(MgmtRestConstants.REQUEST_PARAMETER_PAGING_LIMIT, String.valueOf(sets)))
                 .andDo(MockMvcResultPrinter.print())
@@ -848,22 +837,21 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
      * Ensures that multiple DS requested are listed with expected payload.
      */
     @Test
-    @WithUser(principal = "uploadTester", allSpPermissions = true)
+    @WithUser(principal = "uploadTester", authorities = SpRole.TENANT_ADMIN)
     void getDistributionSets() throws Exception {
         // prepare test data
-        assertThat(distributionSetManagement.findByCompleted(true, PAGE)).isEmpty();
+        assertThat(distributionSetManagement.findAll(PAGE)).isEmpty();
 
         DistributionSet set = testdataFactory.createDistributionSet("one");
-        set = distributionSetManagement.update(entityFactory.distributionSet().update(set.getId())
-                .version("anotherVersion").requiredMigrationStep(true));
+        set = distributionSetManagement.update(Update.builder().id(set.getId()).version("anotherVersion").requiredMigrationStep(true).build());
 
         // load also lazy stuff
-        set = distributionSetManagement.getWithDetails(set.getId()).get();
+        set = distributionSetManagement.getWithDetails(set.getId());
 
-        assertThat(distributionSetManagement.findByCompleted(true, PAGE)).hasSize(1);
+        assertThat(distributionSetManagement.findAll(PAGE)).hasSize(1);
 
         // perform request
-        mvc.perform(get("/rest/v1/distributionsets").accept(MediaType.APPLICATION_JSON))
+        mvc.perform(get("/rest/v1/distributionsets").accept(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
@@ -881,9 +869,9 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
                 .andExpect(jsonPath("$.content.[0].lastModifiedAt", equalTo(set.getLastModifiedAt())))
                 .andExpect(jsonPath("$.content.[0].version", equalTo(set.getVersion())))
                 .andExpect(jsonPath("$.content.[0].modules.[?(@.type=='" + runtimeType.getKey() + "')].id",
-                        contains(set.findFirstModuleByType(runtimeType).get().getId().intValue())))
+                        contains(findFirstModuleByType(set, runtimeType).orElseThrow().getId().intValue())))
                 .andExpect(jsonPath("$.content.[0].modules.[?(@.type=='" + appType.getKey() + "')].id",
-                        contains(set.findFirstModuleByType(appType).get().getId().intValue())))
+                        contains(findFirstModuleByType(set, appType).orElseThrow().getId().intValue())))
                 .andExpect(jsonPath("$.content.[0].modules.[?(@.type=='" + osType.getKey() + "')].id",
                         contains(getOsModule(set).intValue())));
     }
@@ -892,12 +880,12 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
      * Ensures that single DS requested by ID is listed with expected payload.
      */
     @Test
-    @WithUser(principal = "uploadTester", allSpPermissions = true)
+    @WithUser(principal = "uploadTester", authorities = SpRole.TENANT_ADMIN)
     void getDistributionSet() throws Exception {
         final DistributionSet set = testdataFactory.createUpdatedDistributionSet();
 
         // perform request
-        mvc.perform(get("/rest/v1/distributionsets/{dsId}", set.getId()).accept(MediaType.APPLICATION_JSON))
+        mvc.perform(get("/rest/v1/distributionsets/{dsId}", set.getId()).accept(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
@@ -916,45 +904,38 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
                 .andExpect(jsonPath("$.lastModifiedAt", equalTo(set.getLastModifiedAt())))
                 .andExpect(jsonPath("$.version", equalTo(set.getVersion())))
                 .andExpect(jsonPath("$.modules.[?(@.type=='" + runtimeType.getKey() + "')].id",
-                        contains(set.findFirstModuleByType(runtimeType).get().getId().intValue())))
+                        contains(findFirstModuleByType(set, runtimeType).orElseThrow().getId().intValue())))
                 .andExpect(jsonPath("$.modules.[?(@.type=='" + appType.getKey() + "')].id",
-                        contains(set.findFirstModuleByType(appType).get().getId().intValue())))
+                        contains(findFirstModuleByType(set, appType).orElseThrow().getId().intValue())))
                 .andExpect(jsonPath("$.modules.[?(@.type=='" + osType.getKey() + "')].id",
                         contains(getOsModule(set).intValue())));
 
     }
 
     /**
-     * Ensures that multipe DS posted to API are created in the repository.
+     * Ensures that multiple DS posted to API are created in the repository.
      */
     @Test
-    @WithUser(principal = "uploadTester", allSpPermissions = true)
+    @WithUser(principal = "uploadTester", authorities = SpRole.TENANT_ADMIN)
     void createDistributionSets() throws Exception {
-        assertThat(distributionSetManagement.findByCompleted(true, PAGE)).isEmpty();
+        assertThat(distributionSetManagement.findAll(PAGE)).isEmpty();
         final SoftwareModule ah = testdataFactory.createSoftwareModule(TestdataFactory.SM_TYPE_APP);
         final SoftwareModule jvm = testdataFactory.createSoftwareModule(TestdataFactory.SM_TYPE_RT);
         final SoftwareModule os = testdataFactory.createSoftwareModule(TestdataFactory.SM_TYPE_OS);
 
-        DistributionSet one = testdataFactory.generateDistributionSet("one", "one", standardDsType,
-                Arrays.asList(os, jvm, ah));
-        DistributionSet two = testdataFactory.generateDistributionSet("two", "two", standardDsType,
-                Arrays.asList(os, jvm, ah));
-        DistributionSet three = testdataFactory.generateDistributionSet("three", "three", standardDsType,
-                Arrays.asList(os, jvm, ah), true);
-
         final long current = System.currentTimeMillis();
 
-        final MvcResult mvcResult = executeMgmtTargetPost(one, two, three);
+        final MvcResult mvcResult = executeMgmtTargetPost(
+                testdataFactory.generateDistributionSet("one", "one", standardDsType, List.of(os, jvm, ah)),
+                testdataFactory.generateDistributionSet("two", "two", standardDsType, List.of(os, jvm, ah)),
+                testdataFactory.generateDistributionSet("three", "three", standardDsType, List.of(os, jvm, ah), true));
 
-        one = distributionSetManagement
-                .getWithDetails(distributionSetManagement.findByRsql("name==one", PAGE).getContent().get(0).getId())
-                .get();
-        two = distributionSetManagement
-                .getWithDetails(distributionSetManagement.findByRsql("name==two", PAGE).getContent().get(0).getId())
-                .get();
-        three = distributionSetManagement
-                .getWithDetails(distributionSetManagement.findByRsql("name==three", PAGE).getContent().get(0).getId())
-                .get();
+        final DistributionSet one = distributionSetManagement
+                .getWithDetails(distributionSetManagement.findByRsql("name==one", PAGE).getContent().get(0).getId());
+        final DistributionSet two = distributionSetManagement
+                .getWithDetails(distributionSetManagement.findByRsql("name==two", PAGE).getContent().get(0).getId());
+        final DistributionSet three = distributionSetManagement
+                .getWithDetails(distributionSetManagement.findByRsql("name==three", PAGE).getContent().get(0).getId());
 
         assertThat((Object) JsonPath.compile("[0]_links.self.href").read(mvcResult.getResponse().getContentAsString()))
                 .hasToString("http://localhost/rest/v1/distributionsets/" + one.getId());
@@ -973,7 +954,7 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
                 .hasToString(String.valueOf(three.getId()));
 
         // check in database
-        assertThat(distributionSetManagement.findByCompleted(true, PAGE)).hasSize(3);
+        assertThat(distributionSetManagement.findAll(PAGE)).hasSize(3);
         assertThat(one.isRequiredMigrationStep()).isFalse();
         assertThat(two.isRequiredMigrationStep()).isFalse();
         assertThat(three.isRequiredMigrationStep()).isTrue();
@@ -989,19 +970,17 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
     @Test
     void deleteUnassignedistributionSet() throws Exception {
         // prepare test data
-        assertThat(distributionSetManagement.findByCompleted(true, PAGE)).isEmpty();
-
+        assertThat(distributionSetManagement.findAll(PAGE)).isEmpty();
         final DistributionSet set = testdataFactory.createDistributionSet("one");
-
-        assertThat(distributionSetManagement.findByCompleted(true, PAGE)).hasSize(1);
+        assertThat(distributionSetManagement.findAll(PAGE)).hasSize(1);
 
         // perform request
         mvc.perform(delete("/rest/v1/distributionsets/{smId}", set.getId()))
                 .andDo(MockMvcResultPrinter.print())
-                .andExpect(status().isOk());
+                .andExpect(status().isNoContent());
 
         // check repository content
-        assertThat(distributionSetManagement.findByCompleted(true, PAGE)).isEmpty();
+        assertThat(distributionSetManagement.findAll(PAGE)).isEmpty();
         assertThat(distributionSetManagement.count()).isZero();
     }
 
@@ -1021,13 +1000,13 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
     @Test
     void deleteAssignedDistributionSet() throws Exception {
         // prepare test data
-        assertThat(distributionSetManagement.findByCompleted(true, PAGE)).isEmpty();
+        assertThat(distributionSetManagement.findAll(PAGE)).isEmpty();
 
         final DistributionSet set = testdataFactory.createDistributionSet("one");
         testdataFactory.createTarget("test");
         assignDistributionSet(set.getId(), "test");
 
-        assertThat(distributionSetManagement.findByCompleted(true, PAGE)).hasSize(1);
+        assertThat(distributionSetManagement.findAll(PAGE)).hasSize(1);
 
         mvc.perform(get("/rest/v1/distributionsets/{dsId}", set.getId()))
                 .andDo(MockMvcResultPrinter.print())
@@ -1036,7 +1015,7 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
 
         mvc.perform(delete("/rest/v1/distributionsets/{dsId}", set.getId()))
                 .andDo(MockMvcResultPrinter.print())
-                .andExpect(status().isOk());
+                .andExpect(status().isNoContent());
 
         mvc.perform(get("/rest/v1/distributionsets/{dsId}", set.getId()))
                 .andDo(MockMvcResultPrinter.print())
@@ -1044,7 +1023,7 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
                 .andExpect(jsonPath("$.deleted", equalTo(true)));
 
         // check repository content
-        assertThat(distributionSetManagement.findByCompleted(true, PAGE)).isEmpty();
+        assertThat(distributionSetManagement.findAll(PAGE)).isEmpty();
     }
 
     /**
@@ -1053,16 +1032,19 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
     @Test
     void updateDistributionSet() throws Exception {
         // prepare test data
-        assertThat(distributionSetManagement.findByCompleted(true, PAGE)).isEmpty();
+        assertThat(distributionSetManagement.findAll(PAGE)).isEmpty();
 
         final DistributionSet set = testdataFactory.createDistributionSet("one");
         assertThat(distributionSetManagement.count()).isEqualTo(1);
 
-        final String body = new JSONObject().put("version", "anotherVersion").put("requiredMigrationStep", true)
-                .put("deleted", true).toString();
+        final String body = new JSONObject()
+                .put("version", "anotherVersion")
+                .put("requiredMigrationStep", true)
+                .put("deleted", true)
+                .toString();
 
         mvc.perform(put("/rest/v1/distributionsets/{dsId}", set.getId()).content(body)
-                        .contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON))
+                        .contentType(APPLICATION_JSON).accept(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.version", equalTo("anotherVersion")))
@@ -1070,7 +1052,7 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
                 .andExpect(jsonPath("$.locked", equalTo(false)))
                 .andExpect(jsonPath("$.deleted", equalTo(false)));
 
-        final DistributionSet setupdated = distributionSetManagement.get(set.getId()).get();
+        final DistributionSet setupdated = distributionSetManagement.find(set.getId()).get();
 
         assertThat(setupdated.isRequiredMigrationStep()).isTrue();
         assertThat(setupdated.getVersion()).isEqualTo("anotherVersion");
@@ -1082,10 +1064,9 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
      * Ensures that DS property update on requiredMigrationStep fails if DS is assigned to a target.
      */
     @Test
-    void updateRequiredMigrationStepFailsIfDistributionSetisInUse() throws Exception {
-
+    void updateRequiredMigrationStepFailsIfDistributionSetIsInUse() throws Exception {
         // prepare test data
-        assertThat(distributionSetManagement.findByCompleted(true, PAGE)).isEmpty();
+        assertThat(distributionSetManagement.findAll(PAGE)).isEmpty();
 
         final DistributionSet set = testdataFactory.createDistributionSet("one");
         assignDistributionSet(set.getId(), testdataFactory.createTarget().getControllerId());
@@ -1094,15 +1075,15 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
 
         mvc.perform(put("/rest/v1/distributionsets/{dsId}", set.getId())
                         .content("{\"version\":\"anotherVersion\",\"requiredMigrationStep\":\"true\"}")
-                        .contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON))
+                        .contentType(APPLICATION_JSON).accept(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
-                .andExpect(status().isForbidden());
+                .andExpect(status().isLocked());
 
-        final DistributionSet setupdated = distributionSetManagement.get(set.getId()).get();
+        final DistributionSet setUpdated = distributionSetManagement.find(set.getId()).get();
 
-        assertThat(setupdated.isRequiredMigrationStep()).isFalse();
-        assertThat(setupdated.getVersion()).isEqualTo(set.getVersion());
-        assertThat(setupdated.getName()).isEqualTo(set.getName());
+        assertThat(setUpdated.isRequiredMigrationStep()).isFalse();
+        assertThat(setUpdated.getVersion()).isEqualTo(set.getVersion());
+        assertThat(setUpdated.getName()).isEqualTo(set.getName());
     }
 
     /**
@@ -1112,8 +1093,12 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
     void invalidRequestsOnDistributionSetsResource() throws Exception {
         final DistributionSet set = testdataFactory.createDistributionSet("one");
 
-        final List<DistributionSet> sets = new ArrayList<>();
-        sets.add(set);
+        final List<DistributionSetManagement.Create> sets = new ArrayList<>();
+        sets.add(DistributionSetManagement.Create.builder()
+                .type(set.getType())
+                .name(set.getName())
+                .version(set.getVersion())
+                .build());
 
         // SM does not exist
         mvc.perform(get("/rest/v1/distributionsets/12345678"))
@@ -1125,30 +1110,31 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
                 .andExpect(status().isNotFound());
 
         // bad request - no content
-        mvc.perform(post("/rest/v1/distributionsets").contentType(MediaType.APPLICATION_JSON))
+        mvc.perform(post("/rest/v1/distributionsets").contentType(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isBadRequest());
 
         // bad request - bad content
         mvc.perform(post("/rest/v1/distributionsets").content("sdfjsdlkjfskdjf".getBytes())
-                        .contentType(MediaType.APPLICATION_JSON))
+                        .contentType(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isBadRequest());
 
-        final DistributionSet missingName = entityFactory.distributionSet().create().build();
-        mvc.perform(post("/rest/v1/distributionsets").content(JsonBuilder.distributionSets(Collections.singletonList(missingName)))
-                        .contentType(MediaType.APPLICATION_JSON))
+        final DistributionSetManagement.Create missingName = DistributionSetManagement.Create.builder().build();
+        mvc.perform(post("/rest/v1/distributionsets").content(toJson(List.of(missingName)))
+                        .contentType(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isBadRequest());
 
-        final DistributionSet toLongName = testdataFactory.generateDistributionSet(randomString(NamedEntity.NAME_MAX_SIZE + 1));
-        mvc.perform(post("/rest/v1/distributionsets").content(JsonBuilder.distributionSets(Collections.singletonList(toLongName)))
-                        .contentType(MediaType.APPLICATION_JSON))
+        final DistributionSetManagement.Create toLongName =
+                testdataFactory.generateDistributionSet(randomString(NamedEntity.NAME_MAX_SIZE + 1));
+        mvc.perform(post("/rest/v1/distributionsets").content(toJson(List.of(toLongName)))
+                        .contentType(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isBadRequest());
 
         // unsupported media type
-        mvc.perform(post("/rest/v1/distributionsets").content(JsonBuilder.distributionSets(sets))
+        mvc.perform(post("/rest/v1/distributionsets").content(toJson(sets))
                         .contentType(MediaType.APPLICATION_OCTET_STREAM))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isUnsupportedMediaType());
@@ -1165,7 +1151,6 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         mvc.perform(delete("/rest/v1/distributionsets"))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isMethodNotAllowed());
-
     }
 
     /**
@@ -1186,7 +1171,7 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         metaData1.put(new JSONObject().put("key", knownKey2).put("value", knownValue2));
 
         mvc.perform(post("/rest/v1/distributionsets/{dsId}/metadata", testDS.getId())
-                        .contentType(MediaType.APPLICATION_JSON)
+                        .contentType(APPLICATION_JSON)
                         .content(metaData1.toString()))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isCreated());
@@ -1203,10 +1188,10 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         }
 
         mvc.perform(post("/rest/v1/distributionsets/{dsId}/metadata", testDS.getId())
-                        .contentType(MediaType.APPLICATION_JSON)
+                        .contentType(APPLICATION_JSON)
                         .content(metaData2.toString()))
                 .andDo(MockMvcResultPrinter.print())
-                .andExpect(status().isForbidden());
+                .andExpect(status().isTooManyRequests());
 
         // verify that the number of meta-data entries has not changed (we cannot use the PAGE constant here as it tries to sort by ID)
         assertThat(distributionSetManagement.getMetadata(testDS.getId())).hasSize(metaData1.length());
@@ -1227,10 +1212,10 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         final JSONObject jsonObject = new JSONObject().put("key", knownKey).put("value", updateValue);
 
         mvc.perform(put("/rest/v1/distributionsets/{dsId}/metadata/{key}", testDS.getId(), knownKey)
-                        .contentType(MediaType.APPLICATION_JSON)
+                        .contentType(APPLICATION_JSON)
                         .content(jsonObject.toString()))
                 .andDo(MockMvcResultPrinter.print())
-                .andExpect(status().isOk());
+                .andExpect(status().isNoContent());
 
         assertThat(distributionSetManagement.getMetadata(testDS.getId()).get(knownKey)).isEqualTo(updateValue);
     }
@@ -1249,7 +1234,7 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
 
         mvc.perform(delete("/rest/v1/distributionsets/{dsId}/metadata/{key}", testDS.getId(), knownKey))
                 .andDo(MockMvcResultPrinter.print())
-                .andExpect(status().isOk());
+                .andExpect(status().isNoContent());
 
         // already deleted
         mvc.perform(delete("/rest/v1/distributionsets/{dsId}/metadata/{key}", testDS.getId(), knownKey))
@@ -1312,7 +1297,7 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
             distributionSetManagement.createMetadata(testDS.getId(), Map.of(knownKeyPrefix + index, knownValuePrefix + index));
         }
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/{distributionSetId}/metadata", testDS.getId()))
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/{distributionSetId}/metadata", testDS.getId()))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaTypes.HAL_JSON));
@@ -1338,7 +1323,6 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
                 .andExpect(jsonPath("total", equalTo(2)))
                 .andExpect(jsonPath("content[0].name", equalTo("DS1test")))
                 .andExpect(jsonPath("content[1].name", equalTo("DS2test")));
-
     }
 
     /**
@@ -1347,13 +1331,29 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
     @Test
     void filterDistributionSetComplete() throws Exception {
         final int amount = 10;
-        testdataFactory.createDistributionSets(amount);
+        final List<String> dsIds = testdataFactory.createDistributionSets(amount).stream()
+                .map(Identifiable::getId).map(String::valueOf).toList();
         distributionSetManagement
-                .create(entityFactory.distributionSet().create().name("incomplete").version("2").type("os"));
+                .create(DistributionSetManagement.Create.builder()
+                        .type(distributionSetTypeManagement.findByKey("os").orElseThrow())
+                        .name("incomplete").version("2")
+                        .build());
 
-        final String rsqlFindLikeDs1OrDs2 = "complete==" + Boolean.TRUE;
+        mvc.perform(get("/rest/v1/distributionsets?q=complete==true"))
+                .andDo(MockMvcResultPrinter.print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("size", equalTo(10)))
+                .andExpect(jsonPath("total", equalTo(10)));
 
-        mvc.perform(get("/rest/v1/distributionsets?q=" + rsqlFindLikeDs1OrDs2))
+        // and more complex (logical and to comparison conversion) query
+        mvc.perform(get("/rest/v1/distributionsets?q=complete==true;valid==true"))
+                .andDo(MockMvcResultPrinter.print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("size", equalTo(10)))
+                .andExpect(jsonPath("total", equalTo(10)));
+
+        // and more complex (case-insensitive) query
+        mvc.perform(get("/rest/v1/distributionsets?q=complete==true;valid==true;id=IN=(" + String.join(",", dsIds) + ")"))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("size", equalTo(10)))
@@ -1371,16 +1371,15 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         // prepare targets
         final Collection<String> knownTargetIds = Arrays.asList("1", "2", "3", "4", "5");
 
-        knownTargetIds.forEach(
-                controllerId -> targetManagement.create(entityFactory.target().create().controllerId(controllerId)));
+        knownTargetIds.forEach(controllerId -> targetManagement.create(TargetManagement.Create.builder().controllerId(controllerId).build()));
 
         // assign already one target to DS
         assignDistributionSet(createdDs.getId(), knownTargetIds.iterator().next());
 
         final String rsqlFindTargetId1 = "controllerId==1";
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/" + createdDs.getId()
-                        + "/assignedTargets?q=" + rsqlFindTargetId1).contentType(MediaType.APPLICATION_JSON))
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/" + createdDs.getId() + "/assignedTargets?q=" + rsqlFindTargetId1)
+                        .contentType(APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("total", equalTo(1)))
                 .andExpect(jsonPath("size", equalTo(1)))
@@ -1401,7 +1400,7 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         assignDistributionSet(createdDs.getId(), knownTargetIds[0], Action.ActionType.DOWNLOAD_ONLY);
 
         mvc.perform(post("/rest/v1/distributionsets/{ds}/assignedTargets", createdDs.getId())
-                        .contentType(MediaType.APPLICATION_JSON).content(list.toString()))
+                        .contentType(APPLICATION_JSON).content(list.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.assigned", equalTo(knownTargetIds.length - 1)))
                 .andExpect(jsonPath("$.alreadyAssigned", equalTo(1)))
@@ -1416,8 +1415,8 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
      */
     @ParameterizedTest
     @MethodSource("confirmationOptions")
-    void assignTargetsToDistributionSetWithConfirmationOptions(final boolean confirmationFlowActive,
-            final Boolean confirmationRequired) throws Exception {
+    void assignTargetsToDistributionSetWithConfirmationOptions(final boolean confirmationFlowActive, final Boolean confirmationRequired)
+            throws Exception {
         final DistributionSet createdDs = testdataFactory.createDistributionSet();
 
         if (confirmationFlowActive) {
@@ -1429,7 +1428,7 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         final JSONArray list = createTargetAndJsonArray(null, null, null, null, confirmationRequired, targetId);
 
         mvc.perform(post("/rest/v1/distributionsets/{ds}/assignedTargets", createdDs.getId())
-                        .contentType(MediaType.APPLICATION_JSON).content(list.toString()))
+                        .contentType(APPLICATION_JSON).content(list.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.assigned", equalTo(1)))
                 .andExpect(jsonPath("$.alreadyAssigned", equalTo(0)))
@@ -1437,13 +1436,14 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
 
         assertThat(
                 actionRepository
-                        .findAll(ActionSpecifications.byDistributionSetId(createdDs.getId()), PAGE)
+                        .findAll(byDistributionSetId(createdDs.getId()), PAGE)
                         .map(Action.class::cast).getContent()).hasSize(1)
                 .allMatch(action -> {
                     if (!confirmationFlowActive) {
                         return !action.isWaitingConfirmation();
                     }
-                    return confirmationRequired == null ? action.isWaitingConfirmation()
+                    return confirmationRequired == null
+                            ? action.isWaitingConfirmation()
                             : confirmationRequired == action.isWaitingConfirmation();
                 });
     }
@@ -1461,7 +1461,7 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         body.put(getAssignmentObject(targetId, MgmtActionType.FORCED));
 
         mvc.perform(post("/rest/v1/distributionsets/{ds}/assignedTargets", dsId).content(body.toString())
-                        .contentType(MediaType.APPLICATION_JSON))
+                        .contentType(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isBadRequest());
     }
@@ -1479,33 +1479,10 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         body.put(getAssignmentObject(targetId, MgmtActionType.FORCED));
 
         mvc.perform(post("/rest/v1/distributionsets/{ds}/assignedTargets", dsId).content(body.toString())
-                        .contentType(MediaType.APPLICATION_JSON))
+                        .contentType(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("total", equalTo(1)));
-    }
-
-    /**
-     * Assigning targets multiple times to a DS in one request works in multiassignment mode.
-     */
-    @Test
-    void multiAssignment() throws Exception {
-        final List<String> targetIds = testdataFactory.createTargets(2).stream().map(Target::getControllerId)
-                .toList();
-        final Long dsId = testdataFactory.createDistributionSet().getId();
-
-        final JSONArray body = new JSONArray();
-        body.put(getAssignmentObject(targetIds.get(0), MgmtActionType.FORCED, 56));
-        body.put(getAssignmentObject(targetIds.get(0), MgmtActionType.FORCED, 78));
-        body.put(getAssignmentObject(targetIds.get(1), MgmtActionType.FORCED, 67));
-        body.put(getAssignmentObject(targetIds.get(1), MgmtActionType.SOFT, 34));
-
-        enableMultiAssignments();
-        mvc.perform(post("/rest/v1/distributionsets/{ds}/assignedTargets", dsId).content(body.toString())
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andDo(MockMvcResultPrinter.print())
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("total", equalTo(body.length())));
     }
 
     /**
@@ -1514,25 +1491,25 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
     @Test
     void weightValidation() throws Exception {
         final String targetId = testdataFactory.createTarget().getControllerId();
-        final Long dsId = testdataFactory.createDistributionSet().getId();
+        final Long dsId1 = testdataFactory.createDistributionSet().getId();
+        final Long dsId2 = testdataFactory.createDistributionSet().getId();
         final int weight = 78;
 
         final JSONArray bodyValide = new JSONArray().put(getAssignmentObject(targetId, MgmtActionType.FORCED, weight));
         final JSONArray bodyInvalide = new JSONArray()
                 .put(getAssignmentObject(targetId, MgmtActionType.FORCED, Action.WEIGHT_MIN - 1));
 
-        mvc.perform(post("/rest/v1/distributionsets/{ds}/assignedTargets", dsId).content(bodyValide.toString())
-                        .contentType(MediaType.APPLICATION_JSON))
+        mvc.perform(post("/rest/v1/distributionsets/{ds}/assignedTargets", dsId1).content(bodyValide.toString())
+                        .contentType(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk());
-        enableMultiAssignments();
-        mvc.perform(post("/rest/v1/distributionsets/{ds}/assignedTargets", dsId).content(bodyInvalide.toString())
-                        .contentType(MediaType.APPLICATION_JSON))
+        mvc.perform(post("/rest/v1/distributionsets/{ds}/assignedTargets", dsId2).content(bodyInvalide.toString())
+                        .contentType(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode", equalTo("hawkbit.server.error.repo.constraintViolation")));
-        mvc.perform(post("/rest/v1/distributionsets/{ds}/assignedTargets", dsId).content(bodyValide.toString())
-                        .contentType(MediaType.APPLICATION_JSON))
+        mvc.perform(post("/rest/v1/distributionsets/{ds}/assignedTargets", dsId2).content(bodyValide.toString())
+                        .contentType(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk());
 
@@ -1550,15 +1527,13 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         DistributionSet ds1 = testdataFactory.createDistributionSet("DS1");
         DistributionSet ds2 = testdataFactory.createDistributionSet("DS2");
 
-        testdataFactory.createRolloutByVariables("rollout1", "description",
-                1, "name==targets*", ds1, "50", "5", false);
-        Rollout rollout = testdataFactory.createRolloutByVariables("rollout2", "description",
-                1, "name==targets*", ds1, "50", "5", false);
+        testdataFactory.createRolloutByVariables("rollout1", "description", 1, "name==targets*", ds1, "50", "5", false);
+        Rollout rollout = testdataFactory.createRolloutByVariables("rollout2", "description", 1, "name==targets*", ds1, "50", "5", false);
         rolloutManagement.start(rollout.getId());
         rolloutHandler.handleAll();
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/{ds}/statistics/rollouts", ds1.getId()).contentType(
-                        MediaType.APPLICATION_JSON))
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/{ds}/statistics/rollouts", ds1.getId()).contentType(
+                        APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("rollouts.READY", equalTo(1)))
@@ -1567,8 +1542,8 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
                 .andExpect(jsonPath("actions").doesNotExist())
                 .andExpect(jsonPath("totalAutoAssignments").doesNotExist());
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/{ds}/statistics/rollouts", ds2.getId()).contentType(
-                        MediaType.APPLICATION_JSON))
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/{ds}/statistics/rollouts", ds2.getId())
+                        .contentType(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("rollouts").doesNotExist())
@@ -1591,8 +1566,8 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         rolloutManagement.start(rollout.getId());
         rolloutHandler.handleAll();
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/{ds}/statistics/actions", ds1.getId()).contentType(
-                        MediaType.APPLICATION_JSON))
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/{ds}/statistics/actions", ds1.getId())
+                        .contentType(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("actions.RUNNING", equalTo(4)))
@@ -1600,8 +1575,8 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
                 .andExpect(jsonPath("rollouts").doesNotExist())
                 .andExpect(jsonPath("totalAutoAssignments").doesNotExist());
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/{ds}/statistics/actions", ds2.getId()).contentType(
-                        MediaType.APPLICATION_JSON))
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/{ds}/statistics/actions", ds2.getId())
+                        .contentType(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("rollouts").doesNotExist())
@@ -1619,23 +1594,21 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         DistributionSet ds2 = testdataFactory.createDistributionSet("DS2");
 
         targetFilterQueryManagement.create(
-                entityFactory.targetFilterQuery().create().name("test filter 1").autoAssignDistributionSet(ds1.getId())
-                        .query("name==targets*"));
+                Create.builder().name("test filter 1").autoAssignDistributionSet(ds1).query("name==targets*").build());
 
         targetFilterQueryManagement.create(
-                entityFactory.targetFilterQuery().create().name("test filter 2").autoAssignDistributionSet(ds1.getId())
-                        .query("name==targets*"));
+                Create.builder().name("test filter 2").autoAssignDistributionSet(ds1).query("name==targets*").build());
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/{ds}/statistics/autoassignments", ds1.getId()).contentType(
-                        MediaType.APPLICATION_JSON))
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/{ds}/statistics/autoassignments", ds1.getId()).contentType(
+                        APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("totalAutoAssignments", equalTo(2)))
                 .andExpect(jsonPath("rollouts").doesNotExist())
                 .andExpect(jsonPath("actions").doesNotExist());
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/{ds}/statistics/autoassignments", ds2.getId()).contentType(
-                        MediaType.APPLICATION_JSON))
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/{ds}/statistics/autoassignments", ds2.getId()).contentType(
+                        APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("rollouts").doesNotExist())
@@ -1654,16 +1627,14 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         DistributionSet ds2 = testdataFactory.createDistributionSet("DS2");
 
         targetFilterQueryManagement.create(
-                entityFactory.targetFilterQuery().create().name("test filter 1").autoAssignDistributionSet(ds1.getId())
-                        .query("name==autoAssignments*"));
+                Create.builder().name("test filter 1").autoAssignDistributionSet(ds1).query("name==autoAssignments*").build());
 
-        Rollout rollout = testdataFactory.createRolloutByVariables("rollout", "description",
-                1, "name==targets*", ds1, "50", "5", false);
+        Rollout rollout = testdataFactory.createRolloutByVariables("rollout", "description", 1, "name==targets*", ds1, "50", "5", false);
         rolloutManagement.start(rollout.getId());
         rolloutHandler.handleAll();
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/{ds}/statistics", ds1.getId()).contentType(
-                        MediaType.APPLICATION_JSON))
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/{ds}/statistics", ds1.getId())
+                        .contentType(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("totalAutoAssignments", equalTo(1)))
@@ -1672,8 +1643,8 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
                 .andExpect(jsonPath("rollouts.RUNNING", equalTo(1)))
                 .andExpect(jsonPath("rollouts.total", equalTo(1)));
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_V1_REQUEST_MAPPING + "/{ds}/statistics/autoassignments", ds2.getId()).contentType(
-                        MediaType.APPLICATION_JSON))
+        mvc.perform(get(DISTRIBUTIONSETS_V1 + "/{ds}/statistics/autoassignments", ds2.getId())
+                        .contentType(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("rollouts").doesNotExist())
@@ -1685,35 +1656,100 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
      * Verify invalidation of distribution sets that removes distribution sets from auto assignments, stops rollouts and cancels assignments
      */
     @Test
-    void invalidateDistributionSet() throws Exception {
-        final DistributionSet distributionSet = testdataFactory.createDistributionSet();
+    void softInvalidateDistributionSet() throws Exception {
+        DistributionSet distributionSet = testdataFactory.createDistributionSet();
         final List<Target> targets = testdataFactory.createTargets(5, "invalidateDistributionSet");
-        assignDistributionSet(distributionSet, targets);
-        final TargetFilterQuery targetFilterQuery = targetFilterQueryManagement
-                .create(entityFactory.targetFilterQuery().create().name("invalidateDistributionSet").query("name==*")
-                        .autoAssignDistributionSet(distributionSet));
-        final Rollout rollout = testdataFactory.createRolloutByVariables("invalidateDistributionSet", "desc", 2,
-                "name==*", distributionSet, "50", "80");
+        // the distribution set is locked and the old instance become stale
+        distributionSet = assignDistributionSet(distributionSet, targets).getDistributionSet();
+        final TargetFilterQuery targetFilterQuery = targetFilterQueryManagement.create(
+                Create.builder().name("invalidateDistributionSet").query("name==*").autoAssignDistributionSet(distributionSet).build());
+        final Rollout rollout = testdataFactory.createRolloutByVariables(
+                "invalidateDistributionSet", "desc", 2, "name==*", distributionSet, "50", "80");
 
         final JSONObject jsonObject = new JSONObject();
         jsonObject.put("actionCancelationType", "soft");
-        jsonObject.put("cancelRollouts", true);
 
         mvc.perform(post("/rest/v1/distributionsets/{ds}/invalidate", distributionSet.getId())
-                        .content(jsonObject.toString()).contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk());
+                        .contentType(APPLICATION_JSON)
+                        .content(jsonObject.toString()))
+                .andExpect(status().isNoContent());
 
-        assertThat(targetFilterQueryManagement.get(targetFilterQuery.getId()).get().getAutoAssignDistributionSet())
+        assertThat(targetFilterQueryManagement.find(targetFilterQuery.getId()).get().getAutoAssignDistributionSet())
                 .isNull();
-        assertThat(rolloutManagement.get(rollout.getId()).get().getStatus()).isIn(RolloutStatus.STOPPING,
-                RolloutStatus.FINISHED);
+        assertThat(rolloutManagement.get(rollout.getId()).getStatus()).isIn(RolloutStatus.STOPPING,
+                RolloutStatus.STOPPED);
+        //then enforce executor to stop the rollout and check
+        rolloutHandler.handleAll();
+        assertThat(rolloutManagement.get(rollout.getId()).getStatus()).isIn(RolloutStatus.STOPPED);
+
         for (final Target target : targets) {
-            assertThat(targetManagement.get(target.getId()).get().getUpdateStatus())
+            assertThat(targetManagement.find(target.getId()).get().getUpdateStatus())
                     .isEqualTo(TargetUpdateStatus.PENDING);
             assertThat(deploymentManagement.findActionsByTarget(target.getControllerId(), PageRequest.of(0, 100))
                     .getNumberOfElements()).isEqualTo(1);
             assertThat(deploymentManagement.findActionsByTarget(target.getControllerId(), PageRequest.of(0, 100))
                     .getContent().get(0).getStatus()).isEqualTo(Status.CANCELING);
+        }
+    }
+
+    @Test
+    void forceInvalidateDistributionSet() throws Exception {
+        DistributionSet distributionSet = testdataFactory.createDistributionSet();
+        final List<Target> targets = testdataFactory.createTargets(5, "invalidateDistributionSet");
+        distributionSet = assignDistributionSet(distributionSet, targets).getDistributionSet();
+        final TargetFilterQuery targetFilterQuery = targetFilterQueryManagement.create(
+                Create.builder().name("invalidateDistributionSet").query("name==*").autoAssignDistributionSet(distributionSet).build());
+        final Rollout rollout = testdataFactory.createRolloutByVariables("invalidateDistributionSet", "desc", 2,
+                "name==*", distributionSet, "50", "80");
+
+        final JSONObject jsonObject = new JSONObject();
+        jsonObject.put("actionCancelationType", "force");
+
+        mvc.perform(post("/rest/v1/distributionsets/{ds}/invalidate", distributionSet.getId())
+                        .content(jsonObject.toString()).contentType(APPLICATION_JSON))
+                .andExpect(status().isNoContent());
+
+        assertThat(targetFilterQueryManagement.find(targetFilterQuery.getId()).get().getAutoAssignDistributionSet()).isNull();
+        final Long rolloutId = rollout.getId();
+        assertThat(rolloutManagement.get(rolloutId).getStatus()).isIn(RolloutStatus.DELETING, RolloutStatus.DELETED);
+        //then enforce executor to stop the rollout and check
+        rolloutHandler.handleAll();
+        // assert rollout is deleted
+        assertThatExceptionOfType(EntityNotFoundException.class).isThrownBy(() -> rolloutManagement.get(rolloutId));
+
+        for (final Target target : targets) {
+            assertThat(targetManagement.get(target.getId()).getUpdateStatus())
+                    .isEqualTo(TargetUpdateStatus.IN_SYNC);
+            assertThat(deploymentManagement.findActionsByTarget(target.getControllerId(), PageRequest.of(0, 100))
+                    .getNumberOfElements()).isEqualTo(1);
+            assertThat(deploymentManagement.findActionsByTarget(target.getControllerId(), PageRequest.of(0, 100))
+                    .getContent().get(0).getStatus()).isEqualTo(Status.CANCELED);
+        }
+    }
+
+    @Test
+    void invalidateDistributionSetWithNoneCancellation() throws Exception {
+        final DistributionSet distributionSet = testdataFactory.createDistributionSet();
+        final List<Target> targets = testdataFactory.createTargets(5, "invalidateDistributionSet");
+        Rollout rollout = testdataFactory.createRolloutByVariables("invalidateDistributionSet", "desc", 1,
+                "name==*", distributionSet, "50", "80");
+        rollout = testdataFactory.startRollout(rollout);
+
+        final JSONObject jsonObject = new JSONObject();
+        jsonObject.put("actionCancelationType", "none");
+
+        mvc.perform(post("/rest/v1/distributionsets/{ds}/invalidate", distributionSet.getId())
+                        .content(jsonObject.toString()).contentType(APPLICATION_JSON))
+                .andExpect(status().isNoContent());
+
+        assertThat(rolloutManagement.get(rollout.getId()).getStatus()).isIn(RolloutStatus.RUNNING);
+
+        for (final Target target : targets) {
+            assertThat(targetManagement.get(target.getId()).getUpdateStatus()).isEqualTo(TargetUpdateStatus.PENDING);
+            assertThat(deploymentManagement.findActionsByTarget(target.getControllerId(), PageRequest.of(0, 100))
+                    .getNumberOfElements()).isEqualTo(1);
+            assertThat(deploymentManagement.findActionsByTarget(target.getControllerId(), PageRequest.of(0, 100))
+                    .getContent().get(0).getStatus()).isEqualTo(Status.RUNNING);
         }
     }
 
@@ -1723,7 +1759,7 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
     @Test
     void lockDistributionSet() throws Exception {
         // prepare test data
-        assertThat(distributionSetManagement.findByCompleted(true, PAGE)).isEmpty();
+        assertThat(distributionSetManagement.findAll(PAGE)).isEmpty();
 
         final DistributionSet set = testdataFactory.createDistributionSet("one");
         assertThat(distributionSetManagement.count()).isEqualTo(1);
@@ -1732,12 +1768,12 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         // lock
         final String body = new JSONObject().put("locked", true).toString();
         mvc.perform(put("/rest/v1/distributionsets/{dsId}", set.getId()).content(body)
-                        .contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON))
+                        .contentType(APPLICATION_JSON).accept(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.locked", equalTo(true)));
 
-        final DistributionSet updatedSet = distributionSetManagement.get(set.getId()).get();
+        final DistributionSet updatedSet = distributionSetManagement.find(set.getId()).get();
         assertThat(updatedSet.isLocked()).isTrue();
     }
 
@@ -1747,12 +1783,12 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
     @Test
     void unlockDistributionSet() throws Exception {
         // prepare test data
-        assertThat(distributionSetManagement.findByCompleted(true, PAGE)).isEmpty();
+        assertThat(distributionSetManagement.findAll(PAGE)).isEmpty();
 
         final DistributionSet set = testdataFactory.createDistributionSet("one");
         assertThat(distributionSetManagement.count()).isEqualTo(1);
-        distributionSetManagement.lock(set.getId());
-        assertThat(distributionSetManagement.get(set.getId())
+        distributionSetManagement.lock(set);
+        assertThat(distributionSetManagement.find(set.getId())
                 .orElseThrow(() -> new EntityNotFoundException(SoftwareModule.class, set.getId())).isLocked())
                 .as("Distribution set should be locked")
                 .isTrue();
@@ -1760,18 +1796,34 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
         // unlock
         final String body = new JSONObject().put("locked", false).toString();
         mvc.perform(put("/rest/v1/distributionsets/{dsId}", set.getId()).content(body)
-                        .contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON))
+                        .contentType(APPLICATION_JSON).accept(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.locked", equalTo(false)));
 
-        final DistributionSet updatedSet = distributionSetManagement.get(set.getId()).get();
+        final DistributionSet updatedSet = distributionSetManagement.find(set.getId()).get();
         assertThat(updatedSet.isLocked()).isFalse();
     }
 
     private static Stream<Arguments> confirmationOptions() {
         return Stream.of(Arguments.of(true, true), Arguments.of(true, false), Arguments.of(false, true),
                 Arguments.of(false, false), Arguments.of(true, null), Arguments.of(false, null));
+    }
+
+    private static List<MgmtDistributionSetRequestBodyPut> toMgmtDistributionSetPost(final List<DistributionSetManagement.Create> creates) {
+        return creates.stream()
+                .map(create ->
+                        new MgmtDistributionSetRequestBodyPost()
+                                .setType(create.getType().getKey())
+                                .setModules(create.getModules().stream()
+                                        .map(module -> new MgmtSoftwareModuleAssignment().setId(module.getId()))
+                                        .map(MgmtSoftwareModuleAssignment.class::cast)
+                                        .toList())
+                                .setName(create.getName())
+                                .setDescription(create.getDescription())
+                                .setVersion(create.getVersion())
+                                .setRequiredMigrationStep(create.getRequiredMigrationStep()))
+                .toList();
     }
 
     private JSONArray createTargetAndJsonArray(final String schedule, final String duration, final String timezone,
@@ -1809,23 +1861,22 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
 
     private void prepareTestFilters(final String filterNamePrefix, final DistributionSet createdDs) {
         // create target filter queries that should be found
-        targetFilterQueryManagement.create(entityFactory.targetFilterQuery().create().name(filterNamePrefix + "1")
-                .query("name==y").autoAssignDistributionSet(createdDs.getId()));
-        targetFilterQueryManagement.create(entityFactory.targetFilterQuery().create().name(filterNamePrefix + "2")
-                .query("name==y").autoAssignDistributionSet(createdDs.getId()));
+        targetFilterQueryManagement.create(Create.builder().name(filterNamePrefix + "1")
+                .query("name==y").autoAssignDistributionSet(createdDs).build());
+        targetFilterQueryManagement.create(Create.builder().name(filterNamePrefix + "2")
+                .query("name==y").autoAssignDistributionSet(createdDs).build());
         // create some dummy target filter queries
-        targetFilterQueryManagement
-                .create(entityFactory.targetFilterQuery().create().name(filterNamePrefix + "b").query("name==y"));
-        targetFilterQueryManagement
-                .create(entityFactory.targetFilterQuery().create().name(filterNamePrefix + "c").query("name==y"));
+        targetFilterQueryManagement.create(Create.builder().name(filterNamePrefix + "b").query("name==y").build());
+        targetFilterQueryManagement.create(Create.builder().name(filterNamePrefix + "c").query("name==y").build());
     }
 
-    private MvcResult executeMgmtTargetPost(final DistributionSet one, final DistributionSet two,
-            final DistributionSet three) throws Exception {
+    private MvcResult executeMgmtTargetPost(
+            final DistributionSetManagement.Create one,
+            final DistributionSetManagement.Create two,
+            final DistributionSetManagement.Create three) throws Exception {
         return mvc
-                .perform(post("/rest/v1/distributionsets")
-                        .content(JsonBuilder.distributionSets(Arrays.asList(one, two, three)))
-                        .contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON))
+                .perform(post("/rest/v1/distributionsets").content(toJson(toMgmtDistributionSetPost(List.of(one, two, three))))
+                        .contentType(APPLICATION_JSON).accept(APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isCreated())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
@@ -1835,13 +1886,13 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
                 .andExpect(jsonPath("[0]createdBy", equalTo("uploadTester")))
                 .andExpect(jsonPath("[0]version", equalTo(one.getVersion())))
                 .andExpect(jsonPath("[0]complete", equalTo(Boolean.TRUE)))
-                .andExpect(jsonPath("[0]requiredMigrationStep", equalTo(one.isRequiredMigrationStep())))
+                .andExpect(jsonPath("[0]requiredMigrationStep", equalTo(one.getRequiredMigrationStep())))
                 .andExpect(jsonPath("[0].modules.[?(@.type=='" + runtimeType.getKey() + "')].id",
-                        contains(one.findFirstModuleByType(runtimeType).get().getId().intValue())))
+                        contains(findFirstModuleByType(one, runtimeType).get().getId().intValue())))
                 .andExpect(jsonPath("[0].modules.[?(@.type=='" + appType.getKey() + "')].id",
-                        contains(one.findFirstModuleByType(appType).get().getId().intValue())))
+                        contains(findFirstModuleByType(one, appType).get().getId().intValue())))
                 .andExpect(jsonPath("[0].modules.[?(@.type=='" + osType.getKey() + "')].id",
-                        contains(one.findFirstModuleByType(osType).get().getId().intValue())))
+                        contains(findFirstModuleByType(one, osType).get().getId().intValue())))
                 .andExpect(jsonPath("[1]name", equalTo(two.getName())))
                 .andExpect(jsonPath("[1]description", equalTo(two.getDescription())))
                 .andExpect(jsonPath("[1]complete", equalTo(Boolean.TRUE)))
@@ -1849,12 +1900,12 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
                 .andExpect(jsonPath("[1]createdBy", equalTo("uploadTester")))
                 .andExpect(jsonPath("[1]version", equalTo(two.getVersion())))
                 .andExpect(jsonPath("[1].modules.[?(@.type=='" + runtimeType.getKey() + "')].id",
-                        contains(two.findFirstModuleByType(runtimeType).get().getId().intValue())))
+                        contains(findFirstModuleByType(two, runtimeType).get().getId().intValue())))
                 .andExpect(jsonPath("[1].modules.[?(@.type=='" + appType.getKey() + "')].id",
-                        contains(two.findFirstModuleByType(appType).get().getId().intValue())))
+                        contains(findFirstModuleByType(two, appType).get().getId().intValue())))
                 .andExpect(jsonPath("[1].modules.[?(@.type=='" + osType.getKey() + "')].id",
-                        contains(two.findFirstModuleByType(osType).get().getId().intValue())))
-                .andExpect(jsonPath("[1]requiredMigrationStep", equalTo(two.isRequiredMigrationStep())))
+                        contains(findFirstModuleByType(two, osType).get().getId().intValue())))
+                .andExpect(jsonPath("[1]requiredMigrationStep", equalTo(two.getRequiredMigrationStep())))
                 .andExpect(jsonPath("[2]name", equalTo(three.getName())))
                 .andExpect(jsonPath("[2]description", equalTo(three.getDescription())))
                 .andExpect(jsonPath("[2]complete", equalTo(Boolean.TRUE)))
@@ -1862,12 +1913,12 @@ class MgmtDistributionSetResourceTest extends AbstractManagementApiIntegrationTe
                 .andExpect(jsonPath("[2]createdBy", equalTo("uploadTester")))
                 .andExpect(jsonPath("[2]version", equalTo(three.getVersion())))
                 .andExpect(jsonPath("[2].modules.[?(@.type=='" + runtimeType.getKey() + "')].id",
-                        contains(three.findFirstModuleByType(runtimeType).get().getId().intValue())))
+                        contains(findFirstModuleByType(three, runtimeType).get().getId().intValue())))
                 .andExpect(jsonPath("[2].modules.[?(@.type=='" + appType.getKey() + "')].id",
-                        contains(three.findFirstModuleByType(appType).get().getId().intValue())))
+                        contains(findFirstModuleByType(three, appType).get().getId().intValue())))
                 .andExpect(jsonPath("[2].modules.[?(@.type=='" + osType.getKey() + "')].id",
-                        contains(three.findFirstModuleByType(osType).get().getId().intValue())))
-                .andExpect(jsonPath("[2]requiredMigrationStep", equalTo(three.isRequiredMigrationStep())))
+                        contains(findFirstModuleByType(three, osType).get().getId().intValue())))
+                .andExpect(jsonPath("[2]requiredMigrationStep", equalTo(three.getRequiredMigrationStep())))
                 .andReturn();
     }
 

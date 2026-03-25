@@ -9,9 +9,6 @@
  */
 package org.eclipse.hawkbit.repository.model;
 
-import java.io.Serial;
-import java.io.Serializable;
-
 import lombok.Builder;
 import lombok.Data;
 
@@ -22,15 +19,13 @@ import lombok.Data;
  */
 @Data
 @Builder
-public final class TenantConfigurationValue<T extends Serializable> implements Serializable {
-
-    @Serial
-    private static final long serialVersionUID = 1L;
+public final class TenantConfigurationValue<T> {
 
     private T value;
     private Long lastModifiedAt;
     private String lastModifiedBy;
     private Long createdAt;
     private String createdBy;
+    @Builder.Default
     private boolean global = true;
 }

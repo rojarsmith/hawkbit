@@ -12,6 +12,8 @@ package org.eclipse.hawkbit.repository.exception;
 import java.io.Serial;
 
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.ToString;
 import org.eclipse.hawkbit.exception.AbstractServerRtException;
 import org.eclipse.hawkbit.exception.SpServerError;
 
@@ -19,7 +21,9 @@ import org.eclipse.hawkbit.exception.SpServerError;
  * This exception is indicating that the confirmation feedback cannot be processed for a specific actions for different reasons which are
  * listed as enum {@link Reason}.
  */
+@Getter
 @EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
 public class InvalidConfirmationFeedbackException extends AbstractServerRtException {
 
     @Serial
@@ -29,18 +33,9 @@ public class InvalidConfirmationFeedbackException extends AbstractServerRtExcept
 
     private final Reason reason;
 
-    protected InvalidConfirmationFeedbackException(final Reason reason) {
-        super(THIS_ERROR);
-        this.reason = reason;
-    }
-
     public InvalidConfirmationFeedbackException(final Reason reason, final String message) {
-        super(message, THIS_ERROR);
+        super(THIS_ERROR, message);
         this.reason = reason;
-    }
-
-    public Reason getReason() {
-        return reason;
     }
 
     public enum Reason {

@@ -86,9 +86,28 @@ import org.eclipse.hawkbit.mgmt.json.model.MgmtPollStatus;
          }""")
 public class MgmtTarget extends MgmtNamedEntity {
 
+    /**
+     * The target URL mapping, href link for assigned target type.
+     */
+    public static final String TARGET_TYPE = "targetType";
+    /**
+     * The target URL mapping, href link for autoConfirm state of a target.
+     */
+    public static final String AUTO_CONFIRM = "autoConfirm";
+    /**
+     * The target URL mapping, href link for target actions.
+     */
+    public static final String TARGET_V1_ACTIONS = "actions";
+    /**
+     * The target URL mapping, href link for canceled actions.
+     */
+    public static final String TARGET_V1_ACTION_STATUS = "status";
     @JsonProperty(required = true)
     @Schema(description = "Controller ID", example = "123")
     private String controllerId;
+
+    @Schema(description = "Target group", example = "Europe/East")
+    private String group;
 
     @Schema(description = "If the target is in sync", example = "in_sync")
     private String updateStatus;
@@ -113,7 +132,7 @@ public class MgmtTarget extends MgmtNamedEntity {
 
     @Schema(description = "Pre-Shared key that allows targets to authenticate at Direct Device Integration " +
             "API if enabled in the tenant settings", example = "38e6a19932b014040ba061795186514e")
-    @ToString.Exclude
+    @ToString.Exclude // note - it is included only if the received has the needed permissions
     private String securityToken;
 
     @Schema(description = "Request re-transmission of target attributes", example = "true")

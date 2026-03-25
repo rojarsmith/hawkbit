@@ -9,7 +9,6 @@
  */
 package org.eclipse.hawkbit.repository.jpa.model;
 
-import java.io.Serial;
 import java.util.Objects;
 
 import jakarta.persistence.Column;
@@ -22,8 +21,8 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.eclipse.hawkbit.context.AccessContext;
 import org.eclipse.hawkbit.repository.exception.TenantNotExistException;
-import org.eclipse.hawkbit.repository.jpa.model.helper.TenantAwareHolder;
 import org.eclipse.hawkbit.repository.model.TenantAwareBaseEntity;
 import org.eclipse.persistence.annotations.Multitenant;
 import org.eclipse.persistence.annotations.MultitenantType;
@@ -41,16 +40,13 @@ import org.eclipse.persistence.annotations.TenantDiscriminatorColumn;
 @Multitenant(MultitenantType.SINGLE_TABLE)
 public abstract class AbstractJpaTenantAwareBaseEntity extends AbstractJpaBaseEntity implements TenantAwareBaseEntity {
 
-    @Serial
-    private static final long serialVersionUID = 1L;
-
     @Column(name = "tenant", nullable = false, insertable = false, updatable = false, length = 40)
     @Size(min = 1, max = 40)
     @NotNull
     private String tenant;
 
     /**
-     * Tenant aware entities extend the equals/hashcode strategy with the tenant name. That would allow for instance in a
+     * AccessContext aware entities extend the equals/hashcode strategy with the tenant name. That would allow for instance in a
      * multi-schema based data separation setup to have the same primary key for different entities of different tenants.
      */
     @Override
@@ -59,7 +55,7 @@ public abstract class AbstractJpaTenantAwareBaseEntity extends AbstractJpaBaseEn
     }
 
     /**
-     * Tenant aware entities extend the equals/hashcode strategy with the tenant name. That would allow for instance in a
+     * AccessContext aware entities extend the equals/hashcode strategy with the tenant name. That would allow for instance in a
      * multi-schema based data separation setup to have the same primary key for different entities of
      * different tenants.
      */
@@ -75,7 +71,7 @@ public abstract class AbstractJpaTenantAwareBaseEntity extends AbstractJpaBaseEn
 
     @Override
     public String toString() {
-        return getClass().getSimpleName() + " [tenant=" + getTenant() + ", id=" + getId() + "]";
+        return getClass().getSimpleName() + " [tenant=" + getTenant() + ", id=" + getId() + " / optLockRevision=" + getOptLockRevision() + "]";
     }
 
     /**
@@ -86,13 +82,13 @@ public abstract class AbstractJpaTenantAwareBaseEntity extends AbstractJpaBaseEn
      */
     @PrePersist
     void prePersist() {
-        // before persisting the entity check the current ID of the tenant by using the TenantAware service
-        final String currentTenant = TenantAwareHolder.getInstance().getTenantAware().getCurrentTenant();
+        // before persisting the entity check the current ID of the tenant by using the AccessContext
+        final String currentTenant = AccessContext.tenant();
         if (currentTenant == null) {
             throw new TenantNotExistException(
                     String.format(
-                            "Tenant %s does not exists, cannot create entity %s with id %d",
-                            TenantAwareHolder.getInstance().getTenantAware().getCurrentTenant(), getClass(), getId()));
+                            "AccessContext %s does not exists, cannot create entity %s with id %d",
+                            AccessContext.tenant(), getClass(), getId()));
         }
         setTenant(currentTenant.toUpperCase());
     }

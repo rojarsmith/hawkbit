@@ -1,4 +1,4 @@
-<img src=hawkbit_logo.png width=533 height=246 />
+<img alt="hawkBit" src=docs/images/hawkbit_logo.png width=530/>
 
 # Eclipse hawkBit™ - Update Server
 
@@ -41,7 +41,7 @@ The following vendors offer free trial accounts for their hawkBit compatible pro
 
 # Device Integration (Client libraries)
 
-hawkBit exposes HTTP/JSON based [Direct Device Integration (API) API](https://www.eclipse.org/hawkbit/apis/ddi_api/)
+hawkBit exposes HTTP/JSON based [Direct Device Integration (API) API](https://hawkbit.eclipse.dev/#/direct-device-integration-api)
 that allow any update client to integrate quite easily.
 
 The [Eclipse Hara subproject](https://projects.eclipse.org/projects/iot.hawkbit.hara) aims to provide a reference agent
@@ -82,13 +82,13 @@ There are clients outside of the Eclipse IoT eco system as well, e.g.:
 
 ## SQL database
 
-| Database                          |                       H2                       |                             MySQL/MariaDB                             |                        PostgreSQL                        |
-|-----------------------------------|:----------------------------------------------:|:---------------------------------------------------------------------:|:--------------------------------------------------------:|
-| DDLs maintained by project        |               :white_check_mark:               |                          :white_check_mark:                           |                    :white_check_mark:                    |
-| Test dependencies defined         |               :white_check_mark:               |                          :white_check_mark:                           |                    :white_check_mark:                    |
-| Docker image with driver provided |               :white_check_mark:               |                  :white_check_mark: (Tag: "-mysql")                   |                    :white_check_mark:                    |
-| JDBC driver                       | [H2](https://github.com/h2database/h2database) | [MariaDB Connector/J](https://github.com/MariaDB/mariadb-connector-j) |[PostgreSQL JDBC Driver](https://github.com/pgjdbc/pgjdbc)|
-| Status                            |                   Test, Dev                    |                           Production grade                            |                        Test, Dev                         |
+| Database                          |                       H2                       |                             MySQL/MariaDB                             |                         PostgreSQL                         |
+|-----------------------------------|:----------------------------------------------:|:---------------------------------------------------------------------:|:----------------------------------------------------------:|
+| DDLs maintained by project        |               :white_check_mark:               |                          :white_check_mark:                           |                     :white_check_mark:                     |
+| Test dependencies defined         |               :white_check_mark:               |                          :white_check_mark:                           |                     :white_check_mark:                     |
+| Docker image with driver provided |               :white_check_mark:               |                           :white_check_mark                           |                     :white_check_mark:                     |
+| JDBC driver                       | [H2](https://github.com/h2database/h2database) | [MariaDB Connector/J](https://github.com/MariaDB/mariadb-connector-j) | [PostgreSQL JDBC Driver](https://github.com/pgjdbc/pgjdbc) |
+| Status                            |                   Test, Dev                    |                           Production grade                            |                         Test, Dev                          |
 
 ## (Optional) RabbitMQ: 3.6,3.7,3.8
 
@@ -103,9 +103,9 @@ Run with docker:
 docker run -d -p 8080:8080 hawkbit/hawkbit-update-server
 ```
 
-Open the update server in your browser:
+The monolith update server will start on port 8080 with default configuration and H2 database. The default user `admin:admin` is configured.
 
-[localhost:8080](http://localhost:8080)
+The Swagger UI is available at: [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
 
 See below for how to build and run the update server on your own. In addition we have
 a [guide](https://www.eclipse.org/hawkbit/guides/runhawkbit/) for setting up a complete landscape.
@@ -117,31 +117,58 @@ at [guide](https://www.eclipse.org/hawkbit/guides/runhawkbit/) -> _Configure Rab
 # hawkBit (Spring boot) starters
 
 Next to the [Update Server](hawkbit-monolith/hawkbit-update-server) we are also providing a set
-of [Spring Boot Starters](hawkbit-starters) to quick start your
+of [Spring Boot Starters](hawkbit-monolith) to quick start your
 own [Spring Boot](https://projects.spring.io/spring-boot/) based application.
 
 # Clone, build and run hawkBit
 
-## Build and start hawkBit [Update Server](hawkbit-monolith/hawkbit-update-server)
+## Clone and build
 
 ```bash
 git clone https://github.com/eclipse-hawkbit/hawkbit.git
 cd hawkbit
 mvn clean install
+```
+
+## Start hawkBit [Update Server](hawkbit-monolith/hawkbit-update-server)
+
+```bash
 java -jar ./hawkbit-monolith/hawkbit-update-server/target/hawkbit-update-server-0-SNAPSHOT.jar
 ```
 
-## Start hawkBit [Device Simulator](https://github.com/eclipse-hawkbit/hawkbit-examples/tree/master/hawkbit-device-simulator) (optional)
+The monolith update server will start on port 8080 with default configuration and H2 database. The default user `admin:admin` is configured.
+
+The Swagger UI is available at: [http://localhost:8080/swagger-ui/index.html](http://localhost:8080/swagger-ui/index.html)
+
+## Start hawkBit [UI](hawkbit-ui)
 
 ```bash
-git clone https://github.com/eclipse-hawkbit/hawkbit-examples.git
-cd hawkbit-examples
-mvn clean install
+java -jar ./hawkbit-ui/target/hawkbit-ui.jar
 ```
 
+Log in to [hawkbit UI](http://localhost:8088) with default `admin:admin` user.
+
+## Start hawkBit [Device Simulator](hawkbit-sdk/hawkbit-sdk-demo)
+
+* Enable gateway token authentication - on update server set tenant configuration properties (via [Swagger UI](http://localhost:8080/swagger-ui/index.html) or [hawkBit
+  UI](http://localhost:8088)):
+    * `authentication.gatewaytoken.enabled=true` and
+    * `authentication.gatewaytoken.key=<gw_token>`)
+* Start demo Device Simulator - in the script below edit the environment properties accordingly.
+    * DDI url `http://localhost:8080` is default URL when running monolith update server.
+    * Set `hawkbit_tenant_gatewaytoken` to the configured gateway token (`authentication.gatewaytoken.key`))
+    * Then run:
+
 ```bash
-java -jar ./hawkbit-device-simulator/target/hawkbit-device-simulator-#version#.jar
+export hawkbit_server_ddiurl=http://localhost:8080
+export demo_controller_id=demo
+export hawkbit_tenant_gatewaytoken=gw_token
+
+java -jar ./hawkbit-sdk/hawkbit-sdk-demo/target/hawkbit-sdk-demo-0-SNAPSHOT.jar
 ```
+
+* Execute `start` command in the simulator console to start the device simulation.
+* Your device will be registered automatically on the update server and will start polling for updates.
 
 ## Generate getting started data with the [Management API example](https://github.com/eclipse-hawkbit/hawkbit-examples/tree/master/hawkbit-example-mgmt-simulator) (optional)
 

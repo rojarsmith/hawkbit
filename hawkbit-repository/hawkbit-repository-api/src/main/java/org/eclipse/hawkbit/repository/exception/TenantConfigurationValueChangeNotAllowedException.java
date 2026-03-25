@@ -11,35 +11,22 @@ package org.eclipse.hawkbit.repository.exception;
 
 import java.io.Serial;
 
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import org.eclipse.hawkbit.exception.AbstractServerRtException;
 import org.eclipse.hawkbit.exception.SpServerError;
 
 /**
  * Exception which is supposed to be thrown if a property value is valid but cannot be set in the current context.
  */
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
 public class TenantConfigurationValueChangeNotAllowedException extends AbstractServerRtException {
 
     @Serial
     private static final long serialVersionUID = 1L;
 
-    /**
-     * Creates a new exception for the
-     * {@link SpServerError#SP_CONFIGURATION_VALUE_CHANGE_NOT_ALLOWED} error
-     * case.
-     */
     public TenantConfigurationValueChangeNotAllowedException() {
         super(SpServerError.SP_CONFIGURATION_VALUE_CHANGE_NOT_ALLOWED);
     }
-
-    /**
-     * Creates a new exception for the
-     * {@link SpServerError#SP_CONFIGURATION_VALUE_CHANGE_NOT_ALLOWED} error
-     * case.
-     *
-     * @param message A custom error message.
-     */
-    public TenantConfigurationValueChangeNotAllowedException(final String message) {
-        super(message, SpServerError.SP_CONFIGURATION_VALUE_CHANGE_NOT_ALLOWED);
-    }
-
 }

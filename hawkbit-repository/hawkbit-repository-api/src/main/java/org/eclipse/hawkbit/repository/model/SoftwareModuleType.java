@@ -10,15 +10,18 @@
 package org.eclipse.hawkbit.repository.model;
 
 /**
- * {@link SoftwareModuleType} is an abstract definition used in
- * {@link DistributionSetType}s and includes additional {@link SoftwareModule}
+ * {@link SoftwareModuleType} is an abstract definition used in {@link DistributionSetType}s and includes additional {@link SoftwareModule}
  * specific information.
  */
 public interface SoftwareModuleType extends Type {
 
     /**
-     * @return maximum assignments of an {@link SoftwareModule} of this type to
-     *         a {@link DistributionSet}.
+     * @return thet minimum number of artifacts a {@link SoftwareModule} of this type should have in order to be completed.
+     */
+    int getMinArtifacts();
+
+    /**
+     * @return the maximum assignments of a {@link SoftwareModule} of this type to a {@link DistributionSet}.
      */
     int getMaxAssignments();
 }

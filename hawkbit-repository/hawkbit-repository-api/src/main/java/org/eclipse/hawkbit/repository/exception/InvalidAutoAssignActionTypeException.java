@@ -12,12 +12,16 @@ package org.eclipse.hawkbit.repository.exception;
 
 import java.io.Serial;
 
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import org.eclipse.hawkbit.exception.AbstractServerRtException;
 import org.eclipse.hawkbit.exception.SpServerError;
 
 /**
  * Thrown if an action type for auto-assignment is neither 'forced', nor 'soft'.
  */
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
 public class InvalidAutoAssignActionTypeException extends AbstractServerRtException {
 
     @Serial
@@ -25,9 +29,6 @@ public class InvalidAutoAssignActionTypeException extends AbstractServerRtExcept
 
     private static final SpServerError THIS_ERROR = SpServerError.SP_AUTO_ASSIGN_ACTION_TYPE_INVALID;
 
-    /**
-     * Default constructor.
-     */
     public InvalidAutoAssignActionTypeException() {
         super(THIS_ERROR);
     }

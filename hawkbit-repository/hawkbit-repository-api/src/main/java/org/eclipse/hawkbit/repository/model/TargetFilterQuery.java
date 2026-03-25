@@ -18,7 +18,7 @@ import org.eclipse.hawkbit.repository.model.Action.ActionType;
 
 /**
  * Managed filter entity.
- *
+ * <p/>
  * Supported operators.
  * <ul>
  * <li>{@code Equal to : ==}</li>
@@ -45,6 +45,11 @@ public interface TargetFilterQuery extends TenantAwareBaseEntity {
      * Maximum length of query filter string.
      */
     int QUERY_MAX_SIZE = 1024;
+
+    /**
+     * Maximum length of access control context.
+     */
+    int ACCESS_CONTROL_CONTEXT_MAX_SIZE = 32768;
 
     /**
      * Allowed values for auto-assign action type

@@ -32,17 +32,18 @@ import org.eclipse.hawkbit.mgmt.json.model.softwaremodule.MgmtSoftwareModuleAssi
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class MgmtDistributionSetRequestBodyPost extends MgmtDistributionSetRequestBodyPut {
 
-    // deprecated format from the times where os, application and runtime where statically defined
-    @Schema(hidden = true)
-    private MgmtSoftwareModuleAssignment os;
-
-    @Schema(hidden = true)
-    private MgmtSoftwareModuleAssignment runtime;
-
-    @Schema(hidden = true)
-    private MgmtSoftwareModuleAssignment application;
-    // deprecated format - END
-
+    @Schema(description = "Array of Software Modules assigned to the distribution set. " +
+            "Software Modules assigned to Distribution Set would define the 'complete' property of DistributionSet." +
+            "Assigned Software Modules must be 'complete' in order DistributionSet to be 'complete'." +
+            "Distribution Sets that are not 'complete' cannot be used in a Rollout/Auto-Assignment", example = """
+            [
+              {
+                "id": 1
+              },
+              {
+                "id": 2
+              }
+            ]""")
     private List<MgmtSoftwareModuleAssignment> modules;
 
     @Schema(description = "The type of the distribution set", example = "test_default_ds_type")

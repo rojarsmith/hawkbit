@@ -16,24 +16,27 @@ on:
         description: 'GitLab API token for Dash IP lab (needed only if open_tickets is true)'
         required: false
 
+permissions:
+  contents: write
+
 jobs:
   reusable_workflow_license-scan:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.ref }}
 
       - name: Set up JDK & Maven Central credentials
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: 21
           cache: 'maven'
 
       - name: Cache local Maven repository
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
@@ -50,7 +53,7 @@ jobs:
       - name: Check dependency licenses with dash tool (and open issues to Dash IP lab, doesn't fail)
         if: ${{ inputs.open_tickets }}
         run: |
-          mvn license-tool:license-check -Ddash.fail=false -PcheckLicense -Ddash.iplab.token=${GITLAB_API_TOKEN} --projects '!org.eclipse.hawkbit:hawkbit-repository-test,!org.eclipse.hawkbit:hawkbit-dmf-rabbitmq-test'
+          mvn license-tool:license-check -Ddash.fail=false -PcheckLicense -Ddash.iplab.token=${{ secrets.GITLAB_API_TOKEN }}
           CHANGED_FILES_COUNT=$(git status --short | wc -l)
           CHANGED_FILES_COUNT=${CHANGED_FILES_COUNT//[[:space:]]/}
           echo "Number of changed files: ${CHANGED_FILES_COUNT}"
@@ -75,8 +78,6 @@ jobs:
               exit 1
             fi
           fi
-          # do dash.fail=true so if there are restricted dependencies the build will fail
-          mvn license-tool:license-check -Ddash.fail=true -PcheckLicense -Ddash.iplab.token=${{ secrets.GITLAB_API_TOKEN }} --projects '!org.eclipse.hawkbit:hawkbit-repository-test,!org.eclipse.hawkbit:hawkbit-dmf-rabbitmq-test'
 
-      - name: Check dependency licenses with dash tool (and return the result)
+      - name: Check dependency licenses with dash tool (and fail if there are restricted dependencies)
         run: mvn license-tool:license-check -Ddash.fail=true -PcheckLicense --projects '!org.eclipse.hawkbit:hawkbit-repository-test,!org.eclipse.hawkbit:hawkbit-dmf-rabbitmq-test'

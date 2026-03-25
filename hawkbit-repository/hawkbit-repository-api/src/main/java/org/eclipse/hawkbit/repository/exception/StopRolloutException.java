@@ -11,44 +11,23 @@ package org.eclipse.hawkbit.repository.exception;
 
 import java.io.Serial;
 
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import org.eclipse.hawkbit.exception.AbstractServerRtException;
 import org.eclipse.hawkbit.exception.SpServerError;
 
 /**
- * {@link StopRolloutException} is thrown when an error occurs while stopping
- * the rollout (due to an invalidation of distribution set). This could be
- * caused by a long ongoing creation of a rollout.
+ * {@link StopRolloutException} is thrown when an error occurs while stopping the rollout (due to an invalidation of distribution set).
+ * This could be caused by a long ongoing creation of a rollout.
  */
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
 public class StopRolloutException extends AbstractServerRtException {
 
     @Serial
     private static final long serialVersionUID = 1L;
 
-    /**
-     * Creates a new StopRolloutException with
-     * {@link SpServerError#SP_STOP_ROLLOUT_FAILED} error.
-     */
-    public StopRolloutException() {
-        super(SpServerError.SP_STOP_ROLLOUT_FAILED);
-    }
-
-    /**
-     * Creates a new StopRolloutException with
-     * {@link SpServerError#SP_STOP_ROLLOUT_FAILED} error.
-     *
-     * @param cause for the exception
-     */
-    public StopRolloutException(final Throwable cause) {
-        super(SpServerError.SP_STOP_ROLLOUT_FAILED, cause);
-    }
-
-    /**
-     * Creates a new StopRolloutException with
-     * {@link SpServerError#SP_STOP_ROLLOUT_FAILED} error.
-     *
-     * @param message of the error
-     */
     public StopRolloutException(final String message) {
-        super(message, SpServerError.SP_STOP_ROLLOUT_FAILED);
+        super(SpServerError.SP_STOP_ROLLOUT_FAILED, message);
     }
 }

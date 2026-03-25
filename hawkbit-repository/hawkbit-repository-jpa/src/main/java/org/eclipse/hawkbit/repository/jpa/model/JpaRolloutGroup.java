@@ -9,24 +9,20 @@
  */
 package org.eclipse.hawkbit.repository.jpa.model;
 
-import java.io.Serial;
 import java.util.List;
 import java.util.Map;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
-import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Converter;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.ForeignKey;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
-import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
@@ -46,19 +42,14 @@ import org.eclipse.hawkbit.repository.model.TotalTargetCountStatus;
  */
 @NoArgsConstructor // Default constructor needed for JPA entities.
 @Entity
-@Table(name = "sp_rollout_group", uniqueConstraints = @UniqueConstraint(columnNames = { "name", "rollout", "tenant" }, name = "uk_rollout_group"))
+@Table(name = "sp_rollout_group")
 // exception squid:S2160 - BaseEntity equals/hashcode is handling correctly for sub entities
 @SuppressWarnings("squid:S2160")
 public class JpaRolloutGroup extends AbstractJpaNamedEntity implements RolloutGroup, EventAwareEntity {
 
-    @Serial
-    private static final long serialVersionUID = 1L;
-
     @Getter
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(
-            name = "rollout", nullable = false, updatable = false,
-            foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_rollout_group_rollout"))
+    @JoinColumn(name = "rollout", nullable = false, updatable = false)
     private JpaRollout rollout;
 
     @Setter
@@ -67,9 +58,8 @@ public class JpaRolloutGroup extends AbstractJpaNamedEntity implements RolloutGr
     @Convert(converter = RolloutGroupStatusConverter.class)
     private RolloutGroupStatus status = RolloutGroupStatus.CREATING;
 
-    @OneToMany(
-            mappedBy = "rolloutGroup", fetch = FetchType.LAZY,
-            cascade = { CascadeType.PERSIST, CascadeType.REMOVE }, targetEntity = RolloutTargetGroup.class)
+    @OneToMany(targetEntity = RolloutTargetGroup.class, mappedBy = "rolloutGroup",
+            fetch = FetchType.LAZY, cascade = { CascadeType.PERSIST, CascadeType.REMOVE })
     private List<RolloutTargetGroup> rolloutTargetGroup;
 
     // No foreign key to avoid to many nested cascades on delete which some DBs cannot handle

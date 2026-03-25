@@ -25,18 +25,14 @@ import org.eclipse.hawkbit.mgmt.rest.api.MgmtTargetFilterQueryRestApi;
 import org.eclipse.hawkbit.mgmt.rest.resource.mapper.MgmtDistributionSetMapper;
 import org.eclipse.hawkbit.mgmt.rest.resource.mapper.MgmtTargetFilterQueryMapper;
 import org.eclipse.hawkbit.mgmt.rest.resource.util.PagingUtility;
-import org.eclipse.hawkbit.repository.EntityFactory;
 import org.eclipse.hawkbit.repository.TargetFilterQueryManagement;
-import org.eclipse.hawkbit.repository.TenantConfigurationManagement;
-import org.eclipse.hawkbit.repository.builder.AutoAssignDistributionSetUpdate;
+import org.eclipse.hawkbit.repository.TargetFilterQueryManagement.AutoAssignDistributionSetUpdate;
 import org.eclipse.hawkbit.repository.exception.EntityNotFoundException;
+import org.eclipse.hawkbit.repository.helper.TenantConfigHelper;
 import org.eclipse.hawkbit.repository.model.DistributionSet;
 import org.eclipse.hawkbit.repository.model.TargetFilterQuery;
-import org.eclipse.hawkbit.security.SystemSecurityContext;
-import org.eclipse.hawkbit.utils.TenantConfigHelper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -48,17 +44,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class MgmtTargetFilterQueryResource implements MgmtTargetFilterQueryRestApi {
 
-    private final TargetFilterQueryManagement filterManagement;
-    private final EntityFactory entityFactory;
-    private final TenantConfigHelper tenantConfigHelper;
+    private final TargetFilterQueryManagement<? extends TargetFilterQuery> filterManagement;
 
-    MgmtTargetFilterQueryResource(
-            final TargetFilterQueryManagement filterManagement, final EntityFactory entityFactory,
-            final SystemSecurityContext systemSecurityContext,
-            final TenantConfigurationManagement tenantConfigurationManagement) {
+    MgmtTargetFilterQueryResource(final TargetFilterQueryManagement<? extends TargetFilterQuery> filterManagement) {
         this.filterManagement = filterManagement;
-        this.entityFactory = entityFactory;
-        this.tenantConfigHelper = TenantConfigHelper.usingContext(systemSecurityContext, tenantConfigurationManagement);
     }
 
     @Override
@@ -66,7 +55,7 @@ public class MgmtTargetFilterQueryResource implements MgmtTargetFilterQueryRestA
         final TargetFilterQuery findTarget = findFilterWithExceptionIfNotFound(filterId);
         // to single response include poll status
         final MgmtTargetFilterQuery response = MgmtTargetFilterQueryMapper.toResponse(findTarget,
-                tenantConfigHelper.isConfirmationFlowEnabled(), true);
+                TenantConfigHelper.isUserConfirmationFlowEnabled(), true);
         MgmtTargetFilterQueryMapper.addLinks(response);
 
         return ResponseEntity.ok(response);
@@ -77,30 +66,26 @@ public class MgmtTargetFilterQueryResource implements MgmtTargetFilterQueryRestA
             final String rsqlParam, final int pagingOffsetParam, final int pagingLimitParam, final String sortParam,
             final String representationModeParam) {
         final Pageable pageable = PagingUtility.toPageable(pagingOffsetParam, pagingLimitParam, sanitizeTargetFilterQuerySortParam(sortParam));
-        final Slice<TargetFilterQuery> findTargetFiltersAll;
-        final long countTargetsAll;
+        final Page<? extends TargetFilterQuery> findTargetFiltersAll;
         if (rsqlParam != null) {
-            final Page<TargetFilterQuery> findFilterPage = filterManagement.findByRsql(rsqlParam, pageable);
-            countTargetsAll = findFilterPage.getTotalElements();
-            findTargetFiltersAll = findFilterPage;
+            findTargetFiltersAll = filterManagement.findByRsql(rsqlParam, pageable);
         } else {
             findTargetFiltersAll = filterManagement.findAll(pageable);
-            countTargetsAll = filterManagement.count();
         }
 
         final boolean isRepresentationFull = parseRepresentationMode(representationModeParam) == MgmtRepresentationMode.FULL;
 
-        final List<MgmtTargetFilterQuery> rest = MgmtTargetFilterQueryMapper
-                .toResponse(findTargetFiltersAll.getContent(), tenantConfigHelper.isConfirmationFlowEnabled(), isRepresentationFull);
-        return ResponseEntity.ok(new PagedList<>(rest, countTargetsAll));
+        final List<MgmtTargetFilterQuery> rest = MgmtTargetFilterQueryMapper.toResponse(
+                findTargetFiltersAll.getContent(), TenantConfigHelper.isUserConfirmationFlowEnabled(), isRepresentationFull);
+        return ResponseEntity.ok(new PagedList<>(rest, filterManagement.count()));
     }
 
     @Override
     public ResponseEntity<MgmtTargetFilterQuery> createFilter(final MgmtTargetFilterQueryRequestBody filter) {
-        final TargetFilterQuery createdTarget = filterManagement.create(MgmtTargetFilterQueryMapper.fromRequest(entityFactory, filter));
+        final TargetFilterQuery createdTarget = filterManagement.create(MgmtTargetFilterQueryMapper.fromRequest(filter));
 
         final MgmtTargetFilterQuery response = MgmtTargetFilterQueryMapper.toResponse(
-                createdTarget, tenantConfigHelper.isConfirmationFlowEnabled(), false);
+                createdTarget, TenantConfigHelper.isUserConfirmationFlowEnabled(), false);
         MgmtTargetFilterQueryMapper.addLinks(response);
 
         return new ResponseEntity<>(response, HttpStatus.CREATED);
@@ -111,11 +96,12 @@ public class MgmtTargetFilterQueryResource implements MgmtTargetFilterQueryRestA
         log.debug("updating target filter query {}", filterId);
 
         final TargetFilterQuery updateFilter = filterManagement
-                .update(entityFactory.targetFilterQuery().update(filterId).name(targetFilterRest.getName())
-                        .query(targetFilterRest.getQuery()));
+                .update(TargetFilterQueryManagement.Update.builder()
+                        .id(filterId).name(targetFilterRest.getName()).query(targetFilterRest.getQuery())
+                        .build());
 
         final MgmtTargetFilterQuery response = MgmtTargetFilterQueryMapper.toResponse(updateFilter,
-                tenantConfigHelper.isConfirmationFlowEnabled(), false);
+                TenantConfigHelper.isUserConfirmationFlowEnabled(), false);
         MgmtTargetFilterQueryMapper.addLinks(response);
 
         return ResponseEntity.ok(response);
@@ -126,7 +112,7 @@ public class MgmtTargetFilterQueryResource implements MgmtTargetFilterQueryRestA
     public ResponseEntity<Void> deleteFilter(final Long filterId) {
         filterManagement.delete(filterId);
         log.debug("{} target filter query deleted, return status {}", filterId, HttpStatus.OK);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
     @Override
@@ -148,16 +134,16 @@ public class MgmtTargetFilterQueryResource implements MgmtTargetFilterQueryRestA
     public ResponseEntity<MgmtTargetFilterQuery> postAssignedDistributionSet(
             final Long filterId, final MgmtDistributionSetAutoAssignment autoAssignRequest) {
         final boolean confirmationRequired = autoAssignRequest.getConfirmationRequired() == null
-                ? tenantConfigHelper.isConfirmationFlowEnabled()
+                ? TenantConfigHelper.isUserConfirmationFlowEnabled()
                 : autoAssignRequest.getConfirmationRequired();
 
         final AutoAssignDistributionSetUpdate update = MgmtTargetFilterQueryMapper
-                .fromRequest(entityFactory, filterId, autoAssignRequest).confirmationRequired(confirmationRequired);
+                .fromRequest(filterId, autoAssignRequest).confirmationRequired(confirmationRequired);
 
         final TargetFilterQuery updateFilter = filterManagement.updateAutoAssignDS(update);
 
         final MgmtTargetFilterQuery response = MgmtTargetFilterQueryMapper.toResponse(updateFilter,
-                tenantConfigHelper.isConfirmationFlowEnabled(), false);
+                TenantConfigHelper.isUserConfirmationFlowEnabled(), false);
         MgmtTargetFilterQueryMapper.addLinks(response);
 
         return ResponseEntity.ok(response);
@@ -166,7 +152,7 @@ public class MgmtTargetFilterQueryResource implements MgmtTargetFilterQueryRestA
     @Override
     @AuditLog(entity = "TargetFilter", type = AuditLog.Type.DELETE, description = "Delete Target Filter Assigned Distribution Set")
     public ResponseEntity<Void> deleteAssignedDistributionSet(final Long filterId) {
-        filterManagement.updateAutoAssignDS(entityFactory.targetFilterQuery().updateAutoAssign(filterId).ds(null));
+        filterManagement.updateAutoAssignDS(new AutoAssignDistributionSetUpdate(filterId).ds(null));
         return ResponseEntity.noContent().build();
     }
 
@@ -179,7 +165,7 @@ public class MgmtTargetFilterQueryResource implements MgmtTargetFilterQueryRestA
     }
 
     private TargetFilterQuery findFilterWithExceptionIfNotFound(final Long filterId) {
-        return filterManagement.get(filterId)
+        return filterManagement.find(filterId)
                 .orElseThrow(() -> new EntityNotFoundException(TargetFilterQuery.class, filterId));
     }
 }

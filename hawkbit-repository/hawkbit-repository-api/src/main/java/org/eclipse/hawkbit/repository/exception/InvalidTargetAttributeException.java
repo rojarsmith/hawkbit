@@ -12,9 +12,13 @@ package org.eclipse.hawkbit.repository.exception;
 
 import java.io.Serial;
 
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import org.eclipse.hawkbit.exception.AbstractServerRtException;
 import org.eclipse.hawkbit.exception.SpServerError;
 
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
 public class InvalidTargetAttributeException extends AbstractServerRtException {
 
     @Serial
@@ -22,9 +26,6 @@ public class InvalidTargetAttributeException extends AbstractServerRtException {
 
     private static final SpServerError THIS_ERROR = SpServerError.SP_TARGET_ATTRIBUTES_INVALID;
 
-    /**
-     * Default constructor.
-     */
     public InvalidTargetAttributeException() {
         super(THIS_ERROR);
     }

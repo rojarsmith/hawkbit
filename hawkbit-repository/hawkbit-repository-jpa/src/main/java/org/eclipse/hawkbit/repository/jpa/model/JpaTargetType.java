@@ -9,20 +9,15 @@
  */
 package org.eclipse.hawkbit.repository.jpa.model;
 
-import java.io.Serial;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
-import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Entity;
-import jakarta.persistence.ForeignKey;
-import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 
 import lombok.NoArgsConstructor;
 import lombok.ToString;
@@ -40,26 +35,16 @@ import org.eclipse.hawkbit.repository.model.TargetType;
 @NoArgsConstructor // Default constructor for JPA
 @ToString(callSuper = true)
 @Entity
-@Table(name = "sp_target_type", indexes = {
-        @Index(name = "sp_idx_target_type_prim", columnList = "tenant,id") }, uniqueConstraints = {
-        @UniqueConstraint(columnNames = { "name", "tenant" }, name = "uk_target_name") })
+@Table(name = "sp_target_type")
 @SuppressWarnings("java:S2160") // the super class equals/hashcode shall be used
 public class JpaTargetType extends AbstractJpaTypeEntity implements TargetType, EventAwareEntity {
-
-    @Serial
-    private static final long serialVersionUID = 1L;
 
     @ManyToMany(targetEntity = JpaDistributionSetType.class)
     @JoinTable(
             name = "sp_target_type_ds_type",
-            joinColumns = {
-                    @JoinColumn(
-                            name = "target_type", nullable = false,
-                            foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_target_type_ds_type_target_type")) },
-            inverseJoinColumns = {
-                    @JoinColumn(
-                            name = "distribution_set_type", nullable = false,
-                            foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_target_type_ds_type_distribution_set_type")) })
+            joinColumns = { @JoinColumn(name = "target_type", nullable = false) },
+            inverseJoinColumns = { @JoinColumn(name = "distribution_set_type", nullable = false) }
+    )
     private Set<DistributionSetType> distributionSetTypes = new HashSet<>();
 
     public JpaTargetType(final String key, final String name, final String description, final String colour) {
@@ -78,7 +63,7 @@ public class JpaTargetType extends AbstractJpaTypeEntity implements TargetType, 
     }
 
     @Override
-    public Set<DistributionSetType> getCompatibleDistributionSetTypes() {
+    public Set<DistributionSetType> getDistributionSetTypes() {
         return Collections.unmodifiableSet(distributionSetTypes);
     }
 
@@ -88,12 +73,11 @@ public class JpaTargetType extends AbstractJpaTypeEntity implements TargetType, 
      * @param dsTypeId Distribution set type ID
      * @return Target type
      */
-    public JpaTargetType removeDistributionSetType(final Long dsTypeId) {
+    public void removeDistributionSetType(final Long dsTypeId) {
         distributionSetTypes.stream()
                 .filter(element -> element.getId().equals(dsTypeId))
                 .findAny()
                 .ifPresent(distributionSetTypes::remove);
-        return this;
     }
 
     @Override

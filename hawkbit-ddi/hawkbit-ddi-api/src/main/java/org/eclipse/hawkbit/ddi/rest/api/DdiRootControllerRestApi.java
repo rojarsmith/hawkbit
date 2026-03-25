@@ -9,6 +9,12 @@
  */
 package org.eclipse.hawkbit.ddi.rest.api;
 
+import static org.eclipse.hawkbit.rest.ApiResponsesConstants.GONE_410;
+import static org.eclipse.hawkbit.rest.ApiResponsesConstants.INTERNAL_SERVER_ERROR_500;
+import static org.eclipse.hawkbit.rest.ApiResponsesConstants.METHOD_NOT_ALLOWED_405;
+import static org.springframework.hateoas.MediaTypes.HAL_JSON_VALUE;
+import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
+
 import java.io.InputStream;
 import java.lang.annotation.Target;
 import java.util.List;
@@ -35,8 +41,10 @@ import org.eclipse.hawkbit.ddi.json.model.DdiConfirmationBaseAction;
 import org.eclipse.hawkbit.ddi.json.model.DdiConfirmationFeedback;
 import org.eclipse.hawkbit.ddi.json.model.DdiControllerBase;
 import org.eclipse.hawkbit.ddi.json.model.DdiDeploymentBase;
-import org.eclipse.hawkbit.rest.json.model.ExceptionInfo;
-import org.springframework.hateoas.MediaTypes;
+import org.eclipse.hawkbit.rest.ApiResponsesConstants.GetIfExistResponses;
+import org.eclipse.hawkbit.rest.ApiResponsesConstants.GetResponses;
+import org.eclipse.hawkbit.rest.ApiResponsesConstants.PostUpdateResponses;
+import org.eclipse.hawkbit.rest.ApiResponsesConstants.PutResponses;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -55,6 +63,57 @@ import org.springframework.web.bind.annotation.RequestParam;
 public interface DdiRootControllerRestApi {
 
     /**
+     * The base URL mapping of the direct device integration rest resources.
+     */
+    String CONTROLLER_V1 = "/{tenant}/controller/v1";
+
+    /**
+     * Deployment action resources.
+     */
+    String DEPLOYMENT_BASE = "deploymentBase";
+    /**
+     * Confirmation base resource.
+     */
+    String CONFIRMATION_BASE = "confirmationBase";
+    /**
+     * Installed action resources.
+     */
+    String INSTALLED_BASE = "installedBase";
+    /**
+     * Feedback channel.
+     */
+    String FEEDBACK = "feedback";
+    /**
+     * Cancel action resources.
+     */
+    String CANCEL_ACTION = "cancelAction";
+    /**
+     * Config data action resources.
+     */
+    String CONFIG_DATA = "configData";
+    /**
+     * Activate auto-confirm
+     */
+    String ACTIVATE_AUTO_CONFIRM = "activateAutoConfirm";
+    /**
+     * Deactivate auto-confirm
+     */
+    String DEACTIVATE_AUTO_CONFIRM = "deactivateAutoConfirm";
+    /**
+     * Media type for CBOR content.
+     */
+    String MEDIA_TYPE_APPLICATION_CBOR = "application/cbor";
+    /**
+     * File suffix for MDH hash download (see Linux md5sum).
+     */
+    String ARTIFACT_MD5_DOWNLOAD_SUFFIX = ".MD5SUM";
+    /**
+     * Default value specifying that no action history to be sent as part of response to deploymentBase
+     * {@link DdiRootControllerRestApi#getControllerDeploymentBaseAction}, {@link DdiRootControllerRestApi#getConfirmationBaseAction}.
+     */
+    String NO_ACTION_HISTORY = "0";
+
+    /**
      * Returns all artifacts of a given software module and target.
      *
      * @param tenant of the client
@@ -64,25 +123,9 @@ public interface DdiRootControllerRestApi {
      */
     @Operation(summary = "Return all artifacts of a given software module and target",
             description = "Returns all artifacts that are assigned to the software module")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully retrieved"),
-            @ApiResponse(responseCode = "400", description = "Bad Request - e.g. invalid parameters",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ExceptionInfo.class))),
-            @ApiResponse(responseCode = "401", description = "The request requires user authentication.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "403", description = "Insufficient permissions, entity is not allowed to be " +
-                    "changed (i.e. read-only) or data volume restriction applies.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "405", description = "The http request method is not allowed on the resource.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "406", description = "In case accept header is specified and not application/json.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "429", description = "Too many requests. The server will refuse further attempts " +
-                    "and the client has to wait another second.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true)))
-    })
-    @GetMapping(value = DdiRestConstants.BASE_V1_REQUEST_MAPPING + "/{controllerId}/softwaremodules/{softwareModuleId}/artifacts",
-            produces = { MediaTypes.HAL_JSON_VALUE, MediaType.APPLICATION_JSON_VALUE, DdiRestConstants.MEDIA_TYPE_CBOR })
+    @GetIfExistResponses
+    @GetMapping(value = CONTROLLER_V1 + "/{controllerId}/softwaremodules/{softwareModuleId}/artifacts",
+            produces = { HAL_JSON_VALUE, APPLICATION_JSON_VALUE, MEDIA_TYPE_APPLICATION_CBOR })
     ResponseEntity<List<DdiArtifact>> getSoftwareModulesArtifacts(
             @PathVariable("tenant") String tenant,
             @PathVariable("controllerId") String controllerId,
@@ -100,28 +143,12 @@ public interface DdiRootControllerRestApi {
             retrieve actions that need to be executed. Those are provided as a list of links to give more detailed
             information about the action. Links are only available for initial configuration, open actions, or the latest
             installed action, respectively. The resource supports Etag based modification checks in order to save traffic.
-                        
+            
             Note: deployments have to be confirmed in order to move on to the next action. Cancellations have to be
             confirmed or rejected.""")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully retrieved"),
-            @ApiResponse(responseCode = "400", description = "Bad Request - e.g. invalid parameters",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ExceptionInfo.class))),
-            @ApiResponse(responseCode = "401", description = "The request requires user authentication.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "403", description = "Insufficient permissions, entity is not allowed to " +
-                    "be changed (i.e. read-only) or data volume restriction applies.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "405", description = "The http request method is not allowed on the resource.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "406", description = "In case accept header is specified and not application/json.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "429", description = "Too many requests. The server will refuse further attempts " +
-                    "and the client has to wait another second.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true)))
-    })
-    @GetMapping(value = DdiRestConstants.BASE_V1_REQUEST_MAPPING + "/{controllerId}",
-            produces = { MediaTypes.HAL_JSON_VALUE, MediaType.APPLICATION_JSON_VALUE, DdiRestConstants.MEDIA_TYPE_CBOR })
+    @GetResponses
+    @GetMapping(value = CONTROLLER_V1 + "/{controllerId}",
+            produces = { HAL_JSON_VALUE, APPLICATION_JSON_VALUE, MEDIA_TYPE_APPLICATION_CBOR })
     ResponseEntity<DdiControllerBase> getControllerBase(
             @PathVariable("tenant") String tenant,
             @PathVariable("controllerId") String controllerId);
@@ -137,29 +164,15 @@ public interface DdiRootControllerRestApi {
      * @return response of the servlet which in case of success is status code
      *         {@link HttpStatus#OK} or in case of partial download {@link HttpStatus#PARTIAL_CONTENT}.
      */
-    @Operation(summary = "Artifact download", description = "Handles GET DdiArtifact download request. This could be " +
-            "full or partial (as specified by RFC7233 (Range Requests)) download request.")
+    @Operation(summary = "Artifact download",
+            description = "Handles GET DdiArtifact download request. This could be full or partial (as specified by RFC7233 (Range Requests)) " +
+                    "download request.")
+    @GetResponses
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully retrieved"),
-            @ApiResponse(responseCode = "400", description = "Bad Request - e.g. invalid parameters",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ExceptionInfo.class))),
-            @ApiResponse(responseCode = "401", description = "The request requires user authentication.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "403", description = "Insufficient permissions, entity is not allowed to be" +
-                    " changed (i.e. read-only) or data volume restriction applies.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "404", description = "Target or Module not found",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "405", description = "The http request method is not allowed on the resource.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "406", description = "In case accept header is specified and not application/json.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "429", description = "Too many requests. The server will refuse further attempts" +
-                    " and the client has to wait another second.",
+            @ApiResponse(responseCode = INTERNAL_SERVER_ERROR_500, description = "Artifact download or decryption failed",
                     content = @Content(mediaType = "application/json", schema = @Schema(hidden = true)))
     })
-    @GetMapping(value = DdiRestConstants.BASE_V1_REQUEST_MAPPING +
-            "/{controllerId}/softwaremodules/{softwareModuleId}/artifacts/{fileName}")
+    @GetMapping(value = CONTROLLER_V1 + "/{controllerId}/softwaremodules/{softwareModuleId}/artifacts/{fileName}")
     ResponseEntity<InputStream> downloadArtifact(
             @PathVariable("tenant") String tenant,
             @PathVariable("controllerId") String controllerId,
@@ -177,27 +190,9 @@ public interface DdiRootControllerRestApi {
      */
     @Operation(summary = "MD5 checksum download",
             description = "Handles GET {@link DdiArtifact} MD5 checksum file download request.")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully retrieved"),
-            @ApiResponse(responseCode = "400", description = "Bad Request - e.g. invalid parameters",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ExceptionInfo.class))),
-            @ApiResponse(responseCode = "401", description = "The request requires user authentication.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "403", description = "Insufficient permissions, entity is not allowed to be " +
-                    "changed (i.e. read-only) or data volume restriction applies.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "404", description = "Target or Module not found",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "405", description = "The http request method is not allowed on the resource.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "406", description = "In case accept header is specified and not application/json.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "429", description = "Too many requests. The server will refuse further attempts " +
-                    "and the client has to wait another second.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true)))
-    })
-    @GetMapping(value = DdiRestConstants.BASE_V1_REQUEST_MAPPING + "/{controllerId}/softwaremodules/{softwareModuleId}/artifacts/{fileName}" +
-            DdiRestConstants.ARTIFACT_MD5_DOWNLOAD_SUFFIX, produces = MediaType.TEXT_PLAIN_VALUE)
+    @GetResponses
+    @GetMapping(value = CONTROLLER_V1 + "/{controllerId}/softwaremodules/{softwareModuleId}/artifacts/{fileName}" + ARTIFACT_MD5_DOWNLOAD_SUFFIX,
+            produces = MediaType.TEXT_PLAIN_VALUE)
     ResponseEntity<Void> downloadArtifactMd5(
             @PathVariable("tenant") String tenant,
             @PathVariable("controllerId") String controllerId,
@@ -214,7 +209,7 @@ public interface DdiRootControllerRestApi {
      *         the eTag needs to be re-generated
      * @param actionHistoryMessageCount specifies the number of messages to be returned from action history. Regardless of the passed value,
      *         in order to restrict resource utilization by controllers, maximum number of
-     *         messages that are retrieved from database is limited by {@link RepositoryConstants#MAX_ACTION_HISTORY_MSG_COUNT}.
+     *         messages that are retrieved from database is limited by RepositoryConstants#MAX_ACTION_HISTORY_MSG_COUNT.
      *         actionHistoryMessageCount less than zero: retrieves the maximum allowed number of action status messages from history;
      *         actionHistoryMessageCount equal to zero: does not retrieve any message;
      *         actionHistoryMessageCount greater than zero: retrieves the specified number of messages, limited by maximum allowed number.
@@ -222,51 +217,20 @@ public interface DdiRootControllerRestApi {
      */
     @Operation(summary = "Resource for software module (Deployment Base)", description = """
             Core resource for deployment operations. Contains all information necessary in order to execute the operation.
-                        
+            
             Keep in mind that the provided download links for the artifacts are generated dynamically by the update server.
             Host, port and path and not guaranteed to be similar to the provided examples below but will be defined at
             runtime.
             """)
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = """
-                    Successfully retrieved
-                                        
-                    In case a device provides state information on the feedback channel and won’t store it locally,
-                    a query for, e.q, the last 10 messages, could be used which will include the previously provided by the
-                    device,
-                    feedback.
-                                        
-                    In addition to the straight forward approach to inform the device to download and install the software
-                    in one transaction hawkBit supports the separation of download and installation into separate steps.
-                                        
-                    This feature is called Maintenance Window where the device is informed to download the software first
-                    and then when it enters a defined (maintenance) window the installation triggers follows as usual.
-                    """),
-            @ApiResponse(responseCode = "400", description = "Bad Request - e.g. invalid parameters",
-                    content = @Content(mediaType = "application/json",
-                            schema = @Schema(implementation = ExceptionInfo.class))),
-            @ApiResponse(responseCode = "401", description = "The request requires user authentication.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "403",
-                    description = "Insufficient permissions, entity is not allowed to be changed (i.e. read-only) or " +
-                            "data volume restriction applies.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "405", description = "The http request method is not allowed on the resource.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "406", description = "In case accept header is specified and not application/json.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "429", description = "Too many requests. The server will refuse further attempts " +
-                    "and the client has to wait another second.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true)))
-    })
-    @GetMapping(value = DdiRestConstants.BASE_V1_REQUEST_MAPPING + "/{controllerId}/" + DdiRestConstants.DEPLOYMENT_BASE_ACTION + "/{actionId}",
-            produces = { MediaTypes.HAL_JSON_VALUE, MediaType.APPLICATION_JSON_VALUE, DdiRestConstants.MEDIA_TYPE_CBOR })
+    @GetResponses
+    @GetMapping(value = CONTROLLER_V1 + "/{controllerId}/" + DEPLOYMENT_BASE + "/{actionId}",
+            produces = { HAL_JSON_VALUE, APPLICATION_JSON_VALUE, MEDIA_TYPE_APPLICATION_CBOR })
     ResponseEntity<DdiDeploymentBase> getControllerDeploymentBaseAction(
             @PathVariable("tenant") String tenant,
             @PathVariable("controllerId") @NotEmpty String controllerId,
             @PathVariable("actionId") @NotNull Long actionId,
             @RequestParam(value = "c", required = false, defaultValue = "-1") int resource,
-            @RequestParam(value = "actionHistory", defaultValue = DdiRestConstants.NO_ACTION_HISTORY)
+            @RequestParam(value = "actionHistory", defaultValue = NO_ACTION_HISTORY)
             @Schema(description = """
                     (Optional) GET parameter to retrieve a given number of messages which are previously provided by the
                     device. Useful if the devices sent state information to the feedback channel and never stored them
@@ -286,35 +250,13 @@ public interface DdiRootControllerRestApi {
             However, the action will be kept open until the controller on the device reports a finished (either successful
             or error).
             """)
+    @PostUpdateResponses
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully retrieved"),
-            @ApiResponse(responseCode = "400", description = "Bad Request - e.g. invalid parameters",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ExceptionInfo.class))),
-            @ApiResponse(responseCode = "401", description = "The request requires user authentication.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "403", description = "Insufficient permissions, entity is not allowed to be " +
-                    "changed (i.e. read-only) or data volume restriction applies.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "404", description = "Target not found",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "405", description = "The http request method is not allowed on the resource.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "406", description = "In case accept header is specified and not application/json.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "409", description = "E.g. in case an entity is created or modified by another " +
-                    "user in another request at the same time. You may retry your modification request.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "410", description = "Action is not active anymore.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "415", description = "The request was attempt with a media-type which is not " +
-                    "supported by the server for this resource.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "429", description = "Too many requests. The server will refuse further attempts " +
-                    "and the client has to wait another second.",
+            @ApiResponse(responseCode = GONE_410, description = "Action is not active anymore.",
                     content = @Content(mediaType = "application/json", schema = @Schema(hidden = true)))
     })
-    @PostMapping(value = DdiRestConstants.BASE_V1_REQUEST_MAPPING + "/{controllerId}/" + DdiRestConstants.DEPLOYMENT_BASE_ACTION +
-            "/{actionId}/" + DdiRestConstants.FEEDBACK, consumes = { MediaType.APPLICATION_JSON_VALUE, DdiRestConstants.MEDIA_TYPE_CBOR })
+    @PostMapping(value = CONTROLLER_V1 + "/{controllerId}/" + DEPLOYMENT_BASE +
+            "/{actionId}/" + FEEDBACK, consumes = { APPLICATION_JSON_VALUE, MEDIA_TYPE_APPLICATION_CBOR })
     ResponseEntity<Void> postDeploymentBaseActionFeedback(
             @Valid @RequestBody DdiActionFeedback feedback,
             @PathVariable("tenant") String tenant,
@@ -333,31 +275,9 @@ public interface DdiRootControllerRestApi {
             The usual behaviour is that when a new device registers at the server it is requested to provide the meta
             information that will allow the server to identify the device on a hardware level (e.g. hardware revision,
             mac address, serial number etc.).""")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully retrieved"),
-            @ApiResponse(responseCode = "400", description = "Bad Request - e.g. invalid parameters",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ExceptionInfo.class))),
-            @ApiResponse(responseCode = "401", description = "The request requires user authentication.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "403", description = "Insufficient permissions, entity is not allowed to be " +
-                    "changed (i.e. read-only) or data volume restriction applies.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "405", description = "The http request method is not allowed on the resource.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "406", description = "In case accept header is specified and not application/json.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "409", description = "E.g. in case an entity is created or modified by another " +
-                    "user in another request at the same time. You may retry your modification request.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "415", description = "The request was attempt with a media-type which is not " +
-                    "supported by the server for this resource.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "429", description = "Too many requests. The server will refuse further attempts " +
-                    "and the client has to wait another second.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true)))
-    })
-    @PutMapping(value = DdiRestConstants.BASE_V1_REQUEST_MAPPING + "/{controllerId}/" + DdiRestConstants.CONFIG_DATA_ACTION,
-            consumes = { MediaType.APPLICATION_JSON_VALUE, DdiRestConstants.MEDIA_TYPE_CBOR })
+    @PutResponses
+    @PutMapping(value = CONTROLLER_V1 + "/{controllerId}/" + CONFIG_DATA,
+            consumes = { APPLICATION_JSON_VALUE, MEDIA_TYPE_APPLICATION_CBOR })
     ResponseEntity<Void> putConfigData(
             @Valid @RequestBody DdiConfigData configData,
             @PathVariable("tenant") String tenant,
@@ -373,26 +293,10 @@ public interface DdiRootControllerRestApi {
      */
     @Operation(summary = "Cancel an action", description = """
             The Hawkbit server might cancel an operation, e.g. an unfinished update has a successor. It is up to the
-            provisioning target to decide to accept the cancelation or reject it.""")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully retrieved"),
-            @ApiResponse(responseCode = "400", description = "Bad Request - e.g. invalid parameters",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ExceptionInfo.class))),
-            @ApiResponse(responseCode = "401", description = "The request requires user authentication.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "403", description = "Insufficient permissions, entity is not allowed to be " +
-                    "changed (i.e. read-only) or data volume restriction applies.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "405", description = "The http request method is not allowed on the resource.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "406", description = "In case accept header is specified and not application/json.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "429", description = "Too many requests. The server will refuse further attempts " +
-                    "and the client has to wait another second.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true)))
-    })
-    @GetMapping(value = DdiRestConstants.BASE_V1_REQUEST_MAPPING + "/{controllerId}/" + DdiRestConstants.CANCEL_ACTION + "/{actionId}",
-            produces = { MediaTypes.HAL_JSON_VALUE, MediaType.APPLICATION_JSON_VALUE, DdiRestConstants.MEDIA_TYPE_CBOR })
+            provisioning target to decide to accept the cancellation or reject it.""")
+    @GetResponses
+    @GetMapping(value = CONTROLLER_V1 + "/{controllerId}/" + CANCEL_ACTION + "/{actionId}",
+            produces = { HAL_JSON_VALUE, APPLICATION_JSON_VALUE, MEDIA_TYPE_APPLICATION_CBOR })
     ResponseEntity<DdiCancel> getControllerCancelAction(
             @PathVariable("tenant") String tenant,
             @PathVariable("controllerId") @NotEmpty String controllerId,
@@ -411,31 +315,12 @@ public interface DdiRootControllerRestApi {
             It is up to the device how much intermediate feedback is provided. However, the action will be kept open
             until the controller on the device reports a finished (either successful or error) or rejects the action,
             e.g. the canceled actions have been started already.""")
+    @PostUpdateResponses
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully retrieved"),
-            @ApiResponse(responseCode = "400", description = "Bad Request - e.g. invalid parameters",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ExceptionInfo.class))),
-            @ApiResponse(responseCode = "401", description = "The request requires user authentication.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "403", description = "Insufficient permissions, entity is not allowed to be " +
-                    "changed (i.e. read-only) or data volume restriction applies.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "405", description = "The http request method is not allowed on the resource.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "406", description = "In case accept header is specified and not application/json.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "409", description = "E.g. in case an entity is created or modified by another " +
-                    "user in another request at the same time. You may retry your modification request.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "415", description = "The request was attempt with a media-type which is not " +
-                    "supported by the server for this resource.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "429", description = "Too many requests. The server will refuse further attempts " +
-                    "and the client has to wait another second.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true)))
+            @ApiResponse(responseCode = METHOD_NOT_ALLOWED_405, description = "The action is not cancelable / force quitable", content = @Content(mediaType = "application/json", schema = @Schema(hidden = true)))
     })
-    @PostMapping(value = DdiRestConstants.BASE_V1_REQUEST_MAPPING + "/{controllerId}/" + DdiRestConstants.CANCEL_ACTION + "/{actionId}/" +
-            DdiRestConstants.FEEDBACK, consumes = { MediaType.APPLICATION_JSON_VALUE, DdiRestConstants.MEDIA_TYPE_CBOR })
+    @PostMapping(value = CONTROLLER_V1 + "/{controllerId}/" + CANCEL_ACTION + "/{actionId}/" +
+            FEEDBACK, consumes = { APPLICATION_JSON_VALUE, MEDIA_TYPE_APPLICATION_CBOR })
     ResponseEntity<Void> postCancelActionFeedback(
             @Valid @RequestBody DdiActionFeedback feedback,
             @PathVariable("tenant") String tenant,
@@ -450,7 +335,7 @@ public interface DdiRootControllerRestApi {
      * @param actionId of the {@link DdiDeploymentBase} that matches to installed action.
      * @param actionHistoryMessageCount specifies the number of messages to be returned from action
      *         history. Regardless of the passed value, in order to restrict resource utilization by controllers, maximum number of
-     *         messages that are retrieved from database is limited by {@link RepositoryConstants#MAX_ACTION_HISTORY_MSG_COUNT}.
+     *         messages that are retrieved from database is limited by RepositoryConstants#MAX_ACTION_HISTORY_MSG_COUNT.
      *         actionHistoryMessageCount less than zero: retrieves the maximum allowed number of action status messages from history;
      *         actionHistoryMessageCount equal to zero: does not retrieve any message;
      *         actionHistoryMessageCount greater than zero: retrieves the specified number of messages, limited by maximum allowed number.
@@ -461,40 +346,19 @@ public interface DdiRootControllerRestApi {
             the already finished action, for example in case a re-installation is necessary. The response will be of
             the same format as the deploymentBase operation, providing the previous action that has been finished
             successfully. As the action is already finished, no further feedback is expected.
-                        
+            
             Keep in mind that the provided download links for the artifacts are generated dynamically by the update server.
             Host, port and path are not guaranteed to be similar to the provided examples below but will be defined at
             runtime.
             """)
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = """
-                    The response body includes the detailed operation for the already finished action in the same format as
-                    for the deploymentBase operation.
-                                        
-                    In this case the (optional) query for the last 10 messages, previously provided by the device, are included.
-                    """),
-            @ApiResponse(responseCode = "400", description = "Bad Request - e.g. invalid parameters",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ExceptionInfo.class))),
-            @ApiResponse(responseCode = "401", description = "The request requires user authentication.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "403", description = "Insufficient permissions, entity is not allowed to be " +
-                    "changed (i.e. read-only) or data volume restriction applies.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "405", description = "The http request method is not allowed on the resource.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "406", description = "In case accept header is specified and not application/json.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "429", description = "Too many requests. The server will refuse further attempts " +
-                    "and the client has to wait another second.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true)))
-    })
-    @GetMapping(value = DdiRestConstants.BASE_V1_REQUEST_MAPPING + "/{controllerId}/" + DdiRestConstants.INSTALLED_BASE_ACTION + "/{actionId}",
-            produces = { MediaTypes.HAL_JSON_VALUE, MediaType.APPLICATION_JSON_VALUE, DdiRestConstants.MEDIA_TYPE_CBOR })
+    @GetResponses
+    @GetMapping(value = CONTROLLER_V1 + "/{controllerId}/" + INSTALLED_BASE + "/{actionId}",
+            produces = { HAL_JSON_VALUE, APPLICATION_JSON_VALUE, MEDIA_TYPE_APPLICATION_CBOR })
     ResponseEntity<DdiDeploymentBase> getControllerInstalledAction(
             @PathVariable("tenant") String tenant,
             @PathVariable("controllerId") @NotEmpty String controllerId,
             @PathVariable("actionId") @NotNull Long actionId,
-            @RequestParam(value = "actionHistory", defaultValue = DdiRestConstants.NO_ACTION_HISTORY) Integer actionHistoryMessageCount);
+            @RequestParam(value = "actionHistory", defaultValue = NO_ACTION_HISTORY) Integer actionHistoryMessageCount);
 
     /**
      * Returns the confirmation base with the current auto-confirmation state for a given controllerId and toggle links. In case there are
@@ -510,28 +374,9 @@ public interface DdiRootControllerRestApi {
             like the initiator, remark and date of activation (as unix timestamp) will be provided.
             Reference links to switch the auto-confirmation state are exposed as well.
             """)
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = """
-                    The response body in case auto-confirmation is active is richer - it contains additional information
-                    such as initiator, remark and when the auto-confirmation had been activated.
-                    """),
-            @ApiResponse(responseCode = "400", description = "Bad Request - e.g. invalid parameters",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ExceptionInfo.class))),
-            @ApiResponse(responseCode = "401", description = "The request requires user authentication.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "403", description = "Insufficient permissions, entity is not allowed to be " +
-                    "changed (i.e. read-only) or data volume restriction applies.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "405", description = "The http request method is not allowed on the resource.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "406", description = "In case accept header is specified and not application/json.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "429", description = "Too many requests. The server will refuse further attempts " +
-                    "and the client has to wait another second.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true)))
-    })
-    @GetMapping(value = DdiRestConstants.BASE_V1_REQUEST_MAPPING + "/{controllerId}/" + DdiRestConstants.CONFIRMATION_BASE,
-            produces = { MediaTypes.HAL_JSON_VALUE, MediaType.APPLICATION_JSON_VALUE, DdiRestConstants.MEDIA_TYPE_CBOR })
+    @GetResponses
+    @GetMapping(value = CONTROLLER_V1 + "/{controllerId}/" + CONFIRMATION_BASE,
+            produces = { HAL_JSON_VALUE, APPLICATION_JSON_VALUE, MEDIA_TYPE_APPLICATION_CBOR })
     ResponseEntity<DdiConfirmationBase> getConfirmationBase(
             @PathVariable("tenant") String tenant,
             @PathVariable("controllerId") @NotEmpty String controllerId);
@@ -546,7 +391,7 @@ public interface DdiRootControllerRestApi {
      *         needs to be re-generated
      * @param actionHistoryMessageCount specifies the number of messages to be returned from action history. Regardless of the passed value,
      *         in order to restrict resource utilization by controllers, maximum number of messages that are retrieved from database is limited
-     *         by {@link RepositoryConstants#MAX_ACTION_HISTORY_MSG_COUNT}.
+     *         by RepositoryConstants#MAX_ACTION_HISTORY_MSG_COUNT.
      *         actionHistoryMessageCount less than zero: retrieves the maximum allowed number of action status messages from history;
      *         actionHistoryMessageCount equal to zero: does not retrieve any message;
      *         actionHistoryMessageCount greater than zero: retrieves the specified number of messages, limited by maximum allowed number.
@@ -556,39 +401,20 @@ public interface DdiRootControllerRestApi {
             Resource to receive information about a pending confirmation. The response will be of the same format as the
             deploymentBase operation. The controller should provide feedback about the confirmation first, before
             processing the deployment.
-                        
+            
             Keep in mind that the provided download links for the artifacts are generated dynamically by the update server.
             Host, port and path are not guaranteed to be similar to the provided examples below but will be defined at
             runtime.
             """)
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "The response body includes the detailed information about " +
-                    "the action awaiting confirmation in the same format as for the deploymentBase operation."),
-            @ApiResponse(responseCode = "400", description = "Bad Request - e.g. invalid parameters",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ExceptionInfo.class))),
-            @ApiResponse(responseCode = "401", description = "The request requires user authentication.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "403", description = "Insufficient permissions, entity is not allowed to be " +
-                    "changed (i.e. read-only) or data volume restriction applies.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "404", description = "Target not found",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "405", description = "The http request method is not allowed on the resource.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "406", description = "In case accept header is specified and not application/json.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "429", description = "Too many requests. The server will refuse further attempts " +
-                    "and the client has to wait another second.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true)))
-    })
-    @GetMapping(value = DdiRestConstants.BASE_V1_REQUEST_MAPPING + "/{controllerId}/" + DdiRestConstants.CONFIRMATION_BASE + "/{actionId}",
-            produces = { MediaTypes.HAL_JSON_VALUE, MediaType.APPLICATION_JSON_VALUE, DdiRestConstants.MEDIA_TYPE_CBOR })
+    @GetResponses
+    @GetMapping(value = CONTROLLER_V1 + "/{controllerId}/" + CONFIRMATION_BASE + "/{actionId}",
+            produces = { HAL_JSON_VALUE, APPLICATION_JSON_VALUE, MEDIA_TYPE_APPLICATION_CBOR })
     ResponseEntity<DdiConfirmationBaseAction> getConfirmationBaseAction(
             @PathVariable("tenant") String tenant,
             @PathVariable("controllerId") @NotEmpty String controllerId,
             @PathVariable("actionId") @NotNull Long actionId,
             @RequestParam(value = "c", required = false, defaultValue = "-1") int resource,
-            @RequestParam(value = "actionHistory", defaultValue = DdiRestConstants.NO_ACTION_HISTORY) Integer actionHistoryMessageCount);
+            @RequestParam(value = "actionHistory", defaultValue = NO_ACTION_HISTORY) Integer actionHistoryMessageCount);
 
     /**
      * This is the feedback channel for the {@link DdiConfirmationBaseAction} action.
@@ -604,36 +430,13 @@ public interface DdiRootControllerRestApi {
             action will be transferred into the RUNNING state in case the device is confirming it. Afterwards it will be
             exposed by the deploymentBase.
             """)
+    @PostUpdateResponses
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully retrieved"),
-            @ApiResponse(responseCode = "400", description = "Bad Request - e.g. invalid parameters",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ExceptionInfo.class))),
-            @ApiResponse(responseCode = "401", description = "The request requires user authentication.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "403", description = "Insufficient permissions, entity is not allowed to be " +
-                    "changed (i.e. read-only) or data volume restriction applies.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "404", description = "Target or Action not found",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "405", description = "The http request method is not allowed on the resource.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "406", description = "In case accept header is specified and not application/json.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "409", description = "E.g. in case an entity is created or modified by another " +
-                    "user in another request at the same time. You may retry your modification request.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "410", description = "Action is not active anymore.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "415", description = "The request was attempt with a media-type which is not " +
-                    "supported by the server for this resource.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "429", description = "Too many requests. The server will refuse further attempts " +
-                    "and the client has to wait another second.",
+            @ApiResponse(responseCode = GONE_410, description = "Action is not active anymore.",
                     content = @Content(mediaType = "application/json", schema = @Schema(hidden = true)))
     })
-    @PostMapping(value = DdiRestConstants.BASE_V1_REQUEST_MAPPING + "/{controllerId}/" + DdiRestConstants.CONFIRMATION_BASE + "/{actionId}/" +
-            DdiRestConstants.FEEDBACK,
-            consumes = { MediaType.APPLICATION_JSON_VALUE, DdiRestConstants.MEDIA_TYPE_CBOR })
+    @PostMapping(value = CONTROLLER_V1 + "/{controllerId}/" + CONFIRMATION_BASE + "/{actionId}/" + FEEDBACK,
+            consumes = { APPLICATION_JSON_VALUE, MEDIA_TYPE_APPLICATION_CBOR })
     ResponseEntity<Void> postConfirmationActionFeedback(
             @Valid @RequestBody DdiConfirmationFeedback feedback,
             @PathVariable("tenant") String tenant,
@@ -655,33 +458,9 @@ public interface DdiRootControllerRestApi {
             future actions will automatically be confirmed by mentioning the initiator as triggered person. Actions will
             be automatically confirmed, as long as auto-confirmation is active.
             """)
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully retrieved"),
-            @ApiResponse(responseCode = "400", description = "Bad Request - e.g. invalid parameters",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ExceptionInfo.class))),
-            @ApiResponse(responseCode = "401", description = "The request requires user authentication.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "403", description = "Insufficient permissions, entity is not allowed to be " +
-                    "changed (i.e. read-only) or data volume restriction applies.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "404", description = "Target not found",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "405", description = "The http request method is not allowed on the resource.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "406", description = "In case accept header is specified and not application/json.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "409", description = "E.g. in case an entity is created or modified by another " +
-                    "user in another request at the same time. You may retry your modification request.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "415", description = "The request was attempt with a media-type which is not " +
-                    "supported by the server for this resource.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "429", description = "Too many requests. The server will refuse further attempts " +
-                    "and the client has to wait another second.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true)))
-    })
-    @PostMapping(value = DdiRestConstants.BASE_V1_REQUEST_MAPPING + "/{controllerId}/" + DdiRestConstants.CONFIRMATION_BASE + "/" +
-            DdiRestConstants.AUTO_CONFIRM_ACTIVATE, consumes = { MediaType.APPLICATION_JSON_VALUE, DdiRestConstants.MEDIA_TYPE_CBOR })
+    @PostUpdateResponses
+    @PostMapping(value = CONTROLLER_V1 + "/{controllerId}/" + CONFIRMATION_BASE + "/" + ACTIVATE_AUTO_CONFIRM,
+            consumes = { APPLICATION_JSON_VALUE, MEDIA_TYPE_APPLICATION_CBOR })
     ResponseEntity<Void> activateAutoConfirmation(
             @PathVariable("tenant") String tenant,
             @PathVariable("controllerId") @NotEmpty String controllerId,
@@ -698,33 +477,8 @@ public interface DdiRootControllerRestApi {
             The device can use this resource to deactivate auto-confirmation. All active actions will remain unchanged
             while all future actions need to be confirmed, before processing with the deployment.
             """)
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully retrieved"),
-            @ApiResponse(responseCode = "400", description = "Bad Request - e.g. invalid parameters",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ExceptionInfo.class))),
-            @ApiResponse(responseCode = "401", description = "The request requires user authentication.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "403", description = "Insufficient permissions, entity is not allowed to be " +
-                    "changed (i.e. read-only) or data volume restriction applies.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "404", description = "Target not found",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "405", description = "The http request method is not allowed on the resource.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "406", description = "In case accept header is specified and not application/json.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "409", description = "E.g. in case an entity is created or modified by another " +
-                    "user in another request at the same time. You may retry your modification request.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "415", description = "The request was attempt with a media-type which is not " +
-                    "supported by the server for this resource.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "429", description = "Too many requests. The server will refuse further attempts " +
-                    "and the client has to wait another second.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true)))
-    })
-    @PostMapping(value = DdiRestConstants.BASE_V1_REQUEST_MAPPING + "/{controllerId}/" + DdiRestConstants.CONFIRMATION_BASE + "/" +
-            DdiRestConstants.AUTO_CONFIRM_DEACTIVATE)
+    @PostUpdateResponses
+    @PostMapping(value = CONTROLLER_V1 + "/{controllerId}/" + CONFIRMATION_BASE + "/" + DEACTIVATE_AUTO_CONFIRM)
     ResponseEntity<Void> deactivateAutoConfirmation(
             @PathVariable("tenant") String tenant,
             @PathVariable("controllerId") @NotEmpty String controllerId);
@@ -741,35 +495,13 @@ public interface DdiRootControllerRestApi {
             Allow to set current running version.
             This method is EXPERIMENTAL and may change in future releases.
             """)
+    @PutResponses
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successfully retrieved"),
-            @ApiResponse(responseCode = "400", description = "Bad Request - e.g. invalid parameters",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ExceptionInfo.class))),
-            @ApiResponse(responseCode = "401", description = "The request requires user authentication.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "403", description = "Insufficient permissions, entity is not allowed to be changed (i.e. read-only) " +
-                    "or data volume restriction applies.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "404", description = "Target or Distribution not found",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "405", description = "The http request method is not allowed on the resource.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "406", description = "In case accept header is specified and not application/json.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "409", description = "E.g. in case an entity is created or modified by another user in another " +
-                    "request at the same time. You may retry your modification request.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "410", description = "Action is not active anymore.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "415", description = "The request was attempt with a media-type which is not supported by the server " +
-                    "for this resource.",
-                    content = @Content(mediaType = "application/json", schema = @Schema(hidden = true))),
-            @ApiResponse(responseCode = "429", description = "Too many requests. The server will refuse further attempts and the client has " +
-                    "to wait another second.",
+            @ApiResponse(responseCode = GONE_410, description = "Action is not active anymore.",
                     content = @Content(mediaType = "application/json", schema = @Schema(hidden = true)))
     })
-    @PutMapping(value = DdiRestConstants.BASE_V1_REQUEST_MAPPING + "/{controllerId}/" + DdiRestConstants.INSTALLED_BASE_ACTION,
-            consumes = { MediaType.APPLICATION_JSON_VALUE, DdiRestConstants.MEDIA_TYPE_CBOR })
+    @PutMapping(value = CONTROLLER_V1 + "/{controllerId}/" + INSTALLED_BASE,
+            consumes = { APPLICATION_JSON_VALUE, MEDIA_TYPE_APPLICATION_CBOR })
     ResponseEntity<Void> setAssignedOfflineVersion(
             @Valid @RequestBody DdiAssignedVersion ddiAssignedVersion,
             @PathVariable("tenant") String tenant,

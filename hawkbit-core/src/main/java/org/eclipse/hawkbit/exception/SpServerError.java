@@ -12,7 +12,7 @@ package org.eclipse.hawkbit.exception;
 import lombok.Getter;
 
 /**
- * Define the Error codes for Error handling
+ * Define the error codes for error handling
  */
 @Getter
 public enum SpServerError {
@@ -131,9 +131,6 @@ public enum SpServerError {
     SP_REPO_TENANT_NOT_EXISTS(
             "hawkbit.server.error.repo.tenantNotExists",
             "The entity cannot be inserted due the tenant does not exists"),
-    SP_ENTITY_LOCKED(
-            "hawkbit.server.error.entityLocked",
-            "The given entity is locked by the server."),
     SP_REPO_ENTITY_READ_ONLY(
             "hawkbit.server.error.entityReadOnly",
             "The given entity is read only and the change cannot be completed."),
@@ -149,9 +146,6 @@ public enum SpServerError {
     SP_ROLLOUT_VERIFICATION_FAILED(
             "hawkbit.server.error.rollout.verificationFailed",
             "The rollout configuration could not be verified successfully"),
-    SP_REPO_OPERATION_NOT_SUPPORTED(
-            "hawkbit.server.error.operation.notSupported",
-            "Operation or method is (no longer) supported by service."),
     SP_MAINTENANCE_SCHEDULE_INVALID(
             "hawkbit.server.error.maintenanceScheduleInvalid",
             "Information for schedule, duration or timezone is missing; or there is no valid maintenance window available in future."),
@@ -161,7 +155,7 @@ public enum SpServerError {
     SP_CONFIGURATION_VALUE_CHANGE_NOT_ALLOWED(
             "hawkbit.server.error.repo.tenantConfigurationValueChangeNotAllowed",
             "The requested tenant configuration value modification is not allowed."),
-    SP_MULTIASSIGNMENT_NOT_ENABLED(
+    SP_MULTIASSIGNMENT(
             "hawkbit.server.error.multiAssignmentNotEnabled",
             "The requested operation requires multi assignments to be enabled."),
     SP_NO_WEIGHT_PROVIDED_IN_MULTIASSIGNMENT_MODE(
@@ -182,9 +176,6 @@ public enum SpServerError {
     private final String key;
     private final String message;
 
-    /**
-     * Repository side Error codes
-     */
     SpServerError(final String key, final String message) {
         this.key = key;
         this.message = message;

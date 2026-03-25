@@ -1,0 +1,298 @@
+/**
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
+ *
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ */
+package org.eclipse.hawkbit.repository.jpa.scheduler;
+
+import static org.eclipse.hawkbit.context.AccessContext.asActor;
+import static org.eclipse.hawkbit.context.AccessContext.withSecurityContext;
+import static org.eclipse.hawkbit.tenancy.DefaultTenantConfiguration.TENANT_TAG;
+import static org.eclipse.hawkbit.tenancy.DefaultTenantConfiguration.TENANT_TAG_VALUE_PROVIDER;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Lock;
+import java.util.function.Consumer;
+
+import jakarta.persistence.LockTimeoutException;
+import jakarta.persistence.PersistenceException;
+
+import io.micrometer.core.instrument.MeterRegistry;
+import lombok.extern.slf4j.Slf4j;
+import org.eclipse.hawkbit.context.AccessContext;
+import org.eclipse.hawkbit.exception.AbstractServerRtException;
+import org.eclipse.hawkbit.repository.AutoAssignHandler;
+import org.eclipse.hawkbit.repository.DeploymentManagement;
+import org.eclipse.hawkbit.repository.TargetFilterQueryManagement;
+import org.eclipse.hawkbit.repository.TargetManagement;
+import org.eclipse.hawkbit.repository.jpa.configuration.Constants;
+import org.eclipse.hawkbit.repository.jpa.utils.DeploymentHelper;
+import org.eclipse.hawkbit.repository.model.Action;
+import org.eclipse.hawkbit.repository.model.DeploymentRequest;
+import org.eclipse.hawkbit.repository.model.Target;
+import org.eclipse.hawkbit.repository.model.TargetFilterQuery;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
+import org.springframework.integration.support.locks.LockRegistry;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+/**
+ * Checks if targets need a new distribution set (DS) based on the target filter queries and assigns the new DS when necessary. First all target
+ * filter queries are listed. For every target filter query (TFQ) the auto assign DS is retrieved. All targets get listed per target filter
+ * query, that match the TFQ and that don't have the auto assign DS in their action history.
+ */
+@Slf4j
+@Service
+public class JpaAutoAssignHandler implements AutoAssignHandler {
+
+    /**
+     * The message which is added to the action status when a distribution set is assigned to a target.
+     * First %s is the name of the target filter.
+     */
+    private static final String ACTION_MESSAGE = "Auto assignment by target filter: %s";
+
+    /**
+     * Maximum for target filter queries with auto assign DS activated.
+     */
+    private static final int PAGE_SIZE = 1000;
+
+    private static final LockTimeoutException LOCK_TIMEOUT_EXCEPTION = new LockTimeoutException("Could not obtain lock for auto assignment");
+
+    private final TargetFilterQueryManagement<? extends TargetFilterQuery> targetFilterQueryManagement;
+    private final TargetManagement<? extends Target> targetManagement;
+    private final DeploymentManagement deploymentManagement;
+    private final PlatformTransactionManager transactionManager;
+    private final LockRegistry lockRegistry;
+    private final Optional<MeterRegistry> meterRegistry;
+
+    public JpaAutoAssignHandler(
+            final TargetFilterQueryManagement<? extends TargetFilterQuery> targetFilterQueryManagement,
+            final TargetManagement<? extends Target> targetManagement, final DeploymentManagement deploymentManagement,
+            final PlatformTransactionManager transactionManager, final LockRegistry lockRegistry, final Optional<MeterRegistry> meterRegistry) {
+        this.targetFilterQueryManagement = targetFilterQueryManagement;
+        this.targetManagement = targetManagement;
+        this.deploymentManagement = deploymentManagement;
+        this.transactionManager = transactionManager;
+        this.lockRegistry = lockRegistry;
+        this.meterRegistry = meterRegistry;
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void handleAll() {
+        final long startNano = System.nanoTime();
+
+        final AtomicReference<Lock> lockRef = new AtomicReference<>();
+        try {
+            forEachFilterWithAutoAssignDS(targetFilterQuery -> {
+                if (lockRef.get() == null) {
+                    // only if there are targetFilterQueries to process we try to obtain the lock (on the first one)
+                    final Lock lock = lockRegistry.obtain(createAutoAssignmentLockKey(AccessContext.tenant()));
+                    if (!lock.tryLock()) {
+                        if (log.isTraceEnabled()) {
+                            log.trace("Could not obtain lock {}", lock);
+                        }
+                        throw LOCK_TIMEOUT_EXCEPTION;
+                    } else {
+                        lockRef.set(lock);
+
+                        log.debug("Start auto-assign handling");
+                    }
+                }
+
+                final long startNanoPartial = System.nanoTime();
+                try {
+                    checkByTargetFilterQueryAndAssignDS(targetFilterQuery);
+                } finally {
+                    meterRegistry // handle single targetFilterQuery
+                            .map(mReg -> mReg.timer(
+                                    "hawkbit.autoassign.handle", TENANT_TAG, TENANT_TAG_VALUE_PROVIDER.get(), "targetFilterQuery",
+                                    String.valueOf(targetFilterQuery.getId())))
+                            .ifPresent(timer -> timer.record(System.nanoTime() - startNanoPartial, TimeUnit.NANOSECONDS));
+                }
+            });
+        } finally {
+            final Lock lock = lockRef.get();
+            if (lock != null) {
+                lock.unlock();
+
+                // only if there is at least one targetFilterQuery and lock has been obtained then will be measured (as in rollouts)
+                meterRegistry // handle single targetFilterQuery for single target
+                        .map(mReg -> mReg.timer(
+                                "hawkbit.autoassign.handle.all", TENANT_TAG, TENANT_TAG_VALUE_PROVIDER.get()))
+                        .ifPresent(timer -> timer.record(System.nanoTime() - startNano, TimeUnit.NANOSECONDS));
+                log.debug("Auto assign check all targets finished");
+            }
+        }
+    }
+
+    @Override
+    public void handleSingleTarget(final String controllerId) {
+        log.debug("Auto assign check call for device {} started", controllerId);
+        final long startNano = System.nanoTime();
+
+        forEachFilterWithAutoAssignDS(targetFilterQuery -> {
+            final long startNanoPartial = System.nanoTime();
+            try {
+                checkForDevice(controllerId, targetFilterQuery);
+            } finally {
+                meterRegistry // handle single targetFilterQuery for single target
+                        .map(mReg -> mReg.timer(
+                                "hawkbit.autoassign.handle.single", TENANT_TAG, TENANT_TAG_VALUE_PROVIDER.get(), "targetFilterQuery",
+                                String.valueOf(targetFilterQuery.getId())))
+                        .ifPresent(timer -> timer.record(System.nanoTime() - startNanoPartial, TimeUnit.NANOSECONDS));
+            }
+        });
+
+        meterRegistry // handle single targetFilterQuery for single target
+                .map(mReg -> mReg.timer(
+                        "hawkbit.autoassign.handle.single.all", TENANT_TAG, TENANT_TAG_VALUE_PROVIDER.get()))
+                .ifPresent(timer -> timer.record(System.nanoTime() - startNano, TimeUnit.NANOSECONDS));
+        log.debug("Auto assign check call for device {} finished", controllerId);
+    }
+
+    /**
+     * Fetches the distribution set, gets all controllerIds and assigns the DS to them. Catches PersistenceException and own exceptions derived
+     * from AbstractServerRtException
+     *
+     * @param targetFilterQuery the target filter query
+     */
+    private void checkByTargetFilterQueryAndAssignDS(final TargetFilterQuery targetFilterQuery) {
+        log.debug("Auto assign check call for target filter query id {} started", targetFilterQuery.getId());
+        try {
+            int count;
+            do {
+                final List<String> controllerIds = targetManagement
+                        .findByTargetFilterQueryAndNonDSAndCompatibleAndUpdatable(
+                                targetFilterQuery.getAutoAssignDistributionSet().getId(), targetFilterQuery.getQuery(),
+                                PageRequest.of(0, Constants.MAX_ENTRIES_IN_STATEMENT))
+                        .getContent().stream().map(Target::getControllerId).toList();
+                log.debug("Retrieved {} auto assign targets for target filter query id {}, starting with assignment",
+                        controllerIds.size(), targetFilterQuery.getId());
+
+                count = runTransactionalAssignment(targetFilterQuery, controllerIds);
+                log.debug("Assignment for {} auto assign targets for target filter query id {} finished",
+                        controllerIds.size(), targetFilterQuery.getId());
+            } while (count == Constants.MAX_ENTRIES_IN_STATEMENT);
+        } catch (final PersistenceException | AbstractServerRtException e) {
+            log.error("Error during auto assign check of target filter query id {}", targetFilterQuery.getId(), e);
+        }
+        log.debug("Auto assign check call for target filter query id {} finished", targetFilterQuery.getId());
+    }
+
+    private static String getAutoAssignmentInitiatedBy(final TargetFilterQuery targetFilterQuery) {
+        return StringUtils.hasText(targetFilterQuery.getAutoAssignInitiatedBy())
+                ? targetFilterQuery.getAutoAssignInitiatedBy()
+                : targetFilterQuery.getCreatedBy();
+    }
+
+    // run in the context the auto assignment is made in, i.e. if there is access control context it runs in it
+    // otherwise in the tenant & user context built by createdBy
+    // Note: It must be called in a tenant context, i.e. Security.getCurrentTenant() returns the tenant
+    private void forEachFilterWithAutoAssignDS(final Consumer<TargetFilterQuery> consumer) {
+        Slice<TargetFilterQuery> filterQueries;
+        Pageable query = PageRequest.of(0, PAGE_SIZE);
+        do {
+            filterQueries = targetFilterQueryManagement.findWithAutoAssignDS(query);
+
+            try {
+                filterQueries.forEach(filterQuery -> {
+                    try {
+                        filterQuery.getAccessControlContext().ifPresentOrElse(
+                                // has stored context - executes it with it
+                                context -> withSecurityContext(context, () -> consumer.accept(filterQuery)),
+                                // has no stored context - executes it in the tenant & user scope
+                                () -> asActor(getAutoAssignmentInitiatedBy(filterQuery), () -> consumer.accept(filterQuery)));
+                    } catch (final RuntimeException ex) {
+                        if (ex == LOCK_TIMEOUT_EXCEPTION) {
+                            // expected - just stop processing further
+                            throw ex; // throw in order to break
+                        }
+                        if (log.isDebugEnabled()) {
+                            log.debug("Exception on forEachFilterWithAutoAssignDS execution for filter id {}. Continue with next filter query.",
+                                    filterQuery.getId(), ex);
+                        } else {
+                            log.error(
+                                    "Exception on forEachFilterWithAutoAssignDS execution for filter id {} and error message [{}]. Continue with next filter query.",
+                                    filterQuery.getId(), ex.getMessage());
+                        }
+                    }
+                });
+            } catch (final LockTimeoutException lte) {
+                break; // lock not found
+            }
+        } while (filterQueries.hasNext() && (query = filterQueries.nextPageable()) != Pageable.unpaged());
+    }
+
+    /**
+     * Runs target assignments within a dedicated transaction for a given list of controllerIDs
+     *
+     * @param targetFilterQuery the target filter query
+     * @param controllerIds the controllerIDs
+     * @return count of targets
+     */
+    private int runTransactionalAssignment(final TargetFilterQuery targetFilterQuery, final List<String> controllerIds) {
+        final String actionMessage = String.format(ACTION_MESSAGE, targetFilterQuery.getName());
+        return DeploymentHelper.runInNewTransaction(transactionManager, "autoAssignDSToTargets", Isolation.READ_COMMITTED.value(), status -> {
+            final List<DeploymentRequest> deploymentRequests = mapToDeploymentRequests(controllerIds, targetFilterQuery);
+            final int count = deploymentRequests.size();
+            if (count > 0) {
+                asActor(
+                        getAutoAssignmentInitiatedBy(targetFilterQuery),
+                        () -> deploymentManagement.assignDistributionSets(deploymentRequests, actionMessage));
+            }
+            return count;
+        });
+    }
+
+    /**
+     * Creates a list of {@link DeploymentRequest} for given list of controllerIds and {@link TargetFilterQuery}
+     *
+     * @param controllerIds list of controllerIds
+     * @param filterQuery the query the targets have to match
+     * @return list of deployment request
+     */
+    private List<DeploymentRequest> mapToDeploymentRequests(final List<String> controllerIds, final TargetFilterQuery filterQuery) {
+        // the action type is set to FORCED per default (when not explicitly specified)
+        final Action.ActionType autoAssignActionType = filterQuery.getAutoAssignActionType() == null
+                ? Action.ActionType.FORCED
+                : filterQuery.getAutoAssignActionType();
+        return controllerIds.stream()
+                .map(controllerId -> DeploymentRequest
+                        .builder(controllerId, filterQuery.getAutoAssignDistributionSet().getId())
+                        .actionType(autoAssignActionType).weight(filterQuery.getAutoAssignWeight().orElse(null))
+                        .confirmationRequired(filterQuery.isConfirmationRequired()).build())
+                .toList();
+    }
+
+    private void checkForDevice(final String controllerId, final TargetFilterQuery targetFilterQuery) {
+        log.debug("Auto assign check call for target filter query id {} for device {} started", targetFilterQuery.getId(), controllerId);
+        try {
+            if (targetManagement.isTargetMatchingQueryAndDSNotAssignedAndCompatibleAndUpdatable(
+                    controllerId, targetFilterQuery.getAutoAssignDistributionSet().getId(), targetFilterQuery.getQuery())) {
+                runTransactionalAssignment(targetFilterQuery, Collections.singletonList(controllerId));
+            }
+        } catch (final PersistenceException | AbstractServerRtException e) {
+            log.error("Error during auto assign check of target filter query id {}", targetFilterQuery.getId(), e);
+        }
+        log.debug("Auto assign check call for target filter query id {} for device {} finished", targetFilterQuery.getId(), controllerId);
+    }
+
+    private static String createAutoAssignmentLockKey(final String tenant) {
+        return tenant + "-auto-assign";
+    }
+}

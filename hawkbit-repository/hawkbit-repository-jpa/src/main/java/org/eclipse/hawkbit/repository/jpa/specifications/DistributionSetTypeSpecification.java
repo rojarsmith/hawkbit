@@ -9,45 +9,19 @@
  */
 package org.eclipse.hawkbit.repository.jpa.specifications;
 
-import org.eclipse.hawkbit.repository.jpa.model.AbstractJpaNamedEntity_;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.eclipse.hawkbit.repository.jpa.model.AbstractJpaTypeEntity_;
 import org.eclipse.hawkbit.repository.jpa.model.JpaDistributionSetType;
-import org.eclipse.hawkbit.repository.jpa.model.JpaDistributionSetType_;
 import org.eclipse.hawkbit.repository.model.DistributionSet;
 import org.eclipse.hawkbit.repository.model.DistributionSetType;
 import org.springframework.data.jpa.domain.Specification;
 
 /**
- * Specifications class for {@link DistributionSetType}s. The class provides
- * Spring Data JPQL Specifications.
+ * Specifications class for {@link DistributionSetType}s. The class provides Spring Data JPQL Specifications.
  */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class DistributionSetTypeSpecification {
-
-    private DistributionSetTypeSpecification() {
-        // utility class
-    }
-
-    /**
-     * {@link Specification} for retrieving {@link DistributionSetType}s with
-     * DELETED attribute <code>false</code> - i.e. is not deleted.
-     *
-     * @return the {@link DistributionSetType} {@link Specification}
-     */
-    public static Specification<JpaDistributionSetType> isNotDeleted() {
-        return (targetRoot, query, cb) -> cb.equal(targetRoot.<Boolean> get(JpaDistributionSetType_.deleted), false);
-    }
-
-    /**
-     * {@link Specification} for retrieving {@link DistributionSetType} with
-     * given {@link DistributionSetType#getName()} including fetching the
-     * elements list.
-     *
-     * @param name to search
-     * @return the {@link DistributionSet} {@link Specification}
-     */
-    public static Specification<JpaDistributionSetType> byName(final String name) {
-        return (targetRoot, query, cb) -> cb.equal(targetRoot.get(AbstractJpaNamedEntity_.name), name);
-    }
 
     /**
      * {@link Specification} for retrieving {@link DistributionSetType} with

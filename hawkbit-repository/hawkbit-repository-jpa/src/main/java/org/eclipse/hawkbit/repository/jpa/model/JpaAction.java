@@ -11,7 +11,6 @@ package org.eclipse.hawkbit.repository.jpa.model;
 
 import static org.eclipse.hawkbit.repository.model.BaseEntity.getIdOrNull;
 
-import java.io.Serial;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -23,13 +22,10 @@ import java.util.Optional;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
-import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Converter;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.ForeignKey;
-import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.NamedAttributeNode;
@@ -51,7 +47,6 @@ import org.eclipse.hawkbit.repository.event.remote.entity.ActionUpdatedEvent;
 import org.eclipse.hawkbit.repository.jpa.utils.MapAttributeConverter;
 import org.eclipse.hawkbit.repository.model.Action;
 import org.eclipse.hawkbit.repository.model.ActionStatus;
-import org.eclipse.hawkbit.repository.model.BaseEntity;
 import org.eclipse.hawkbit.repository.model.DistributionSet;
 import org.eclipse.hawkbit.repository.model.Rollout;
 import org.eclipse.hawkbit.repository.model.RolloutGroup;
@@ -60,13 +55,7 @@ import org.eclipse.hawkbit.repository.model.Target;
 /**
  * JPA implementation of {@link Action}.
  */
-@Table(
-        name = "sp_action",
-        indexes = {
-                @Index(name = "sp_idx_action_01", columnList = "tenant,distribution_set"),
-                @Index(name = "sp_idx_action_02", columnList = "tenant,target,active"),
-                @Index(name = "sp_idx_action_prim", columnList = "tenant,id")
-        })
+@Table(name = "sp_action")
 @NamedEntityGraphs({
         @NamedEntityGraph(name = "Action.all", attributeNodes = {
                 @NamedAttributeNode(value = "target", subgraph = "target.ds"),
@@ -82,22 +71,16 @@ import org.eclipse.hawkbit.repository.model.Target;
 @SuppressWarnings({ "squid:S2160", "java:S1710", "java:S1171", "java:S3599" })
 public class JpaAction extends AbstractJpaTenantAwareBaseEntity implements Action, EventAwareEntity {
 
-    @Serial
-    private static final long serialVersionUID = 1L;
-
     @Getter
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(
-            name = "distribution_set", nullable = false, updatable = false,
-            foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_action_distribution_set"))
+    @JoinColumn(name = "distribution_set", nullable = false, updatable = false)
     @NotNull
     private JpaDistributionSet distributionSet;
 
     @Getter
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
-            name = "target", updatable = false,
-            foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_action_target"))
+            name = "target", updatable = false)
     @NotNull
     private JpaTarget target;
 
@@ -137,15 +120,12 @@ public class JpaAction extends AbstractJpaTenantAwareBaseEntity implements Actio
     @Getter
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(
-            name = "rollout_group", updatable = false,
-            foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_action_rollout_group"))
+            name = "rollout_group", updatable = false)
     private JpaRolloutGroup rolloutGroup;
 
     @Getter
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(
-            name = "rollout", updatable = false,
-            foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_action_rollout"))
+    @JoinColumn(name = "rollout", updatable = false)
     private JpaRollout rollout;
 
     // a cron expression to be used for scheduling.

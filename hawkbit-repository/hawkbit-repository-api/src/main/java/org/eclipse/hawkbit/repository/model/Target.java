@@ -9,18 +9,16 @@
  */
 package org.eclipse.hawkbit.repository.model;
 
-import java.net.URI;
 import java.util.concurrent.TimeUnit;
 
+import org.eclipse.hawkbit.auth.SpPermission;
+import org.eclipse.hawkbit.repository.Identifiable;
+
 /**
- * <p>
- * The {@link Target} is the target of all provisioning operations. It contains
- * the currently installed {@link DistributionSet} (i.e. current state). In
- * addition it holds the target {@link DistributionSet} that has to be
- * provisioned next (i.e. target state).
- * </p>
+ * The {@link Target} is the target of all provisioning operations. It contains the currently installed {@link DistributionSet}
+ * (i.e. current state). In addition, it holds the target {@link DistributionSet} that has to be provisioned next (i.e. target state).
  */
-public interface Target extends NamedEntity {
+public interface Target extends NamedEntity, Identifiable<Long> {
 
     /**
      * Maximum length of controllerId.
@@ -64,22 +62,15 @@ public interface Target extends NamedEntity {
 
     /**
      * @return the securityToken if the current security context contains the necessary permission
-     *         {@link org.eclipse.hawkbit.im.authentication.SpPermission#READ_TARGET_SEC_TOKEN}
+     *         {@link SpPermission#READ_TARGET_SECURITY_TOKEN}
      *         or the current context is executed as system code, otherwise {@code null}.
      */
     String getSecurityToken();
 
     /**
-     * @return {@link TargetWithActionType} with default settings
-     */
-    default TargetWithActionType getTargetWithActionType() {
-        return new TargetWithActionType(getControllerId());
-    }
-
-    /**
      * @return the address under which the target can be reached
      */
-    URI getAddress();
+    String getAddress();
 
     /**
      * @return time in {@link TimeUnit#MILLISECONDS} GMT when the {@link Target} polled the server the last time or <code>null</code> if target
@@ -88,8 +79,7 @@ public interface Target extends NamedEntity {
     Long getLastTargetQuery();
 
     /**
-     * @return time in {@link TimeUnit#MILLISECONDS} GMT when
-     *         {@link #getInstalledDistributionSet()} was applied.
+     * @return time in {@link TimeUnit#MILLISECONDS} GMT when {@link #getInstalledDistributionSet()} was applied.
      */
     Long getInstallationDate();
 
@@ -104,10 +94,8 @@ public interface Target extends NamedEntity {
     TargetType getTargetType();
 
     /**
-     * @return the poll time which holds the last poll time of the target, the
-     *         next poll time and the overdue time. In case the
-     *         {@link #lastTargetQuery} is not set e.g. the target never polled
-     *         before this method returns {@code null}
+     * @return the poll time which holds the last poll time of the target, the next poll time and the overdue time. In case the
+     *         {@link #lastTargetQuery} is not set e.g. the target never polled before this method returns {@code null}
      */
     PollStatus getPollStatus();
 
@@ -120,8 +108,13 @@ public interface Target extends NamedEntity {
     AutoConfirmationStatus getAutoConfirmationStatus();
 
     /**
-     * @return <code>true</code> if the {@link Target} has not jet provided
-     *         {@link #getControllerAttributes()}.
+     * @return <code>true</code> if the {@link Target} has not yet provided {@link #getControllerAttributes()}.
      */
     boolean isRequestControllerAttributes();
+
+    /**
+     *
+     * @return the group of the target
+     */
+    String getGroup();
 }

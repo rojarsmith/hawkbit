@@ -9,19 +9,16 @@
  */
 package org.eclipse.hawkbit.repository.jpa.model;
 
-import java.io.Serial;
 import java.util.Optional;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.ForeignKey;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
 
@@ -44,15 +41,10 @@ import org.eclipse.hawkbit.repository.model.TargetFilterQuery;
 @Setter
 @Getter
 @Entity
-@Table(
-        name = "sp_target_filter_query",
-        uniqueConstraints = @UniqueConstraint(columnNames = { "name", "tenant" }, name = "uk_target_filter_query"))
+@Table(name = "sp_target_filter_query")
 // exception squid:S2160 - BaseEntity equals/hashcode is handling correctly for sub entities
 @SuppressWarnings("squid:S2160")
 public class JpaTargetFilterQuery extends AbstractJpaTenantAwareBaseEntity implements TargetFilterQuery, EventAwareEntity {
-
-    @Serial
-    private static final long serialVersionUID = 1L;
 
     @Column(name = "name", length = NamedEntity.NAME_MAX_SIZE, nullable = false)
     @Size(max = NamedEntity.NAME_MAX_SIZE)
@@ -64,11 +56,9 @@ public class JpaTargetFilterQuery extends AbstractJpaTenantAwareBaseEntity imple
     @NotEmpty
     private String query;
 
-    @ManyToOne(optional = true, fetch = FetchType.LAZY, targetEntity = JpaDistributionSet.class)
-    @JoinColumn(
-            name = "auto_assign_distribution_set",
-            foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_target_filter_query_auto_assign_distribution_set"))
-    private JpaDistributionSet autoAssignDistributionSet;
+    @ManyToOne(fetch = FetchType.LAZY, targetEntity = JpaDistributionSet.class)
+    @JoinColumn(name = "auto_assign_distribution_set")
+    private DistributionSet autoAssignDistributionSet;
 
     @Column(name = "auto_assign_action_type")
     @Convert(converter = JpaAction.ActionTypeConverter.class)
@@ -84,6 +74,8 @@ public class JpaTargetFilterQuery extends AbstractJpaTenantAwareBaseEntity imple
     private boolean confirmationRequired;
 
     @Column(name = "access_control_context")
+    @Lob
+    @Size(max = TargetFilterQuery.ACCESS_CONTROL_CONTEXT_MAX_SIZE)
     private String accessControlContext;
 
     public JpaTargetFilterQuery(final String name, final String query, final DistributionSet autoAssignDistributionSet,
@@ -120,7 +112,7 @@ public class JpaTargetFilterQuery extends AbstractJpaTenantAwareBaseEntity imple
 
     @Override
     public void fireUpdateEvent() {
-        EventPublisherHolder.getInstance().getEventPublisher().publishEvent( new TargetFilterQueryUpdatedEvent(this));
+        EventPublisherHolder.getInstance().getEventPublisher().publishEvent(new TargetFilterQueryUpdatedEvent(this));
     }
 
     @Override

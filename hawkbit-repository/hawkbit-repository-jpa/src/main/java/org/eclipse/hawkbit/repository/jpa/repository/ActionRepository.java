@@ -9,7 +9,6 @@
  */
 package org.eclipse.hawkbit.repository.jpa.repository;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -184,6 +183,25 @@ public interface ActionRepository extends BaseEntityRepository<JpaAction> {
     Long countByRolloutIdAndStatus(Long rolloutId, Action.Status status);
 
     /**
+     * Returns the number of active/non-active actions for a rollout
+     *
+     * @param rolloutId - the ID of the rollout the actions belong to
+     * @param active - wether the actions should be active or not
+     * @return number of actions which match the criteria
+     */
+    Long countByRolloutIdAndActive(Long rolloutId, boolean active);
+
+    /**
+     * Returns the number of active/non-active actions for a rollout which status is not the provided one.
+     *
+     * @param rolloutId - the ID of the rollout the actions belong to
+     * @param active - wether the actions should be active or not
+     * @param status - the status that matched actions should not be.
+     * @return number of actions which match the criteria
+     */
+    Long countByRolloutIdAndActiveAndStatusNot(Long rolloutId, boolean active, Action.Status status);
+
+    /**
      * Returns {@code true} if actions for the given rollout exists, otherwise {@code false}
      * <p/>
      * No access control applied
@@ -301,15 +319,4 @@ public interface ActionRepository extends BaseEntityRepository<JpaAction> {
     @Transactional
     @Query("UPDATE JpaAction a SET a.externalRef = :externalRef WHERE a.id = :actionId")
     void updateExternalRef(@Param("actionId") Long actionId, @Param("externalRef") String externalRef);
-
-    /**
-     * Deletes all actions with the given IDs.
-     *
-     * @param actionIDs the IDs of the actions to be deleted.
-     */
-    @Modifying
-    @Transactional
-    // Workaround for https://bugs.eclipse.org/bugs/show_bug.cgi?id=349477
-    @Query("DELETE FROM JpaAction a WHERE a.id IN ?1")
-    void deleteByIdIn(Collection<Long> actionIDs);
 }

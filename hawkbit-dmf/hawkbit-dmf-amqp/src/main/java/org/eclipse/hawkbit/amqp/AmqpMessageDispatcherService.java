@@ -9,7 +9,7 @@
  */
 package org.eclipse.hawkbit.amqp;
 
-import static org.eclipse.hawkbit.repository.RepositoryConstants.MAX_ACTION_COUNT;
+import static org.eclipse.hawkbit.context.AccessContext.asSystem;
 import static org.eclipse.hawkbit.tenancy.configuration.TenantConfigurationProperties.TenantConfigurationKey.BATCH_ASSIGNMENTS_ENABLED;
 
 import java.net.URI;
@@ -29,11 +29,9 @@ import java.util.stream.StreamSupport;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.IterableUtils;
 import org.apache.commons.collections4.ListUtils;
-import org.eclipse.hawkbit.artifact.repository.urlhandler.ApiType;
-import org.eclipse.hawkbit.artifact.repository.urlhandler.ArtifactUrl;
-import org.eclipse.hawkbit.artifact.repository.urlhandler.ArtifactUrlHandler;
-import org.eclipse.hawkbit.artifact.repository.urlhandler.URLPlaceholder;
-import org.eclipse.hawkbit.artifact.repository.urlhandler.URLPlaceholder.SoftwareData;
+import org.eclipse.hawkbit.artifact.urlresolver.ArtifactUrl;
+import org.eclipse.hawkbit.artifact.urlresolver.ArtifactUrlResolver;
+import org.eclipse.hawkbit.artifact.urlresolver.ArtifactUrlResolver.DownloadDescriptor;
 import org.eclipse.hawkbit.dmf.amqp.api.EventTopic;
 import org.eclipse.hawkbit.dmf.amqp.api.MessageHeaderKey;
 import org.eclipse.hawkbit.dmf.amqp.api.MessageType;
@@ -44,39 +42,35 @@ import org.eclipse.hawkbit.dmf.json.model.DmfBatchDownloadAndUpdateRequest;
 import org.eclipse.hawkbit.dmf.json.model.DmfConfirmRequest;
 import org.eclipse.hawkbit.dmf.json.model.DmfDownloadAndUpdateRequest;
 import org.eclipse.hawkbit.dmf.json.model.DmfMetadata;
-import org.eclipse.hawkbit.dmf.json.model.DmfMultiActionRequest;
 import org.eclipse.hawkbit.dmf.json.model.DmfSoftwareModule;
 import org.eclipse.hawkbit.dmf.json.model.DmfTarget;
 import org.eclipse.hawkbit.repository.DeploymentManagement;
 import org.eclipse.hawkbit.repository.DistributionSetManagement;
-import org.eclipse.hawkbit.repository.RepositoryConstants;
 import org.eclipse.hawkbit.repository.SoftwareModuleManagement;
 import org.eclipse.hawkbit.repository.SystemManagement;
 import org.eclipse.hawkbit.repository.TargetManagement;
-import org.eclipse.hawkbit.repository.TenantConfigurationManagement;
 import org.eclipse.hawkbit.repository.event.remote.CancelTargetAssignmentEvent;
-import org.eclipse.hawkbit.repository.event.remote.MultiActionEvent;
 import org.eclipse.hawkbit.repository.event.remote.TargetAssignDistributionSetEvent;
 import org.eclipse.hawkbit.repository.event.remote.TargetAttributesRequestedEvent;
 import org.eclipse.hawkbit.repository.event.remote.TargetDeletedEvent;
+import org.eclipse.hawkbit.repository.event.remote.service.CancelTargetAssignmentServiceEvent;
+import org.eclipse.hawkbit.repository.event.remote.service.TargetAssignDistributionSetServiceEvent;
+import org.eclipse.hawkbit.repository.event.remote.service.TargetAttributesRequestedServiceEvent;
+import org.eclipse.hawkbit.repository.event.remote.service.TargetDeletedServiceEvent;
+import org.eclipse.hawkbit.repository.helper.TenantConfigHelper;
 import org.eclipse.hawkbit.repository.model.Action;
 import org.eclipse.hawkbit.repository.model.ActionProperties;
 import org.eclipse.hawkbit.repository.model.Artifact;
 import org.eclipse.hawkbit.repository.model.DistributionSet;
 import org.eclipse.hawkbit.repository.model.SoftwareModule;
-import org.eclipse.hawkbit.repository.model.SoftwareModuleMetadata;
 import org.eclipse.hawkbit.repository.model.Target;
 import org.eclipse.hawkbit.repository.model.TenantMetaData;
-import org.eclipse.hawkbit.security.SystemSecurityContext;
-import org.eclipse.hawkbit.util.IpUtil;
+import org.eclipse.hawkbit.utils.IpUtil;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.cloud.bus.ServiceMatcher;
-import org.springframework.cloud.bus.event.RemoteApplicationEvent;
 import org.springframework.context.event.EventListener;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.util.CollectionUtils;
@@ -91,69 +85,45 @@ public class AmqpMessageDispatcherService extends BaseAmqpService {
 
     private static final int MAX_PROCESSING_SIZE = 1000;
 
-    private final ArtifactUrlHandler artifactUrlHandler;
+    private final ArtifactUrlResolver artifactUrlHandler;
     private final AmqpMessageSenderService amqpSenderService;
-    private final SystemSecurityContext systemSecurityContext;
     private final SystemManagement systemManagement;
-    private final TargetManagement targetManagement;
-    private final ServiceMatcher serviceMatcher;
-    private final DistributionSetManagement distributionSetManagement;
+    private final TargetManagement<? extends Target> targetManagement;
+    private final SoftwareModuleManagement<? extends SoftwareModule> softwareModuleManagement;
+    private final DistributionSetManagement<? extends DistributionSet> distributionSetManagement;
     private final DeploymentManagement deploymentManagement;
-    private final SoftwareModuleManagement softwareModuleManagement;
-    private final TenantConfigurationManagement tenantConfigurationManagement;
 
-    /**
-     * Constructor.
-     *
-     * @param rabbitTemplate the rabbitTemplate
-     * @param amqpSenderService to send AMQP message
-     * @param artifactUrlHandler for generating download URLs
-     * @param systemSecurityContext for execution with system permissions
-     * @param systemManagement the systemManagement
-     * @param targetManagement to access target information
-     * @param serviceMatcher to check in cluster case if the message is from the same cluster node
-     * @param distributionSetManagement to retrieve modules
-     * @param tenantConfigurationManagement to access tenant configuration
-     */
     @SuppressWarnings("java:S107")
     protected AmqpMessageDispatcherService(
             final RabbitTemplate rabbitTemplate,
-            final AmqpMessageSenderService amqpSenderService, final ArtifactUrlHandler artifactUrlHandler,
-            final SystemSecurityContext systemSecurityContext, final SystemManagement systemManagement,
-            final TargetManagement targetManagement, final ServiceMatcher serviceMatcher,
-            final DistributionSetManagement distributionSetManagement,
-            final SoftwareModuleManagement softwareModuleManagement, final DeploymentManagement deploymentManagement,
-            final TenantConfigurationManagement tenantConfigurationManagement) {
+            final AmqpMessageSenderService amqpSenderService, final ArtifactUrlResolver artifactUrlHandler,
+            final SystemManagement systemManagement,
+            final TargetManagement<? extends Target> targetManagement,
+            final SoftwareModuleManagement<? extends SoftwareModule> softwareModuleManagement,
+            final DistributionSetManagement<? extends DistributionSet> distributionSetManagement,
+            final DeploymentManagement deploymentManagement) {
         super(rabbitTemplate);
         this.artifactUrlHandler = artifactUrlHandler;
         this.amqpSenderService = amqpSenderService;
-        this.systemSecurityContext = systemSecurityContext;
         this.systemManagement = systemManagement;
         this.targetManagement = targetManagement;
-        this.serviceMatcher = serviceMatcher;
-        this.distributionSetManagement = distributionSetManagement;
         this.softwareModuleManagement = softwareModuleManagement;
+        this.distributionSetManagement = distributionSetManagement;
         this.deploymentManagement = deploymentManagement;
-        this.tenantConfigurationManagement = tenantConfigurationManagement;
     }
 
     public boolean isBatchAssignmentsEnabled() {
-        return systemSecurityContext.runAsSystem(() ->
-                tenantConfigurationManagement
-                        .getConfigurationValue(BATCH_ASSIGNMENTS_ENABLED, Boolean.class).getValue());
+        return TenantConfigHelper.getAsSystem(BATCH_ASSIGNMENTS_ENABLED, Boolean.class);
     }
 
     /**
      * Method to send a message to a RabbitMQ Exchange after the Distribution set has been assign to a Target.
      *
-     * @param assignedEvent the object to be sent.
+     * @param targetAssignDistributionSetServiceEvent event to be processed
      */
-    @EventListener(classes = TargetAssignDistributionSetEvent.class)
-    protected void targetAssignDistributionSet(final TargetAssignDistributionSetEvent assignedEvent) {
-        if (shouldSkip(assignedEvent)) {
-            return;
-        }
-
+    @EventListener(classes = TargetAssignDistributionSetServiceEvent.class)
+    protected void targetAssignDistributionSet(final TargetAssignDistributionSetServiceEvent targetAssignDistributionSetServiceEvent) {
+        final TargetAssignDistributionSetEvent assignedEvent = targetAssignDistributionSetServiceEvent.getRemoteEvent();
         final List<Target> filteredTargetList = getTargetsWithoutPendingCancellations(assignedEvent.getActions().keySet());
 
         if (!filteredTargetList.isEmpty()) {
@@ -162,78 +132,51 @@ public class AmqpMessageDispatcherService extends BaseAmqpService {
         }
     }
 
-    /**
-     * Listener for Multi-Action events.
-     *
-     * @param multiActionEvent the Multi-Action event to be processed
-     */
-    @EventListener(classes = MultiActionEvent.class)
-    protected void onMultiAction(final MultiActionEvent multiActionEvent) {
-        if (shouldSkip(multiActionEvent)) {
-            return;
-        }
-
-        log.debug("MultiActionEvent received for {}", multiActionEvent.getControllerIds());
-        sendMultiActionRequestMessages(multiActionEvent.getControllerIds());
-    }
-
     protected void sendUpdateMessageToTarget(
             final ActionProperties actionsProps, final Target target,
-            final Map<SoftwareModule, List<SoftwareModuleMetadata>> softwareModules) {
+            final Map<SoftwareModule, Map<String, String>> softwareModules) {
         final Map<String, ActionProperties> actionProp = new HashMap<>();
         actionProp.put(target.getControllerId(), actionsProps);
         sendUpdateMessageToTargets(actionProp, Collections.singletonList(target), softwareModules);
     }
 
     protected DmfDownloadAndUpdateRequest createDownloadAndUpdateRequest(
-            final Target target, final Long actionId,
-            final Map<SoftwareModule, List<SoftwareModuleMetadata>> softwareModules) {
+            final Target target, final Long actionId, final Map<SoftwareModule, Map<String, String>> softwareModules) {
         return new DmfDownloadAndUpdateRequest(
-                actionId,
-                systemSecurityContext.runAsSystem(target::getSecurityToken),
-                convertToAmqpSoftwareModules(target, softwareModules));
+                actionId, asSystem(target::getSecurityToken), convertToAmqpSoftwareModules(target, softwareModules));
     }
 
     /**
      * Method to send a message to a RabbitMQ Exchange after the assignment of
      * the Distribution set to a Target has been canceled.
      *
-     * @param cancelEvent that is to be converted to a DMF message
+     * @param cancelTargetAssignmentServiceEvent that is to be converted to a DMF message
      */
-    @EventListener(classes = CancelTargetAssignmentEvent.class)
-    protected void targetCancelAssignmentToDistributionSet(final CancelTargetAssignmentEvent cancelEvent) {
-        if (shouldSkip(cancelEvent)) {
-            return;
-        }
-
-        final List<Target> eventTargets = partitionedParallelExecution(
-                cancelEvent.getActions().keySet(), targetManagement::getByControllerID);
-
+    @EventListener(classes = CancelTargetAssignmentServiceEvent.class)
+    protected void targetCancelAssignmentToDistributionSet(final CancelTargetAssignmentServiceEvent cancelTargetAssignmentServiceEvent) {
+        final CancelTargetAssignmentEvent cancelEvent = cancelTargetAssignmentServiceEvent.getRemoteEvent();
+        final List<Target> eventTargets = partitionedParallelExecution(cancelEvent.getActions().keySet(), targetManagement::findByControllerId);
         eventTargets.forEach(target ->
                 cancelEvent.getActionPropertiesForController(target.getControllerId())
                         .map(ActionProperties::getId)
-                        .ifPresent(actionId ->
-                                sendCancelMessageToTarget(cancelEvent.getTenant(), target.getControllerId(), actionId, target.getAddress())
-                        )
-        );
+                        .ifPresent(actionId -> sendCancelMessageToTarget
+                                (cancelEvent.getTenant(), target.getControllerId(), actionId, IpUtil.addressToUri(target.getAddress()))));
     }
 
     /**
      * Method to send a message to a RabbitMQ Exchange after a Target was deleted.
      *
-     * @param deleteEvent the TargetDeletedEvent which holds the necessary data for sending a target delete message.
+     * @param serviceTargetDeleteEvent the TargetDeletedEvent which holds the necessary data for sending a target delete message.
      */
-    @EventListener(classes = TargetDeletedEvent.class)
-    protected void targetDelete(final TargetDeletedEvent deleteEvent) {
-        if (shouldSkip(deleteEvent)) {
-            return;
-        }
-
+    @EventListener(classes = TargetDeletedServiceEvent.class)
+    protected void targetDelete(final TargetDeletedServiceEvent serviceTargetDeleteEvent) {
+        final TargetDeletedEvent deleteEvent = serviceTargetDeleteEvent.getRemoteEvent();
         sendDeleteMessage(deleteEvent.getTenant(), deleteEvent.getControllerId(), deleteEvent.getTargetAddress());
     }
 
-    @EventListener(classes = TargetAttributesRequestedEvent.class)
-    protected void targetTriggerUpdateAttributes(final TargetAttributesRequestedEvent updateAttributesEvent) {
+    @EventListener(classes = TargetAttributesRequestedServiceEvent.class)
+    protected void targetTriggerUpdateAttributes(final TargetAttributesRequestedServiceEvent serviceTargetUpdateAttributesEvent) {
+        final TargetAttributesRequestedEvent updateAttributesEvent = serviceTargetUpdateAttributesEvent.getRemoteEvent();
         sendUpdateAttributesMessageToTarget(
                 updateAttributesEvent.getTenant(), updateAttributesEvent.getControllerId(),
                 updateAttributesEvent.getTargetAddress());
@@ -241,7 +184,7 @@ public class AmqpMessageDispatcherService extends BaseAmqpService {
 
     protected void sendPingResponseToDmfReceiver(final Message ping, final String tenant, final String virtualHost) {
         final Message message = MessageBuilder
-                .withBody(String.valueOf(System.currentTimeMillis()).getBytes())
+                .withBody(String.valueOf(java.lang.System.currentTimeMillis()).getBytes())
                 .setContentType(MessageProperties.CONTENT_TYPE_TEXT_PLAIN)
                 .setCorrelationId(ping.getMessageProperties().getCorrelationId())
                 .setHeader(MessageHeaderKey.TYPE, MessageType.PING_RESPONSE)
@@ -250,10 +193,6 @@ public class AmqpMessageDispatcherService extends BaseAmqpService {
 
         amqpSenderService.sendMessage(message,
                 IpUtil.createAmqpUri(virtualHost, ping.getMessageProperties().getReplyTo()));
-    }
-
-    protected boolean shouldSkip(final RemoteApplicationEvent event) {
-        return !isFromSelf(event);
     }
 
     protected void sendCancelMessageToTarget(final String tenant, final String controllerId, final Long actionId, final URI address) {
@@ -269,46 +208,9 @@ public class AmqpMessageDispatcherService extends BaseAmqpService {
         amqpSenderService.sendMessage(message, address);
     }
 
-    protected DmfTarget convertToDmfTarget(final Target target, final Long actionId) {
-        return new DmfTarget(actionId, target.getControllerId(), systemSecurityContext.runAsSystem(target::getSecurityToken));
-    }
-
     protected DmfConfirmRequest createConfirmRequest(
-            final Target target, final Long actionId, final Map<SoftwareModule, List<SoftwareModuleMetadata>> softwareModules) {
-        return new DmfConfirmRequest(
-                actionId,
-                systemSecurityContext.runAsSystem(target::getSecurityToken),
-                convertToAmqpSoftwareModules(target, softwareModules));
-    }
-
-    void sendMultiActionRequestToTarget(
-            final Target target, final List<Action> actions,
-            final Function<SoftwareModule, List<SoftwareModuleMetadata>> getSoftwareModuleMetaData) {
-        final URI targetAddress = target.getAddress();
-        if (!IpUtil.isAmqpUri(targetAddress) || CollectionUtils.isEmpty(actions)) {
-            return;
-        }
-
-        final DmfMultiActionRequest multiActionRequest = new DmfMultiActionRequest(
-                actions.stream()
-                        .map(action -> {
-                            final DmfActionRequest actionRequest = createDmfActionRequest(
-                                    target, action,
-                                    action.getDistributionSet().getModules().stream()
-                                            .collect(Collectors.toMap(Function.identity(), module -> {
-                                                final List<SoftwareModuleMetadata> softwareModuleMetadata = getSoftwareModuleMetaData.apply(
-                                                        module);
-                                                return softwareModuleMetadata == null ? Collections.emptyList() : softwareModuleMetadata;
-                                            })));
-                            final int weight = deploymentManagement.getWeightConsideringDefault(action);
-                            return new DmfMultiActionRequest.DmfMultiActionElement(getEventTypeForAction(action), actionRequest, weight);
-                        })
-                        .toList());
-
-        final Message message = getMessageConverter().toMessage(
-                multiActionRequest,
-                createConnectorMessagePropertiesEvent(target.getTenant(), target.getControllerId(), EventTopic.MULTI_ACTION));
-        amqpSenderService.sendMessage(message, targetAddress);
+            final Target target, final Long actionId, final Map<SoftwareModule, Map<String, String>> softwareModules) {
+        return new DmfConfirmRequest(actionId, asSystem(target::getSecurityToken), convertToAmqpSoftwareModules(target, softwareModules));
     }
 
     /**
@@ -326,19 +228,6 @@ public class AmqpMessageDispatcherService extends BaseAmqpService {
         return (Action.ActionType.DOWNLOAD_ONLY == action.getActionType() || !action.isMaintenanceWindowAvailable())
                 ? EventTopic.DOWNLOAD
                 : EventTopic.DOWNLOAD_AND_INSTALL;
-    }
-
-    /**
-     * Determines the {@link EventTopic} for the given {@link Action}, depending on its action type.
-     *
-     * @param action to obtain the corresponding {@link EventTopic} for
-     * @return the {@link EventTopic} for this action
-     */
-    private static EventTopic getEventTypeForAction(final Action action) {
-        if (action.isCancelingOrCanceled()) {
-            return EventTopic.CANCEL_DOWNLOAD;
-        }
-        return getEventTypeForTarget(new ActionProperties(action));
     }
 
     private static <T, R> List<R> partitionedParallelExecution(
@@ -411,7 +300,7 @@ public class AmqpMessageDispatcherService extends BaseAmqpService {
 
     private List<Target> getTargetsWithoutPendingCancellations(final Set<String> controllerIds) {
         return partitionedParallelExecution(controllerIds, partition ->
-                targetManagement.getByControllerID(partition).stream()
+                targetManagement.findByControllerId(partition).stream()
                         .filter(target -> {
                             if (hasPendingCancellations(target.getId())) {
                                 log.debug("Target {} has pending cancellations. Will not send update message to it.",
@@ -424,15 +313,15 @@ public class AmqpMessageDispatcherService extends BaseAmqpService {
 
     private void sendUpdateMessageToTargets(
             final Long dsId, final Map<String, ActionProperties> actionsPropsByTargetId, final List<Target> targets) {
-        distributionSetManagement.get(dsId).ifPresent(ds -> {
-            final Map<SoftwareModule, List<SoftwareModuleMetadata>> softwareModules = getSoftwareModulesWithMetadata(ds);
+        distributionSetManagement.find(dsId).ifPresent(ds -> {
+            final Map<SoftwareModule, Map<String, String>> softwareModules = getSoftwareModulesWithMetadata(ds);
             sendUpdateMessageToTargets(actionsPropsByTargetId, targets, softwareModules);
         });
     }
 
     private void sendUpdateMessageToTargets(
             final Map<String, ActionProperties> actionsPropsByTargetId,
-            final List<Target> targets, final Map<SoftwareModule, List<SoftwareModuleMetadata>> softwareModules) {
+            final List<Target> targets, final Map<SoftwareModule, Map<String, String>> softwareModules) {
         if (!targets.isEmpty() && isBatchAssignmentsEnabled()) {
             sendBatchUpdateMessage(actionsPropsByTargetId, targets, softwareModules);
         } else {
@@ -443,46 +332,11 @@ public class AmqpMessageDispatcherService extends BaseAmqpService {
         }
     }
 
-    private void sendMultiActionRequestMessages(final List<String> controllerIds) {
-        final Map<String, List<Action>> controllerIdToActions = controllerIds.stream()
-                .collect(Collectors.toMap(
-                        Function.identity(),
-                        controllerId -> deploymentManagement.findActiveActionsWithHighestWeight(controllerId, MAX_ACTION_COUNT)));
-
-        // gets all software modules for all action at once
-        final Set<Long> allSmIds = controllerIdToActions.values().stream()
-                .flatMap(actions -> actions.stream()
-                        .map(Action::getDistributionSet)
-                        .flatMap(ds -> ds.getModules().stream())
-                        .map(SoftwareModule::getId))
-                .collect(Collectors.toSet());
-        final Map<Long, List<SoftwareModuleMetadata>> getSoftwareModuleMetadata =
-                allSmIds.isEmpty()
-                        ? Collections.emptyMap()
-                        : softwareModuleManagement.findMetaDataBySoftwareModuleIdsAndTargetVisible(allSmIds);
-
-        targetManagement.getByControllerID(controllerIds).forEach(target ->
-                sendMultiActionRequestToTarget(
-                        target, controllerIdToActions.get(target.getControllerId()), module -> getSoftwareModuleMetadata.get(module.getId())));
-    }
-
-    private DmfActionRequest createDmfActionRequest(
-            final Target target, final Action action,
-            final Map<SoftwareModule, List<SoftwareModuleMetadata>> softwareModules) {
-        if (action.isCancelingOrCanceled()) {
-            return new DmfActionRequest(action.getId());
-        } else if (action.isWaitingConfirmation()) {
-            return createConfirmRequest(target, action.getId(), softwareModules);
-        }
-        return createDownloadAndUpdateRequest(target, action.getId(), softwareModules);
-    }
-
     private void sendSingleUpdateMessage(
-            final ActionProperties action, final Target target,
-            final Map<SoftwareModule, List<SoftwareModuleMetadata>> modules) {
+            final ActionProperties action, final Target target, final Map<SoftwareModule, Map<String, String>> modules) {
         final String tenant = action.getTenant();
 
-        final URI targetAddress = target.getAddress();
+        final URI targetAddress = IpUtil.addressToUri(target.getAddress());
         if (!IpUtil.isAmqpUri(targetAddress)) {
             return;
         }
@@ -515,10 +369,6 @@ public class AmqpMessageDispatcherService extends BaseAmqpService {
         return targetAddress == null || !IpUtil.isAmqpUri(URI.create(targetAddress));
     }
 
-    private boolean isFromSelf(final RemoteApplicationEvent event) {
-        return serviceMatcher == null || serviceMatcher.isFromSelf(event);
-    }
-
     private boolean hasPendingCancellations(final Long targetId) {
         return deploymentManagement.hasPendingCancellations(targetId);
     }
@@ -536,7 +386,7 @@ public class AmqpMessageDispatcherService extends BaseAmqpService {
     }
 
     private List<DmfSoftwareModule> convertToAmqpSoftwareModules(
-            final Target target, final Map<SoftwareModule, List<SoftwareModuleMetadata>> softwareModules) {
+            final Target target, final Map<SoftwareModule, Map<String, String>> softwareModules) {
         return Optional.ofNullable(softwareModules)
                 .map(Map::entrySet)
                 .map(Set::stream)
@@ -544,71 +394,70 @@ public class AmqpMessageDispatcherService extends BaseAmqpService {
                 .orElse(null);
     }
 
-    private DmfSoftwareModule convertToAmqpSoftwareModule(
-            final Target target, final Entry<SoftwareModule, List<SoftwareModuleMetadata>> entry) {
+    private DmfSoftwareModule convertToAmqpSoftwareModule(final Target target, final Entry<SoftwareModule, Map<String, String>> entry) {
         return new DmfSoftwareModule(
                 entry.getKey().getId(),
                 entry.getKey().getType().getKey(),
                 entry.getKey().getVersion(),
                 entry.getKey().isEncrypted() ? Boolean.TRUE : null,
                 convertArtifacts(target, entry.getKey().getArtifacts()),
-                CollectionUtils.isEmpty(entry.getValue()) ? null :convertMetadata(entry.getValue()));
+                CollectionUtils.isEmpty(entry.getValue()) ? null : convertMetadata(entry.getValue()));
     }
 
-    private List<DmfMetadata> convertMetadata(final List<SoftwareModuleMetadata> metadata) {
-        return metadata.stream().map(md -> new DmfMetadata(md.getKey(), md.getValue())).toList();
+    private List<DmfMetadata> convertMetadata(final Map<String, String> metadata) {
+        return metadata.entrySet().stream().map(md -> new DmfMetadata(md.getKey(), md.getValue())).toList();
     }
 
-    private List<DmfArtifact> convertArtifacts(final Target target, final List<Artifact> localArtifacts) {
-        if (localArtifacts.isEmpty()) {
+    private List<DmfArtifact> convertArtifacts(final Target target, final List<Artifact> artifacts) {
+        if (artifacts.isEmpty()) {
             return Collections.emptyList();
         }
 
-        return localArtifacts.stream().map(localArtifact -> convertArtifact(target, localArtifact))
-                .toList();
+        return artifacts.stream().map(artifact -> convertArtifact(target, artifact)).toList();
     }
 
-    private DmfArtifact convertArtifact(final Target target, final Artifact localArtifact) {
+    private DmfArtifact convertArtifact(final Target target, final Artifact artifact) {
         final TenantMetaData tenantMetadata = systemManagement.getTenantMetadataWithoutDetails();
         return new DmfArtifact(
-                localArtifact.getFilename(),
-                new DmfArtifactHash(localArtifact.getSha1Hash(), localArtifact.getMd5Hash()),
-                localArtifact.getSize(),
-                localArtifact.getLastModifiedAt(),
+                artifact.getFilename(),
+                new DmfArtifactHash(artifact.getSha1Hash(), artifact.getMd5Hash()),
+                artifact.getSize(),
+                artifact.getLastModifiedAt(),
                 artifactUrlHandler
-                        .getUrls(new URLPlaceholder(
-                                        tenantMetadata.getTenant(), tenantMetadata.getId(), target.getControllerId(), target.getId(),
-                                        new SoftwareData(
-                                                localArtifact.getSoftwareModule().getId(), localArtifact.getFilename(), localArtifact.getId(),
-                                                localArtifact.getSha1Hash())),
-                                ApiType.DMF)
+                        .getUrls(new DownloadDescriptor(
+                                        tenantMetadata.getTenant(), target.getControllerId(),
+                                        artifact.getSoftwareModule().getId(), artifact.getFilename(), artifact.getSha1Hash()),
+                                ArtifactUrlResolver.ApiType.DMF)
                         .stream()
-                        .collect(Collectors.toMap(ArtifactUrl::getProtocol, ArtifactUrl::getRef))
+                        .collect(Collectors.toMap(ArtifactUrl::protocol, ArtifactUrl::ref))
         );
     }
 
-    private Map<SoftwareModule, List<SoftwareModuleMetadata>> getSoftwareModulesWithMetadata(final DistributionSet distributionSet) {
-        return distributionSet.getModules().stream().collect(Collectors.toMap(Function.identity(), this::getSoftwareModuleMetadata));
-    }
-
-    private List<SoftwareModuleMetadata> getSoftwareModuleMetadata(final SoftwareModule module) {
-        return softwareModuleManagement.findMetaDataBySoftwareModuleIdAndTargetVisible(
-                module.getId(), PageRequest.of(0, RepositoryConstants.MAX_META_DATA_COUNT)).getContent();
+    private Map<SoftwareModule, Map<String, String>> getSoftwareModulesWithMetadata(final DistributionSet distributionSet) {
+        final Map<Long, Map<String, String>> softwareModuleMetadata =
+                softwareModuleManagement.findMetaDataBySoftwareModuleIdsAndTargetVisible(
+                        distributionSet.getModules().stream()
+                                .map(SoftwareModule::getId)
+                                .toList());
+        return distributionSet.getModules().stream()
+                .collect(Collectors.toMap(
+                        Function.identity(),
+                        module -> softwareModuleMetadata.getOrDefault(module.getId(), Collections.emptyMap())));
     }
 
     private void sendBatchUpdateMessage(
             final Map<String, ActionProperties> actions, final List<Target> targets,
-            final Map<SoftwareModule, List<SoftwareModuleMetadata>> modules) {
-
+            final Map<SoftwareModule, Map<String, String>> modules) {
         final List<DmfTarget> dmfTargets = targets.stream()
-                .filter(target -> IpUtil.isAmqpUri(target.getAddress()))
-                .map(t -> convertToDmfTarget(t, actions.get(t.getControllerId()).getId()))
+                .filter(target -> IpUtil.isAmqpUri(IpUtil.addressToUri(target.getAddress())))
+                // as system - the security token is sent to DMF receiver
+                .map(t -> new DmfTarget(actions.get(t.getControllerId()).getId(), t.getControllerId(), asSystem(t::getSecurityToken)))
                 .toList();
 
         // due to the fact that all targets in a batch use the same set of software modules we don't generate target-specific urls
         final Target firstTarget = targets.get(0);
         final DmfBatchDownloadAndUpdateRequest batchRequest = new DmfBatchDownloadAndUpdateRequest(
-                System.currentTimeMillis(),
+                java.lang.System.currentTimeMillis(),
                 dmfTargets,
                 Optional.ofNullable(modules)
                         .map(Map::entrySet)
@@ -616,12 +465,12 @@ public class AmqpMessageDispatcherService extends BaseAmqpService {
                         .map(stream -> stream.map(entry -> convertToAmqpSoftwareModule(firstTarget, entry)).toList())
                         .orElse(null));
 
-        // we use only the first action when constructing message as Tenant and action type are the same
+        // we use only the first action when constructing message as AccessContext and action type are the same
         // since all actions have the same trigger
         final ActionProperties firstAction = actions.values().iterator().next();
         final Message message = getMessageConverter().toMessage(
                 batchRequest,
                 createMessagePropertiesBatch(firstAction.getTenant(), getBatchEventTopicForAction(firstAction)));
-        amqpSenderService.sendMessage(message, firstTarget.getAddress());
+        amqpSenderService.sendMessage(message, IpUtil.addressToUri(firstTarget.getAddress()));
     }
 }

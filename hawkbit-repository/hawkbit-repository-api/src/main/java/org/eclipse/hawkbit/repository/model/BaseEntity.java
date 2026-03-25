@@ -9,7 +9,6 @@
  */
 package org.eclipse.hawkbit.repository.model;
 
-import java.io.Serializable;
 import java.util.concurrent.TimeUnit;
 
 import org.eclipse.hawkbit.repository.Identifiable;
@@ -17,7 +16,7 @@ import org.eclipse.hawkbit.repository.Identifiable;
 /**
  * Core information of all entities.
  */
-public interface BaseEntity extends Serializable, Identifiable<Long> {
+public interface BaseEntity extends Identifiable<Long> {
 
     static Long getIdOrNull(final BaseEntity entity) {
         return entity == null ? null : entity.getId();
@@ -39,8 +38,7 @@ public interface BaseEntity extends Serializable, Identifiable<Long> {
     String getLastModifiedBy();
 
     /**
-     * @return time in {@link TimeUnit#MILLISECONDS} when the {@link BaseEntity}
-     *         was last time changed.
+     * @return time in {@link TimeUnit#MILLISECONDS} when the {@link BaseEntity} was last time changed.
      */
     long getLastModifiedAt();
 

@@ -14,7 +14,9 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.ToString;
 import org.eclipse.hawkbit.exception.AbstractServerRtException;
 import org.eclipse.hawkbit.exception.SpServerError;
 import org.eclipse.hawkbit.repository.model.BaseEntity;
@@ -22,89 +24,56 @@ import org.eclipse.hawkbit.repository.model.BaseEntity;
 /**
  * the {@link EntityNotFoundException} is thrown when a entity queried but not found.
  */
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
 @Getter
 public class EntityNotFoundException extends AbstractServerRtException {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     public static final String KEY = "key";
     public static final String ENTITY_ID = "entityId";
     public static final String TYPE = "type";
-    @Serial
-    private static final long serialVersionUID = 1L;
+
     private static final SpServerError THIS_ERROR = SpServerError.SP_REPO_ENTITY_NOT_EXISTS;
     private static final int ENTITY_STRING_MAX_LENGTH = 100;
 
-    /**
-     * Default constructor.
-     */
     public EntityNotFoundException() {
         super(THIS_ERROR);
     }
 
-    /**
-     * Parameterized constructor.
-     *
-     * @param cause of the exception
-     */
     public EntityNotFoundException(final Throwable cause) {
         super(THIS_ERROR, cause);
     }
 
-    /**
-     * Parameterized constructor.
-     *
-     * @param message of the exception
-     * @param cause of the exception
-     */
     public EntityNotFoundException(final String message, final Throwable cause) {
-        super(message, THIS_ERROR, cause);
+        super(THIS_ERROR, message, cause);
     }
 
-    /**
-     * Parameterized constructor.
-     *
-     * @param message of the exception
-     */
     protected EntityNotFoundException(final String message) {
-        super(message, THIS_ERROR);
+        super(THIS_ERROR, message);
     }
 
-    /**
-     * Parameterized constructor for {@link BaseEntity} not found.
-     *
-     * @param type of the entity that was not found
-     * @param entityId of the {@link BaseEntity}
-     */
     public EntityNotFoundException(final String type, final Object entityId) {
-        super(type + " with given identifier {" + entityId + "} does not exist.", THIS_ERROR, Map.of(TYPE, type, ENTITY_ID, entityId));
+        super(THIS_ERROR, type + " with given identifier {" + entityId + "} does not exist.", Map.of(TYPE, type, ENTITY_ID, entityId));
     }
 
-    /**
-     * Parameterized constructor for {@link BaseEntity} not found.
-     *
-     * @param type of the entity that was not found
-     * @param entityId of the {@link BaseEntity}
-     */
     public EntityNotFoundException(final Class<? extends BaseEntity> type, final Object entityId) {
         this(type.getSimpleName(), entityId);
     }
 
-    /**
-     * Parameterized constructor for a list of {@link BaseEntity}s not found.
-     *
-     * @param type of the entity that was not found
-     * @param expected collection of the {@link BaseEntity#getId()}s
-     * @param found collection of the {@link BaseEntity#getId()}s
-     */
     public EntityNotFoundException(final Class<? extends BaseEntity> type, final Collection<?> expected, final Collection<?> found) {
         super(
-                String.format("%ss with given identifiers {%s} do not exist.",
+                THIS_ERROR, String.format("%ss with given identifiers {%s} do not exist.",
                         type.getSimpleName(),
                         toEntityString(expected.stream()
                                 .filter(id -> !found.contains(id))
                                 .map(String::valueOf)
                                 .collect(Collectors.joining(",")))),
-                THIS_ERROR,
-                Map.of(TYPE, type.getSimpleName(), ENTITY_ID, expected.stream().filter(id -> !found.contains(id)).map(String::valueOf)));
+                Map.of(
+                        TYPE, type.getSimpleName(),
+                        ENTITY_ID, expected.stream().filter(id -> !found.contains(id)).map(String::valueOf).toList()));
     }
 
     private static String toEntityString(final Object obj) {

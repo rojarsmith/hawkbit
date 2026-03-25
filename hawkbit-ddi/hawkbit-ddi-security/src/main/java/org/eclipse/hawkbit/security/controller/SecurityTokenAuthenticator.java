@@ -9,11 +9,10 @@
  */
 package org.eclipse.hawkbit.security.controller;
 
+import static org.eclipse.hawkbit.context.AccessContext.asSystemAsTenant;
+
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.hawkbit.repository.ControllerManagement;
-import org.eclipse.hawkbit.repository.TenantConfigurationManagement;
-import org.eclipse.hawkbit.security.SystemSecurityContext;
-import org.eclipse.hawkbit.tenancy.TenantAware;
 import org.eclipse.hawkbit.tenancy.configuration.TenantConfigurationProperties.TenantConfigurationKey;
 import org.slf4j.Logger;
 import org.springframework.security.core.Authentication;
@@ -32,11 +31,7 @@ public class SecurityTokenAuthenticator extends Authenticator.AbstractAuthentica
 
     private final ControllerManagement controllerManagement;
 
-    public SecurityTokenAuthenticator(
-            final TenantConfigurationManagement tenantConfigurationManagement, final TenantAware tenantAware,
-            final SystemSecurityContext systemSecurityContext,
-            final ControllerManagement controllerManagement) {
-        super(tenantConfigurationManagement, tenantAware, systemSecurityContext);
+    public SecurityTokenAuthenticator(final ControllerManagement controllerManagement) {
         this.controllerManagement = controllerManagement;
     }
 
@@ -59,14 +54,13 @@ public class SecurityTokenAuthenticator extends Authenticator.AbstractAuthentica
         log.debug("Found 'authorization' header starting with '{}'", TARGET_SECURITY_TOKEN_AUTH_SCHEME);
         final String presentedToken = authHeader.substring(OFFSET_TARGET_TOKEN);
 
-        return systemSecurityContext.runAsSystemAsTenant(() -> controllerSecurityToken.getTargetId() != null
-                                ? controllerManagement.get(controllerSecurityToken.getTargetId())
-                                : controllerManagement.getByControllerId(controllerSecurityToken.getControllerId()),
-                        controllerSecurityToken.getTenant())
+        final String tenant = controllerSecurityToken.getTenant();
+        return asSystemAsTenant(tenant, () -> controllerSecurityToken.getTargetId() != null
+                                ? controllerManagement.find(controllerSecurityToken.getTargetId())
+                                : controllerManagement.findByControllerId(controllerSecurityToken.getControllerId()))
                 // validate if the presented token is the same as the one set for the target
-                .filter(target -> presentedToken.equals(
-                        systemSecurityContext.runAsSystemAsTenant(target::getSecurityToken, controllerSecurityToken.getTenant())))
-                .map(target -> authenticatedController(controllerSecurityToken.getTenant(), target.getControllerId()))
+                .filter(target -> presentedToken.equals(asSystemAsTenant(tenant, target::getSecurityToken)))
+                .map(target -> authenticatedController(tenant, target.getControllerId()))
                 .orElse(null);
     }
 
@@ -77,6 +71,6 @@ public class SecurityTokenAuthenticator extends Authenticator.AbstractAuthentica
 
     @Override
     protected String getTenantConfigurationKey() {
-        return TenantConfigurationKey.AUTHENTICATION_MODE_TARGET_SECURITY_TOKEN_ENABLED;
+        return TenantConfigurationKey.AUTHENTICATION_TARGET_SECURITY_TOKEN_ENABLED;
     }
 }

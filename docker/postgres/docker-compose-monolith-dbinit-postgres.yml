@@ -33,7 +33,7 @@ services:
       retries: 5
       timeout: 60s
     depends_on:
-      postgress:
+      postgres:
         condition: service_healthy
     labels:
       NAME: "hawkbit-db-init"
@@ -52,8 +52,6 @@ services:
       - 'SPRING_RABBITMQ_HOST=rabbitmq'
       - 'SPRING_RABBITMQ_USERNAME=guest'
       - 'SPRING_RABBITMQ_PASSWORD=guest'
-    volumes:
-      - artifactrepo:/artifactrepo
     restart: always
     ports:
       - "8080:8080"
@@ -62,6 +60,8 @@ services:
         condition: service_healthy
     labels:
       NAME: "hawkbit"
+    volumes:
+      - artifactrepo:/app/artifactrepo
 
 volumes:
   artifactrepo:

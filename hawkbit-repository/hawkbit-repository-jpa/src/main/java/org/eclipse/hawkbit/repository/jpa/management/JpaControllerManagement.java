@@ -9,6 +9,9 @@
  */
 package org.eclipse.hawkbit.repository.jpa.management;
 
+import static org.eclipse.hawkbit.context.AccessContext.asActor;
+import static org.eclipse.hawkbit.context.AccessContext.asSystem;
+import static org.eclipse.hawkbit.repository.jpa.executor.AfterTransactionCommitExecutor.afterCommit;
 import static org.eclipse.hawkbit.repository.model.Action.Status.DOWNLOADED;
 import static org.eclipse.hawkbit.repository.model.Action.Status.FINISHED;
 import static org.eclipse.hawkbit.repository.model.Target.CONTROLLER_ATTRIBUTE_MAX_KEY_SIZE;
@@ -45,19 +48,19 @@ import jakarta.validation.constraints.NotEmpty;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.ListUtils;
+import org.eclipse.hawkbit.context.AccessContext;
+import org.eclipse.hawkbit.ql.jpa.QLSupport;
 import org.eclipse.hawkbit.repository.ConfirmationManagement;
 import org.eclipse.hawkbit.repository.ControllerManagement;
 import org.eclipse.hawkbit.repository.DeploymentManagement;
 import org.eclipse.hawkbit.repository.DistributionSetManagement;
-import org.eclipse.hawkbit.repository.EntityFactory;
 import org.eclipse.hawkbit.repository.MaintenanceScheduleHelper;
 import org.eclipse.hawkbit.repository.QuotaManagement;
 import org.eclipse.hawkbit.repository.RepositoryConstants;
 import org.eclipse.hawkbit.repository.RepositoryProperties;
-import org.eclipse.hawkbit.repository.TargetTypeManagement;
-import org.eclipse.hawkbit.repository.TenantConfigurationManagement;
+import org.eclipse.hawkbit.repository.SecurityTokenGenerator;
+import org.eclipse.hawkbit.repository.SoftwareModuleManagement;
 import org.eclipse.hawkbit.repository.UpdateMode;
-import org.eclipse.hawkbit.repository.builder.ActionStatusCreate;
 import org.eclipse.hawkbit.repository.event.EventPublisherHolder;
 import org.eclipse.hawkbit.repository.event.remote.CancelTargetAssignmentEvent;
 import org.eclipse.hawkbit.repository.event.remote.TargetAttributesRequestedEvent;
@@ -66,11 +69,11 @@ import org.eclipse.hawkbit.repository.exception.CancelActionNotAllowedException;
 import org.eclipse.hawkbit.repository.exception.EntityAlreadyExistsException;
 import org.eclipse.hawkbit.repository.exception.EntityNotFoundException;
 import org.eclipse.hawkbit.repository.exception.InvalidTargetAttributeException;
+import org.eclipse.hawkbit.repository.exception.SoftwareModuleNotAssignedToTargetException;
+import org.eclipse.hawkbit.repository.helper.TenantConfigHelper;
 import org.eclipse.hawkbit.repository.jpa.Jpa;
 import org.eclipse.hawkbit.repository.jpa.acm.AccessController;
-import org.eclipse.hawkbit.repository.jpa.builder.JpaActionStatusCreate;
 import org.eclipse.hawkbit.repository.jpa.configuration.Constants;
-import org.eclipse.hawkbit.repository.jpa.executor.AfterTransactionCommitExecutor;
 import org.eclipse.hawkbit.repository.jpa.model.AbstractJpaBaseEntity_;
 import org.eclipse.hawkbit.repository.jpa.model.JpaAction;
 import org.eclipse.hawkbit.repository.jpa.model.JpaActionStatus;
@@ -81,27 +84,32 @@ import org.eclipse.hawkbit.repository.jpa.model.JpaTarget;
 import org.eclipse.hawkbit.repository.jpa.model.JpaTarget_;
 import org.eclipse.hawkbit.repository.jpa.repository.ActionRepository;
 import org.eclipse.hawkbit.repository.jpa.repository.ActionStatusRepository;
-import org.eclipse.hawkbit.repository.jpa.repository.SoftwareModuleMetadataRepository;
 import org.eclipse.hawkbit.repository.jpa.repository.SoftwareModuleRepository;
 import org.eclipse.hawkbit.repository.jpa.repository.TargetRepository;
+import org.eclipse.hawkbit.repository.jpa.repository.TargetTypeRepository;
 import org.eclipse.hawkbit.repository.jpa.specifications.ActionSpecifications;
 import org.eclipse.hawkbit.repository.jpa.specifications.TargetSpecifications;
+import org.eclipse.hawkbit.repository.jpa.specifications.TargetTypeSpecification;
 import org.eclipse.hawkbit.repository.jpa.utils.DeploymentHelper;
 import org.eclipse.hawkbit.repository.jpa.utils.QuotaHelper;
 import org.eclipse.hawkbit.repository.model.Action;
+import org.eclipse.hawkbit.repository.model.Action.ActionStatusCreate;
 import org.eclipse.hawkbit.repository.model.Action.Status;
 import org.eclipse.hawkbit.repository.model.ActionStatus;
 import org.eclipse.hawkbit.repository.model.AutoConfirmationStatus;
 import org.eclipse.hawkbit.repository.model.DistributionSet;
 import org.eclipse.hawkbit.repository.model.DistributionSetAssignmentResult;
 import org.eclipse.hawkbit.repository.model.SoftwareModule;
-import org.eclipse.hawkbit.repository.model.SoftwareModuleMetadata;
 import org.eclipse.hawkbit.repository.model.Target;
 import org.eclipse.hawkbit.repository.model.TargetType;
 import org.eclipse.hawkbit.repository.model.TargetUpdateStatus;
-import org.eclipse.hawkbit.security.SystemSecurityContext;
-import org.eclipse.hawkbit.tenancy.TenantAware;
+import org.eclipse.hawkbit.repository.qfields.TargetFields;
+import org.eclipse.hawkbit.tenancy.configuration.ControllerPollProperties;
+import org.eclipse.hawkbit.tenancy.configuration.DurationHelper;
+import org.eclipse.hawkbit.tenancy.configuration.PollingTime;
 import org.eclipse.hawkbit.tenancy.configuration.TenantConfigurationProperties.TenantConfigurationKey;
+import org.eclipse.hawkbit.utils.IpUtil;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -112,71 +120,70 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 
-/**
- * JPA based {@link ControllerManagement} implementation.
- */
 @Slf4j
 @Transactional(readOnly = true)
 @Validated
+@Service
+@ConditionalOnBooleanProperty(prefix = "hawkbit.jpa", name = { "enabled", "controller-management" }, matchIfMissing = true)
 public class JpaControllerManagement extends JpaActionManagement implements ControllerManagement {
 
     private static final Pattern PATTERN = Pattern.compile("[a-zA-Z0-9_\\-!@#$%^&*()+=\\[\\]{}|;:'\",.<>/\\\\?\\s]*");
 
-    private final BlockingDeque<TargetPoll> queue;
-
     // TODO - make it final
     private TargetRepository targetRepository;
-    private final TargetTypeManagement targetTypeManagement;
+    private final TargetTypeRepository targetTypeRepository;
     private final DeploymentManagement deploymentManagement;
     private final ConfirmationManagement confirmationManagement;
     private final SoftwareModuleRepository softwareModuleRepository;
-    private final SoftwareModuleMetadataRepository softwareModuleMetadataRepository;
-    private final DistributionSetManagement distributionSetManagement;
-    private final TenantConfigurationManagement tenantConfigurationManagement;
+    private final SoftwareModuleManagement<? extends SoftwareModule> softwareModuleManagement;
+    private final DistributionSetManagement<? extends DistributionSet> distributionSetManagement;
+    private final ControllerPollProperties controllerPollProperties;
     private final PlatformTransactionManager txManager;
-    private final EntityFactory entityFactory;
     private final EntityManager entityManager;
-    private final AfterTransactionCommitExecutor afterCommit;
-    private final SystemSecurityContext systemSecurityContext;
-    private final TenantAware tenantAware;
+
+    private final Duration minPollingTime;
+    private final Duration maxPollingTime;
+    private final BlockingDeque<TargetPoll> queue;
 
     @SuppressWarnings("squid:S00107")
-    public JpaControllerManagement(
+    protected JpaControllerManagement(
             final ActionRepository actionRepository, final ActionStatusRepository actionStatusRepository, final QuotaManagement quotaManagement,
             final RepositoryProperties repositoryProperties,
-            final TargetRepository targetRepository, final TargetTypeManagement targetTypeManagement,
+            final TargetRepository targetRepository, final TargetTypeRepository targetTypeRepository,
             final DeploymentManagement deploymentManagement, final ConfirmationManagement confirmationManagement,
-            final SoftwareModuleRepository softwareModuleRepository, final SoftwareModuleMetadataRepository softwareModuleMetadataRepository,
-            final DistributionSetManagement distributionSetManagement,
-            final TenantConfigurationManagement tenantConfigurationManagement,
-            final PlatformTransactionManager txManager, final EntityFactory entityFactory, final EntityManager entityManager,
-            final AfterTransactionCommitExecutor afterCommit,
-            final SystemSecurityContext systemSecurityContext, final TenantAware tenantAware,
+            final SoftwareModuleRepository softwareModuleRepository,
+            final SoftwareModuleManagement<? extends SoftwareModule> softwareModuleManagement,
+            final DistributionSetManagement<? extends DistributionSet> distributionSetManagement,
+            final ControllerPollProperties controllerPollProperties,
+            final PlatformTransactionManager txManager, final EntityManager entityManager,
             final ScheduledExecutorService executorService) {
         super(actionRepository, actionStatusRepository, quotaManagement, repositoryProperties);
 
         this.targetRepository = targetRepository;
-        this.targetTypeManagement = targetTypeManagement;
+        this.targetTypeRepository = targetTypeRepository;
         this.deploymentManagement = deploymentManagement;
         this.confirmationManagement = confirmationManagement;
         this.softwareModuleRepository = softwareModuleRepository;
-        this.softwareModuleMetadataRepository = softwareModuleMetadataRepository;
+        this.softwareModuleManagement = softwareModuleManagement;
         this.distributionSetManagement = distributionSetManagement;
-        this.tenantConfigurationManagement = tenantConfigurationManagement;
+        this.controllerPollProperties = controllerPollProperties;
         this.txManager = txManager;
-        this.entityFactory = entityFactory;
         this.entityManager = entityManager;
-        this.afterCommit = afterCommit;
-        this.systemSecurityContext = systemSecurityContext;
-        this.tenantAware = tenantAware;
 
+        minPollingTime = controllerPollProperties.getMinPollingTime() == null
+                ? Duration.of(0, ChronoUnit.SECONDS)
+                : DurationHelper.fromString(controllerPollProperties.getMinPollingTime());
+        maxPollingTime = controllerPollProperties.getMaxPollingTime() == null
+                ? Duration.of(100, ChronoUnit.YEARS)
+                : DurationHelper.fromString(controllerPollProperties.getMaxPollingTime());
         if (!repositoryProperties.isEagerPollPersistence()) {
             executorService.scheduleWithFixedDelay(this::flushUpdateQueue,
                     repositoryProperties.getPollPersistenceFlushTime(),
@@ -195,7 +202,7 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
     @Override
     protected void onActionStatusUpdate(final JpaActionStatus newActionStatus, final JpaAction action) {
         final Action.Status updatedActionStatus = newActionStatus.getStatus();
-        final long occurredAt = newActionStatus.getOccurredAt();
+        final long timestamp = newActionStatus.getTimestamp();
         switch (updatedActionStatus) {
             case ERROR: {
                 final JpaTarget target = action.getTarget();
@@ -204,12 +211,12 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
                 break;
             }
             case FINISHED: {
-                requestControllerAttributes(handleFinishedAndStoreInTargetStatus(occurredAt, action));
+                requestControllerAttributes(handleFinishedAndStoreInTargetStatus(timestamp, action));
                 break;
             }
             case DOWNLOADED: {
                 handleDownloadedActionStatus(action).ifPresent(controllerId ->
-                        requestControllerAttributes(getByControllerId(controllerId)
+                        requestControllerAttributes(findByControllerId(controllerId)
                                 .map(JpaTarget.class::cast)
                                 .orElseThrow(() -> new EntityNotFoundException(Target.class, controllerId))));
                 break;
@@ -224,17 +231,13 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
     @Transactional(isolation = Isolation.READ_COMMITTED)
     @Retryable(retryFor = { ConcurrencyFailureException.class }, maxAttempts = Constants.TX_RT_MAX,
             backoff = @Backoff(delay = Constants.TX_RT_DELAY))
-    public Action addCancelActionStatus(final ActionStatusCreate c) {
-        final JpaActionStatusCreate create = (JpaActionStatusCreate) c;
-
-        final JpaAction action = getActionAndThrowExceptionIfNotFound(create.getActionId());
-
+    public Action addCancelActionStatus(final ActionStatusCreate create) {
+        final JpaAction action = actionRepository.getById(create.getActionId());
         if (!action.isCancelingOrCanceled()) {
             throw new CancelActionNotAllowedException("The action is not in canceling state.");
         }
 
-        final JpaActionStatus actionStatus = create.build();
-
+        final JpaActionStatus actionStatus = buildJpaActionStatus(create);
         switch (actionStatus.getStatus()) {
             case CANCELED, FINISHED: {
                 handleFinishedCancelation(actionStatus, action);
@@ -247,7 +250,7 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
             }
             default: {
                 // information status entry - check for a potential DOS attack
-                assertActionStatusQuota(actionStatus, action);
+                assertActionStatusQuota(create, action);
                 assertActionStatusMessageQuota(actionStatus);
                 break;
             }
@@ -260,32 +263,29 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
     }
 
     @Override
-    public Optional<SoftwareModule> getSoftwareModule(final long id) {
-        return softwareModuleRepository.findById(id).map(SoftwareModule.class::cast);
+    public SoftwareModule getSoftwareModule(final long id) {
+        return softwareModuleRepository.findById(id).map(SoftwareModule.class::cast)
+                .orElseThrow(() -> new EntityNotFoundException(SoftwareModule.class, id));
     }
 
     @Override
-    public Map<Long, List<SoftwareModuleMetadata>> findTargetVisibleMetaDataBySoftwareModuleId(final Collection<Long> moduleId) {
-        return softwareModuleMetadataRepository
-                .findBySoftwareModuleIdInAndTargetVisible(moduleId, true, PageRequest.of(0, RepositoryConstants.MAX_META_DATA_COUNT))
-                .getContent().stream()
-                .collect(Collectors.groupingBy(o -> (Long) o[0], Collectors.mapping(o -> (SoftwareModuleMetadata) o[1], Collectors.toList())));
+    public Map<Long, Map<String, String>> findTargetVisibleMetaDataBySoftwareModuleId(final Collection<Long> moduleId) {
+        return asSystem(() -> softwareModuleManagement.findMetaDataBySoftwareModuleIdsAndTargetVisible(moduleId));
     }
 
     @Override
     @Transactional
     @Retryable(retryFor = { ConcurrencyFailureException.class }, maxAttempts = Constants.TX_RT_MAX,
             backoff = @Backoff(delay = Constants.TX_RT_DELAY))
-    public ActionStatus addInformationalActionStatus(final ActionStatusCreate c) {
-        final JpaActionStatusCreate create = (JpaActionStatusCreate) c;
-        final JpaAction action = getActionAndThrowExceptionIfNotFound(create.getActionId());
-        final JpaActionStatus statusMessage = create.build();
-        statusMessage.setAction(action);
+    public ActionStatus addInformationalActionStatus(final ActionStatusCreate create) {
+        final JpaAction action = actionRepository.getById(create.getActionId());
+        assertActionStatusQuota(create, action);
 
-        assertActionStatusQuota(statusMessage, action);
-        assertActionStatusMessageQuota(statusMessage);
+        final JpaActionStatus actionStatus = buildJpaActionStatus(create);
+        actionStatus.setAction(action);
+        assertActionStatusMessageQuota(actionStatus);
 
-        return actionStatusRepository.save(statusMessage);
+        return actionStatusRepository.save(actionStatus);
     }
 
     @Override
@@ -293,7 +293,7 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
     @Retryable(retryFor = { ConcurrencyFailureException.class }, maxAttempts = Constants.TX_RT_MAX,
             backoff = @Backoff(delay = Constants.TX_RT_DELAY))
     public Action addUpdateActionStatus(final ActionStatusCreate statusCreate) {
-        return addActionStatus((JpaActionStatusCreate) statusCreate);
+        return addActionStatus(statusCreate);
     }
 
     @Override
@@ -345,6 +345,7 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
     public Target findOrRegisterTargetIfItDoesNotExist(final String controllerId, final URI address, final String name, final String type) {
         return findOrRegisterTargetIfItDoesNotExist0(controllerId, address, name, type);
     }
+
     private Target findOrRegisterTargetIfItDoesNotExist0(final String controllerId, final URI address, final String name, final String type) {
         final Specification<JpaTarget> spec = (targetRoot, query, cb) -> cb.equal(targetRoot.get(JpaTarget_.controllerId), controllerId);
         return targetRepository.findOne(spec)
@@ -353,7 +354,7 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
     }
 
     @Override
-    public Optional<Action> getActionForDownloadByTargetAndSoftwareModule(final String controllerId, final long moduleId) {
+    public Action getActionForDownloadByTargetAndSoftwareModule(final String controllerId, final long moduleId) {
         throwExceptionIfTargetDoesNotExist(controllerId);
         throwExceptionIfSoftwareModuleDoesNotExist(moduleId);
 
@@ -369,46 +370,45 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
                         .stream()
                         .anyMatch(module -> module.getId() == moduleId))
                 .map(Action.class::cast)
-                .findFirst();
+                .findFirst()
+                .orElseThrow(() -> new SoftwareModuleNotAssignedToTargetException(moduleId, controllerId));
     }
 
     @Override
-    public String getPollingTime() {
-        return systemSecurityContext.runAsSystem(() -> tenantConfigurationManagement
-                .getConfigurationValue(TenantConfigurationKey.POLLING_TIME_INTERVAL, String.class).getValue());
-    }
-
-    /**
-     * Returns the configured minimum polling interval.
-     *
-     * @return current {@link TenantConfigurationKey#MIN_POLLING_TIME_INTERVAL}.
-     */
-    @Override
-    public String getMinPollingTime() {
-        return systemSecurityContext.runAsSystem(() -> tenantConfigurationManagement
-                .getConfigurationValue(TenantConfigurationKey.MIN_POLLING_TIME_INTERVAL, String.class).getValue());
-    }
-
-    /**
-     * Returns the count to be used for reducing polling interval while calling {@link ControllerManagement#getPollingTimeForAction(Action)}.
-     *
-     * @return configured value of
-     *         {@link TenantConfigurationKey#MAINTENANCE_WINDOW_POLL_COUNT}.
-     */
-    @Override
-    public int getMaintenanceWindowPollCount() {
-        return systemSecurityContext.runAsSystem(() -> tenantConfigurationManagement
-                .getConfigurationValue(TenantConfigurationKey.MAINTENANCE_WINDOW_POLL_COUNT, Integer.class).getValue());
+    public String getPollingTime(final Target target) {
+        // as system so to be able to read tenant configuration (READ_TENANT_CONFIGURATION)
+        return asSystem(() -> {
+            final PollingTime pollingTime = new PollingTime(
+                    TenantConfigHelper.getTenantConfigurationManagement()
+                            .getConfigurationValue(TenantConfigurationKey.POLLING_TIME, String.class).getValue());
+            if (!ObjectUtils.isEmpty(pollingTime.getOverrides()) && target instanceof JpaTarget jpaTarget) {
+                for (final PollingTime.Override override : pollingTime.getOverrides()) {
+                    try {
+                        if (QLSupport.getInstance().entityMatcher(override.qlStr(), TargetFields.class).match(jpaTarget)) {
+                            return override.pollingInterval().getFormattedIntervalWithDeviation(minPollingTime, maxPollingTime);
+                        }
+                    } catch (final Exception e) {
+                        log.warn("Error while evaluating polling override for target {}: {}", jpaTarget.getId(), e.getMessage());
+                    }
+                }
+            }
+            // returns default - no overrides or not applicable for the target
+            return pollingTime.getPollingInterval().getFormattedIntervalWithDeviation(minPollingTime, maxPollingTime);
+        });
     }
 
     @Override
-    public String getPollingTimeForAction(final Action action) {
+    public String getPollingTimeForAction(final Target target, final Action action) {
+        final String pollingTime = getPollingTime(target);
         if (!action.hasMaintenanceSchedule() || action.isMaintenanceScheduleLapsed()) {
-            return getPollingTime();
+            return pollingTime;
+        } else {
+            // the count to be used for reducing polling interval -> the configured value of {@link TenantConfigurationKey#MAINTENANCE_WINDOW_POLL_COUNT}
+            final int maintenanceWindowPollCount = TenantConfigHelper.getAsSystem(
+                    TenantConfigurationKey.MAINTENANCE_WINDOW_POLL_COUNT, Integer.class);
+            return new EventTimer(pollingTime, controllerPollProperties.getMinPollingTime(), ChronoUnit.SECONDS)
+                    .timeToNextEvent(maintenanceWindowPollCount, action.getMaintenanceWindowStartTime().orElse(null));
         }
-
-        return new EventTimer(getPollingTime(), getMinPollingTime(), ChronoUnit.SECONDS)
-                .timeToNextEvent(getMaintenanceWindowPollCount(), action.getMaintenanceWindowStartTime().orElse(null));
     }
 
     @Override
@@ -427,8 +427,8 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
     @Transactional
     @Retryable(retryFor = { ConcurrencyFailureException.class }, maxAttempts = Constants.TX_RT_MAX,
             backoff = @Backoff(delay = Constants.TX_RT_DELAY))
-    public Action registerRetrieved(final long actionId, final String message) {
-        return handleRegisterRetrieved(actionId, message);
+    public void registerRetrieved(final long actionId, final String message) {
+        handleRegisterRetrieved(actionId, message);
     }
 
     @Override
@@ -472,13 +472,13 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
     }
 
     @Override
-    public Optional<Target> getByControllerId(final String controllerId) {
-        return targetRepository.findByControllerId(controllerId).map(Target.class::cast);
+    public Optional<Target> find(final long targetId) {
+        return targetRepository.findById(targetId).map(Target.class::cast);
     }
 
     @Override
-    public Optional<Target> get(final long targetId) {
-        return targetRepository.findById(targetId).map(Target.class::cast);
+    public Optional<Target> findByControllerId(final String controllerId) {
+        return targetRepository.findByControllerId(controllerId).map(Target.class::cast);
     }
 
     @Override
@@ -493,7 +493,7 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
                 ? RepositoryConstants.MAX_ACTION_HISTORY_MSG_COUNT
                 : messageCount;
 
-        final PageRequest pageable = PageRequest.of(0, limit, Sort.by(Direction.DESC, "occurredAt"));
+        final PageRequest pageable = PageRequest.of(0, limit, Sort.by(Direction.DESC, "timestamp"));
         final Page<String> messages = actionStatusRepository.findMessagesByActionIdAndMessageNotLike(
                 actionId, RepositoryConstants.SERVER_MESSAGE_PREFIX + "%", pageable);
 
@@ -518,7 +518,7 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
             jpaAction.setStatus(Status.CANCELING);
             // document that the status has been retrieved
             actionStatusRepository.save(
-                    new JpaActionStatus(jpaAction, Status.CANCELING, System.currentTimeMillis(), "manual cancelation requested"));
+                    new JpaActionStatus(jpaAction, Status.CANCELING, java.lang.System.currentTimeMillis(), "manual cancelation requested"));
             final Action saveAction = actionRepository.save(jpaAction);
 
             cancelAssignDistributionSetEvent(jpaAction);
@@ -534,16 +534,8 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
         targetRepository.getAccessController().ifPresent(
                 accessController -> accessController.assertOperationAllowed(
                         AccessController.Operation.UPDATE,
-                        actionRepository
-                                .findById(actionId)
-                                .orElseThrow(() -> new EntityNotFoundException(Action.class, actionId))
-                                .getTarget()));
+                        actionRepository.getById(actionId).getTarget()));
         actionRepository.updateExternalRef(actionId, externalRef);
-    }
-
-    @Override
-    public Optional<Action> getActionByExternalRef(@NotEmpty final String externalRef) {
-        return actionRepository.findByExternalRef(externalRef);
     }
 
     @Override
@@ -554,7 +546,7 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
     }
 
     @Override
-    public Optional<Action> getInstalledActionByTarget(final Target target) {
+    public Optional<Action> findInstalledActionByTarget(final Target target) {
         final JpaTarget jpaTarget = (JpaTarget) target;
         return Optional.ofNullable(jpaTarget.getInstalledDistributionSet())
                 .flatMap(installedDistributionSet -> actionRepository.findFirstByTargetIdAndDistributionSetIdAndStatusOrderByIdDesc(
@@ -574,20 +566,17 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
     @Override
     public boolean updateOfflineAssignedVersion(@NotEmpty final String controllerId, final String distributionName, final String version) {
         List<DistributionSetAssignmentResult> distributionSetAssignmentResults =
-                systemSecurityContext.runAsSystem(() ->
-                        distributionSetManagement.findByNameAndVersion(distributionName, version).map(
-                                        distributionSet -> deploymentManagement.offlineAssignedDistributionSets(
-                                                List.of(Map.entry(controllerId, distributionSet.getId())), controllerId))
-                                .orElseThrow(() ->
-                                        new EntityNotFoundException(DistributionSet.class, Map.entry(distributionName, version))));
+                asSystem(() -> asActor(controllerId, () -> deploymentManagement.offlineAssignedDistributionSets(
+                        List.of(Map.entry(controllerId, distributionSetManagement.findByNameAndVersion(distributionName, version).getId())))));
 
-        return distributionSetAssignmentResults.stream().findFirst()
+        return distributionSetAssignmentResults.stream()
+                .findFirst()
                 .map(result -> result.getAlreadyAssigned() == 0)
                 .orElseThrow();
     }
 
-    Optional<TargetType> getTargetType(String targetTypeName) {
-        return systemSecurityContext.runAsSystem(() -> targetTypeManagement.getByName(targetTypeName));
+    private Optional<TargetType> findTargetType(String targetTypeName) {
+        return targetTypeRepository.findOne(TargetTypeSpecification.hasName(targetTypeName)).map(TargetType.class::cast);
     }
 
     // for testing
@@ -655,16 +644,18 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
     }
 
     private Target createTarget(final String controllerId, final URI address, final String name, final String type) {
-
         log.debug("Creating target for thing ID \"{}\".", controllerId);
-        JpaTarget jpaTarget = (JpaTarget) entityFactory.target().create()
-                .controllerId(controllerId).description("Plug and Play target: " + controllerId)
-                .name((StringUtils.hasText(name) ? name : controllerId)).status(TargetUpdateStatus.REGISTERED)
-                .lastTargetQuery(System.currentTimeMillis())
-                .address(Optional.ofNullable(address).map(URI::toString).orElse(null)).build();
+        final JpaTarget jpaTarget = new JpaTarget();
+        jpaTarget.setControllerId(controllerId);
+        jpaTarget.setDescription("Plug and Play target: " + controllerId);
+        jpaTarget.setName((StringUtils.hasText(name) ? name : controllerId));
+        jpaTarget.setSecurityToken(SecurityTokenGenerator.generateToken());
+        jpaTarget.setUpdateStatus(TargetUpdateStatus.REGISTERED);
+        jpaTarget.setLastTargetQuery(java.lang.System.currentTimeMillis());
+        jpaTarget.setAddress(Optional.ofNullable(address).map(URI::toString).orElse(null));
 
         if (StringUtils.hasText(type)) {
-            var targetTypeOptional = getTargetType(type);
+            final Optional<TargetType> targetTypeOptional = findTargetType(type);
             if (targetTypeOptional.isPresent()) {
                 log.debug("Setting target type for thing ID \"{}\" to \"{}\".", controllerId, type);
                 jpaTarget.setTargetType(targetTypeOptional.get());
@@ -675,9 +666,7 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
         }
 
         final Target result = targetRepository.save(jpaTarget);
-
-        afterCommit.afterCommit(() -> EventPublisherHolder.getInstance().getEventPublisher().publishEvent(new TargetPollEvent(result)));
-
+        afterCommit(() -> EventPublisherHolder.getInstance().getEventPublisher().publishEvent(new TargetPollEvent(result)));
         return result;
     }
 
@@ -703,11 +692,10 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
         }
 
         try {
-            events.stream().collect(Collectors.groupingBy(TargetPoll::getTenant)).forEach((tenant, polls) -> {
-                final TransactionCallback<Void> createTransaction = status -> updateLastTargetQueries(tenant, polls);
-                tenantAware.runAsTenant(tenant,
-                        () -> DeploymentHelper.runInNewTransaction(txManager, "flushUpdateQueue", createTransaction));
-            });
+            events.stream().collect(Collectors.groupingBy(TargetPoll::getTenant))
+                    .forEach((tenant, polls) -> DeploymentHelper.runInNewTransaction(
+                            txManager, "flushUpdateQueue",
+                            status -> updateLastTargetQueries(tenant, polls)));
         } catch (final RuntimeException ex) {
             log.error("Failed to persist UpdateQueue content.", ex);
             return;
@@ -724,8 +712,8 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
                 Constants.MAX_ENTRIES_IN_STATEMENT);
 
         pollChunks.forEach(chunk -> {
-            setLastTargetQuery(tenant, System.currentTimeMillis(), chunk);
-            chunk.forEach(controllerId -> afterCommit.afterCommit(() -> EventPublisherHolder.getInstance().getEventPublisher()
+            setLastTargetQuery(tenant, java.lang.System.currentTimeMillis(), chunk);
+            chunk.forEach(controllerId -> afterCommit(() -> EventPublisherHolder.getInstance().getEventPublisher()
                     .publishEvent(new TargetPollEvent(controllerId, tenant))));
         });
 
@@ -753,13 +741,13 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
     }
 
     /**
-     * Stores target directly to DB in case either {@link Target#getAddress()}
-     * or {@link Target#getUpdateStatus()} or {@link Target#getName()} changes
-     * or the buffer queue is full.
+     * Stores target directly to DB in case either {@link Target#getAddress()} or {@link Target#getUpdateStatus()} or {@link Target#getName()}
+     * changes or the buffer queue is full.
      */
+    @SuppressWarnings("java:S3776") // it's just complex
     private Target updateTarget(final JpaTarget toUpdate, final URI address, final String name, final String type) {
         if (isStoreEager(toUpdate, address, name, type) || !queue.offer(new TargetPoll(toUpdate))) {
-            if (isAddressChanged(toUpdate.getAddress(), address)) {
+            if (isAddressChanged(IpUtil.addressToUri(toUpdate.getAddress()), address)) {
                 toUpdate.setAddress(address.toString());
             }
             if (isNameChanged(toUpdate.getName(), name)) {
@@ -768,13 +756,14 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
 
             if (isTypeChanged(toUpdate.getTargetType(), type)) {
                 if (StringUtils.hasText(type)) {
-                    var targetTypeOptional = getTargetType(type);
+                    final Optional<TargetType> targetTypeOptional = findTargetType(type);
                     if (targetTypeOptional.isPresent()) {
                         log.debug("Updating target type for thing ID \"{}\" to \"{}\".", toUpdate.getControllerId(), type);
                         toUpdate.setTargetType(targetTypeOptional.get());
                     } else {
-                        log.error("Target type with the provided name \"{}\" was not found. Target type for thing ID" +
-                                " \"{}\" will not be updated", type, toUpdate.getControllerId());
+                        log.error(
+                                "Target type with the provided name \"{}\" was not found. Target type for thing ID \"{}\" will not be updated",
+                                type, toUpdate.getControllerId());
                     }
                 } else {
                     log.debug("Removing target type assignment for thing ID \"{}\".", toUpdate.getControllerId());
@@ -784,24 +773,22 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
             if (isStatusUnknown(toUpdate.getUpdateStatus())) {
                 toUpdate.setUpdateStatus(TargetUpdateStatus.REGISTERED);
             }
-            toUpdate.setLastTargetQuery(System.currentTimeMillis());
-            afterCommit.afterCommit(() -> EventPublisherHolder.getInstance().getEventPublisher().publishEvent(new TargetPollEvent(toUpdate)));
+            toUpdate.setLastTargetQuery(java.lang.System.currentTimeMillis());
+            afterCommit(() -> EventPublisherHolder.getInstance().getEventPublisher().publishEvent(new TargetPollEvent(toUpdate)));
             return targetRepository.save(toUpdate);
         }
         return toUpdate;
     }
 
     private boolean isStoreEager(final JpaTarget toUpdate, final URI address, final String name, final String type) {
-        return repositoryProperties.isEagerPollPersistence() || isAddressChanged(toUpdate.getAddress(), address)
+        return repositoryProperties.isEagerPollPersistence() || isAddressChanged(IpUtil.addressToUri(toUpdate.getAddress()), address)
                 || isNameChanged(toUpdate.getName(), name) || isTypeChanged(toUpdate.getTargetType(), type)
                 || isStatusUnknown(toUpdate.getUpdateStatus());
     }
 
     private void handleFinishedCancelation(final JpaActionStatus actionStatus, final JpaAction action) {
-        // in case of successful cancellation we also report the success at
-        // the canceled action itself.
-        actionStatus.addMessage(
-                RepositoryConstants.SERVER_MESSAGE_PREFIX + "Cancellation completion is finished sucessfully.");
+        // in case of successful cancellation we also report the success at the canceled action itself.
+        actionStatus.addMessage(RepositoryConstants.SERVER_MESSAGE_PREFIX + "Cancellation completion is finished successfully.");
         DeploymentHelper.successCancellation(action, actionRepository, targetRepository);
     }
 
@@ -832,9 +819,8 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
         target.setRequestControllerAttributes(true);
 
         EventPublisherHolder.getInstance().getEventPublisher()
-                .publishEvent(new TargetAttributesRequestedEvent(tenantAware.getCurrentTenant(), target.getId(),
-                        JpaTarget.class, target.getControllerId(), target.getAddress() != null ? target.getAddress().toString() : null
-                ));
+                .publishEvent(new TargetAttributesRequestedEvent(AccessContext.tenant(), target.getId(),
+                        JpaTarget.class, target.getControllerId(), target.getAddress() != null ? target.getAddress() : null));
     }
 
     private void handleErrorOnAction(final JpaAction mergedAction, final JpaTarget mergedTarget) {
@@ -852,15 +838,15 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
      * @param action updated action
      * @return a present controllerId in case the attributes needs to be requested.
      */
-    private JpaTarget handleFinishedAndStoreInTargetStatus(final long occurredAt, final JpaAction action) {
+    private JpaTarget handleFinishedAndStoreInTargetStatus(final long timestamp, final JpaAction action) {
         final JpaTarget target = action.getTarget();
         action.setActive(false);
         action.setStatus(Status.FINISHED);
-        if (target.getInstallationDate() == null || target.getInstallationDate() < occurredAt) {
+        if (target.getInstallationDate() == null || target.getInstallationDate() < timestamp) {
             final JpaDistributionSet ds = entityManager.merge(action.getDistributionSet());
 
             target.setInstalledDistributionSet(ds);
-            target.setInstallationDate(occurredAt);
+            target.setInstallationDate(timestamp);
 
             // Target reported an installation of a DOWNLOAD_ONLY assignment, the assigned DS has to be adapted
             // because the currently assigned DS can be unequal to the currently installed DS (the downloadOnly DS)
@@ -893,11 +879,9 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
      *
      * @param actionId to the handle status for
      * @param message for the status
-     * @return the updated action in case the status has been changed to
-     *         {@link Status#RETRIEVED}
      */
-    private Action handleRegisterRetrieved(final Long actionId, final String message) {
-        final JpaAction action = getActionAndThrowExceptionIfNotFound(actionId);
+    private void handleRegisterRetrieved(final Long actionId, final String message) {
+        final JpaAction action = actionRepository.getById(actionId);
         // do a manual query with CriteriaBuilder to avoid unnecessary field queries and an extra
         // count query made by spring-data when using pageable requests, we don't need an extra count
         // query, we just want to check if the last action status is a retrieved or not.
@@ -908,8 +892,7 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
                 .multiselect(actionStatusRoot.get(AbstractJpaBaseEntity_.id), actionStatusRoot.get(JpaActionStatus_.status))
                 .where(cb.equal(actionStatusRoot.get(JpaActionStatus_.action).get(AbstractJpaBaseEntity_.id), actionId))
                 .orderBy(cb.desc(actionStatusRoot.get(AbstractJpaBaseEntity_.id)));
-        final List<Object[]> resultList = entityManager.createQuery(query).setFirstResult(0).setMaxResults(1)
-                .getResultList();
+        final List<Object[]> resultList = entityManager.createQuery(query).setFirstResult(0).setMaxResults(1).getResultList();
 
         // if the latest status is not in retrieve state then we add a retrieved state again, we want
         // to document a deployment retrieved status and a cancel retrieved status, but multiple
@@ -917,8 +900,7 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
         // case controller retrieves a action multiple times.
         if (resultList.isEmpty() || (Status.RETRIEVED != resultList.get(0)[1])) {
             // document that the status has been retrieved
-            actionStatusRepository
-                    .save(new JpaActionStatus(action, Status.RETRIEVED, System.currentTimeMillis(), message));
+            actionStatusRepository.save(new JpaActionStatus(action, Status.RETRIEVED, java.lang.System.currentTimeMillis(), message));
 
             // don't change the action status itself in case the action is in
             // canceling state otherwise
@@ -926,15 +908,12 @@ public class JpaControllerManagement extends JpaActionManagement implements Cont
             // cancel job anymore.
             if (!action.isCancelingOrCanceled()) {
                 action.setStatus(Status.RETRIEVED);
-                return actionRepository.save(action);
             }
         }
-        return action;
     }
 
     private void cancelAssignDistributionSetEvent(final Action action) {
-        afterCommit.afterCommit(() -> EventPublisherHolder.getInstance().getEventPublisher()
-                .publishEvent(new CancelTargetAssignmentEvent(action)));
+        afterCommit(() -> EventPublisherHolder.getInstance().getEventPublisher().publishEvent(new CancelTargetAssignmentEvent(action)));
     }
 
     /**

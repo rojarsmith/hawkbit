@@ -13,12 +13,11 @@ import java.io.InputStream;
 
 import jakarta.servlet.http.HttpServletRequest;
 
-import org.eclipse.hawkbit.artifact.repository.model.DbArtifact;
+import org.eclipse.hawkbit.artifact.exception.ArtifactBinaryNoLongerExistsException;
+import org.eclipse.hawkbit.artifact.model.ArtifactStream;
 import org.eclipse.hawkbit.mgmt.rest.api.MgmtDownloadArtifactRestApi;
 import org.eclipse.hawkbit.repository.ArtifactManagement;
 import org.eclipse.hawkbit.repository.SoftwareModuleManagement;
-import org.eclipse.hawkbit.repository.exception.ArtifactBinaryNoLongerExistsException;
-import org.eclipse.hawkbit.repository.exception.ArtifactBinaryNotFoundException;
 import org.eclipse.hawkbit.repository.exception.EntityNotFoundException;
 import org.eclipse.hawkbit.repository.model.Artifact;
 import org.eclipse.hawkbit.repository.model.SoftwareModule;
@@ -36,10 +35,11 @@ import org.springframework.web.context.WebApplicationContext;
 @Scope(value = WebApplicationContext.SCOPE_REQUEST)
 public class MgmtDownloadArtifactResource implements MgmtDownloadArtifactRestApi {
 
-    private final SoftwareModuleManagement softwareModuleManagement;
+    private final SoftwareModuleManagement<? extends SoftwareModule> softwareModuleManagement;
     private final ArtifactManagement artifactManagement;
 
-    public MgmtDownloadArtifactResource(final SoftwareModuleManagement softwareModuleManagement, final ArtifactManagement artifactManagement) {
+    public MgmtDownloadArtifactResource(final SoftwareModuleManagement<? extends SoftwareModule> softwareModuleManagement,
+            final ArtifactManagement artifactManagement) {
         this.softwareModuleManagement = softwareModuleManagement;
         this.artifactManagement = artifactManagement;
     }
@@ -53,7 +53,7 @@ public class MgmtDownloadArtifactResource implements MgmtDownloadArtifactRestApi
      */
     @Override
     public ResponseEntity<InputStream> downloadArtifact(final Long softwareModuleId, final Long artifactId) {
-        final SoftwareModule module = softwareModuleManagement.get(softwareModuleId)
+        final SoftwareModule module = softwareModuleManagement.find(softwareModuleId)
                 .orElseThrow(() -> new EntityNotFoundException(SoftwareModule.class, softwareModuleId));
         if (module.isDeleted()) {
             throw new ArtifactBinaryNoLongerExistsException();
@@ -61,9 +61,7 @@ public class MgmtDownloadArtifactResource implements MgmtDownloadArtifactRestApi
         final Artifact artifact = module.getArtifact(artifactId)
                 .orElseThrow(() -> new EntityNotFoundException(Artifact.class, artifactId));
 
-        final DbArtifact file = artifactManagement
-                .loadArtifactBinary(artifact.getSha1Hash(), module.getId(), module.isEncrypted())
-                .orElseThrow(() -> new ArtifactBinaryNotFoundException(artifact.getSha1Hash()));
+        final ArtifactStream file = artifactManagement.getArtifactStream(artifact.getSha1Hash(), module.getId(), module.isEncrypted());
         final HttpServletRequest request = RequestResponseContextHolder.getHttpServletRequest();
         final String ifMatch = request.getHeader(HttpHeaders.IF_MATCH);
         if (ifMatch != null && !HttpUtil.matchesHttpHeader(ifMatch, artifact.getSha1Hash())) {
@@ -71,6 +69,6 @@ public class MgmtDownloadArtifactResource implements MgmtDownloadArtifactRestApi
         }
 
         return FileStreamingUtil.writeFileResponse(file, artifact.getFilename(), artifact.getCreatedAt(),
-                RequestResponseContextHolder.getHttpServletResponse(), request, null);
+                request, RequestResponseContextHolder.getHttpServletResponse(), null);
     }
 }

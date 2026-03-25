@@ -80,11 +80,11 @@ import org.springframework.beans.factory.annotation.Autowired;
  */
 class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegrationTest {
 
-    static final String DMF_REGISTER_TEST_CONTROLLER_ID = "Dmf_hand_registerTargets_1";
-    static final String DMF_ATTR_TEST_CONTROLLER_ID = "Dmf_hand_updateAttributes";
-    static final String UPDATE_ATTR_TEST_CONTROLLER_ID = "ControllerAttributeTestTarget";
+    private static final String DMF_REGISTER_TEST_CONTROLLER_ID = "Dmf_hand_registerTargets_1";
+    private static final String DMF_ATTR_TEST_CONTROLLER_ID = "Dmf_hand_updateAttributes";
+    private static final String UPDATE_ATTR_TEST_CONTROLLER_ID = "ControllerAttributeTestTarget";
     private static final String TARGET_PREFIX = "Dmf_hand_";
-    
+
     @Autowired
     private AmqpProperties amqpProperties;
 
@@ -128,16 +128,13 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     @Test
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
-            @Expect(type = TargetUpdatedEvent.class, count = 1), 
+            @Expect(type = TargetUpdatedEvent.class, count = 1),
             @Expect(type = TargetPollEvent.class, count = 2) })
     void registerTargetWithName() {
         final String controllerId = TARGET_PREFIX + "registerTargetWithName";
         final String name = "NonDefaultTargetName";
-        registerAndAssertTargetWithExistingTenant(controllerId, name, 1, TargetUpdateStatus.REGISTERED, CREATED_BY,
-                null);
-
-        registerSameTargetAndAssertBasedOnVersion(controllerId, name + "_updated", 1, TargetUpdateStatus.REGISTERED,
-                null);
+        registerAndAssertTargetWithExistingTenant(controllerId, name, 1, TargetUpdateStatus.REGISTERED, CREATED_BY, null);
+        registerSameTargetAndAssertBasedOnVersion(controllerId, name + "_updated", 1, TargetUpdateStatus.REGISTERED, null);
 
         Mockito.verifyNoInteractions(getDeadletterListener());
     }
@@ -148,7 +145,7 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     @Test
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
-            @Expect(type = TargetUpdatedEvent.class, count = 2), 
+            @Expect(type = TargetUpdatedEvent.class, count = 2),
             @Expect(type = TargetPollEvent.class, count = 2) })
     void registerTargetWithAttributes() {
         final String controllerId = TARGET_PREFIX + "registerTargetWithAttributes";
@@ -156,8 +153,7 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         attributes.put("testKey1", "testValue1");
         attributes.put("testKey2", "testValue2");
 
-        registerAndAssertTargetWithExistingTenant(controllerId, null, 1, TargetUpdateStatus.REGISTERED, CREATED_BY,
-                attributes);
+        registerAndAssertTargetWithExistingTenant(controllerId, null, 1, TargetUpdateStatus.REGISTERED, CREATED_BY, attributes);
 
         attributes.put("testKey3", "testValue3");
         registerSameTargetAndAssertBasedOnVersion(controllerId, null, 1, TargetUpdateStatus.REGISTERED, attributes);
@@ -171,29 +167,27 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     @Test
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
-            @Expect(type = TargetUpdatedEvent.class, count = 3), 
+            @Expect(type = TargetUpdatedEvent.class, count = 3),
             @Expect(type = TargetPollEvent.class, count = 2) })
     void registerTargetWithNameAndAttributes() {
         final String controllerId = TARGET_PREFIX + "registerTargetWithAttributes";
         final String name = "NonDefaultTargetName";
+
         final Map<String, String> attributes = new HashMap<>();
         attributes.put("testKey1", "testValue1");
         attributes.put("testKey2", "testValue2");
-
-        registerAndAssertTargetWithExistingTenant(controllerId, name, 1, TargetUpdateStatus.REGISTERED, CREATED_BY,
-                attributes);
+        registerAndAssertTargetWithExistingTenant(controllerId, name, 1, TargetUpdateStatus.REGISTERED, CREATED_BY, attributes);
 
         attributes.put("testKey3", "testValue3");
-        registerSameTargetAndAssertBasedOnVersion(controllerId, name + "_updated", 1, TargetUpdateStatus.REGISTERED,
-                attributes);
+        registerSameTargetAndAssertBasedOnVersion(controllerId, name + "_updated", 1, TargetUpdateStatus.REGISTERED, attributes);
 
         Mockito.verifyNoInteractions(getDeadletterListener());
     }
 
-    @ParameterizedTest
     /**
      * Tests register invalid target with empty controller id.
      */
+    @ParameterizedTest
     @ValueSource(strings = { "", "Invalid Invalid" })
     @NullSource
     @ExpectEvents({ @Expect(type = TargetCreatedEvent.class) })
@@ -328,10 +322,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         assertAllTargetsCount(0);
     }
 
-    @ParameterizedTest
     /**
      * Tests null type message header. This message should forwarded to the deadletter queue
      */
+    @ParameterizedTest
     @ValueSource(strings = { "", "NotExist" })
     @NullSource
     @ExpectEvents({ @Expect(type = TargetCreatedEvent.class) })
@@ -344,10 +338,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         assertAllTargetsCount(0);
     }
 
-    @ParameterizedTest
     /**
      * Tests null topic message header. This message should forwarded to the deadletter queue
      */
+    @ParameterizedTest
     @ValueSource(strings = { "", "NotExist" })
     @NullSource
     @ExpectEvents({ @Expect(type = TargetCreatedEvent.class) })
@@ -372,10 +366,10 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         verifyOneDeadLetterMessage();
     }
 
-    @ParameterizedTest
     /**
      * Tests invalid null message content. This message should forwarded to the deadletter queue
      */
+    @ParameterizedTest
     @ValueSource(strings = { "", "Invalid Content" })
     @NullSource
     @ExpectEvents({ @Expect(type = TargetCreatedEvent.class) })
@@ -404,14 +398,14 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
-            @Expect(type = ActionUpdatedEvent.class, count = 1), 
+            @Expect(type = ActionUpdatedEvent.class, count = 1),
             @Expect(type = ActionCreatedEvent.class, count = 1),
             @Expect(type = DistributionSetCreatedEvent.class, count = 1),
             @Expect(type = SoftwareModuleCreatedEvent.class, count = 3),
             @Expect(type = DistributionSetUpdatedEvent.class, count = 1), // implicit lock
             @Expect(type = SoftwareModuleUpdatedEvent.class, count = 9), // implicit lock
             @Expect(type = TargetAttributesRequestedEvent.class, count = 1),
-            @Expect(type = TargetUpdatedEvent.class, count = 2), 
+            @Expect(type = TargetUpdatedEvent.class, count = 2),
             @Expect(type = TargetPollEvent.class, count = 1) })
     void finishActionStatus() {
         final String controllerId = TARGET_PREFIX + "finishActionStatus";
@@ -425,13 +419,13 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
-            @Expect(type = ActionUpdatedEvent.class), 
+            @Expect(type = ActionUpdatedEvent.class),
             @Expect(type = ActionCreatedEvent.class, count = 1),
             @Expect(type = DistributionSetCreatedEvent.class, count = 1),
             @Expect(type = SoftwareModuleCreatedEvent.class, count = 3),
             @Expect(type = DistributionSetUpdatedEvent.class, count = 1), // implicit lock
             @Expect(type = SoftwareModuleUpdatedEvent.class, count = 9), // implicit lock
-            @Expect(type = TargetUpdatedEvent.class, count = 1), 
+            @Expect(type = TargetUpdatedEvent.class, count = 1),
             @Expect(type = TargetPollEvent.class, count = 1) })
     void runningActionStatus() {
         final String controllerId = TARGET_PREFIX + "runningActionStatus";
@@ -445,13 +439,13 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
-            @Expect(type = ActionUpdatedEvent.class), 
+            @Expect(type = ActionUpdatedEvent.class),
             @Expect(type = ActionCreatedEvent.class, count = 1),
             @Expect(type = DistributionSetCreatedEvent.class, count = 1),
             @Expect(type = SoftwareModuleCreatedEvent.class, count = 3),
             @Expect(type = DistributionSetUpdatedEvent.class, count = 1), // implicit lock
             @Expect(type = SoftwareModuleUpdatedEvent.class, count = 9), // implicit lock
-            @Expect(type = TargetUpdatedEvent.class, count = 1), 
+            @Expect(type = TargetUpdatedEvent.class, count = 1),
             @Expect(type = TargetPollEvent.class, count = 1) })
     void downloadedActionStatus() {
         final String controllerId = TARGET_PREFIX + "downloadedActionStatus";
@@ -470,7 +464,7 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
             @Expect(type = SoftwareModuleCreatedEvent.class, count = 3),
             @Expect(type = DistributionSetUpdatedEvent.class, count = 1), // implicit lock
             @Expect(type = SoftwareModuleUpdatedEvent.class, count = 9), // implicit lock
-            @Expect(type = TargetUpdatedEvent.class, count = 1), 
+            @Expect(type = TargetUpdatedEvent.class, count = 1),
             @Expect(type = TargetPollEvent.class, count = 1) })
     void downloadActionStatus() {
         final String controllerId = TARGET_PREFIX + "downloadActionStatus";
@@ -484,13 +478,13 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
-            @Expect(type = ActionUpdatedEvent.class, count = 1), 
+            @Expect(type = ActionUpdatedEvent.class, count = 1),
             @Expect(type = ActionCreatedEvent.class, count = 1),
             @Expect(type = DistributionSetCreatedEvent.class, count = 1),
             @Expect(type = SoftwareModuleCreatedEvent.class, count = 3),
             @Expect(type = DistributionSetUpdatedEvent.class, count = 1), // implicit lock
             @Expect(type = SoftwareModuleUpdatedEvent.class, count = 9), // implicit lock
-            @Expect(type = TargetUpdatedEvent.class, count = 2), 
+            @Expect(type = TargetUpdatedEvent.class, count = 2),
             @Expect(type = TargetPollEvent.class, count = 1) })
     void errorActionStatus() {
         final String controllerId = TARGET_PREFIX + "errorActionStatus";
@@ -509,7 +503,7 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
             @Expect(type = SoftwareModuleCreatedEvent.class, count = 3),
             @Expect(type = DistributionSetUpdatedEvent.class, count = 1), // implicit lock
             @Expect(type = SoftwareModuleUpdatedEvent.class, count = 9), // implicit lock
-            @Expect(type = TargetUpdatedEvent.class, count = 1), 
+            @Expect(type = TargetUpdatedEvent.class, count = 1),
             @Expect(type = TargetPollEvent.class, count = 1) })
     void warningActionStatus() {
         final String controllerId = TARGET_PREFIX + "warningActionStatus";
@@ -528,7 +522,7 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
             @Expect(type = SoftwareModuleCreatedEvent.class, count = 3),
             @Expect(type = DistributionSetUpdatedEvent.class, count = 1), // implicit lock
             @Expect(type = SoftwareModuleUpdatedEvent.class, count = 9), // implicit lock
-            @Expect(type = TargetUpdatedEvent.class, count = 1), 
+            @Expect(type = TargetUpdatedEvent.class, count = 1),
             @Expect(type = TargetPollEvent.class, count = 1) })
     void retrievedActionStatus() {
         final String controllerId = TARGET_PREFIX + "retrievedActionStatus";
@@ -547,7 +541,7 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
             @Expect(type = SoftwareModuleCreatedEvent.class, count = 3),
             @Expect(type = DistributionSetUpdatedEvent.class, count = 1), // implicit lock
             @Expect(type = SoftwareModuleUpdatedEvent.class, count = 9), // implicit lock
-            @Expect(type = TargetUpdatedEvent.class, count = 1), 
+            @Expect(type = TargetUpdatedEvent.class, count = 1),
             @Expect(type = TargetPollEvent.class, count = 1) })
     void cancelNotAllowActionStatus() {
         final String controllerId = TARGET_PREFIX + "cancelNotAllowActionStatus";
@@ -567,7 +561,7 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
             @Expect(type = SoftwareModuleCreatedEvent.class, count = 3),
             @Expect(type = DistributionSetUpdatedEvent.class, count = 1), // implicit lock
             @Expect(type = SoftwareModuleUpdatedEvent.class, count = 9), // implicit lock
-            @Expect(type = TargetUpdatedEvent.class, count = 1), 
+            @Expect(type = TargetUpdatedEvent.class, count = 1),
             @Expect(type = TargetPollEvent.class, count = 2) })
     void receiveDownloadAndInstallMessageAfterAssignment() {
         final String controllerId = TARGET_PREFIX + "receiveDownLoadAndInstallMessageAfterAssignment";
@@ -598,7 +592,7 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
             @Expect(type = SoftwareModuleCreatedEvent.class, count = 3),
             @Expect(type = DistributionSetUpdatedEvent.class, count = 1), // implicit lock
             @Expect(type = SoftwareModuleUpdatedEvent.class, count = 9), // implicit lock
-            @Expect(type = TargetUpdatedEvent.class, count = 1), 
+            @Expect(type = TargetUpdatedEvent.class, count = 1),
             @Expect(type = TargetPollEvent.class, count = 2) })
     void receiveDownloadMessageBeforeMaintenanceWindowStartTime() {
         final String controllerId = TARGET_PREFIX + "receiveDownLoadMessageBeforeMaintenanceWindowStartTime";
@@ -607,8 +601,8 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         registerAndAssertTargetWithExistingTenant(controllerId);
         final DistributionSet distributionSet = testdataFactory.createDistributionSet(UUID.randomUUID().toString());
         testdataFactory.addSoftwareModuleMetadata(distributionSet);
-        assignDistributionSetWithMaintenanceWindow(distributionSet.getId(), controllerId, getTestSchedule(2),
-                getTestDuration(1), getTestTimeZone());
+        assignDistributionSetWithMaintenanceWindow(
+                distributionSet.getId(), controllerId, getTestSchedule(2), getTestDuration(1), getTestTimeZone());
 
         // test
         registerSameTargetAndAssertBasedOnVersion(controllerId, 1, TargetUpdateStatus.PENDING);
@@ -630,7 +624,7 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
             @Expect(type = SoftwareModuleCreatedEvent.class, count = 3),
             @Expect(type = DistributionSetUpdatedEvent.class, count = 1), // implicit lock
             @Expect(type = SoftwareModuleUpdatedEvent.class, count = 9), // implicit lock
-            @Expect(type = TargetUpdatedEvent.class, count = 1), 
+            @Expect(type = TargetUpdatedEvent.class, count = 1),
             @Expect(type = TargetPollEvent.class, count = 2) })
     void receiveDownloadAndInstallMessageDuringMaintenanceWindow() {
         final String controllerId = TARGET_PREFIX + "receiveDownLoadAndInstallMessageDuringMaintenanceWindow";
@@ -639,8 +633,8 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
         registerAndAssertTargetWithExistingTenant(controllerId);
         final DistributionSet distributionSet = testdataFactory.createDistributionSet(UUID.randomUUID().toString());
         testdataFactory.addSoftwareModuleMetadata(distributionSet);
-        assignDistributionSetWithMaintenanceWindow(distributionSet.getId(), controllerId, getTestSchedule(-5),
-                getTestDuration(10), getTestTimeZone());
+        assignDistributionSetWithMaintenanceWindow(
+                distributionSet.getId(), controllerId, getTestSchedule(-5), getTestDuration(10), getTestTimeZone());
 
         // test
         registerSameTargetAndAssertBasedOnVersion(controllerId, 1, TargetUpdateStatus.PENDING);
@@ -663,7 +657,7 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
             @Expect(type = DistributionSetUpdatedEvent.class, count = 1), // implicit lock
             @Expect(type = SoftwareModuleUpdatedEvent.class, count = 3), // implicit lock
             @Expect(type = CancelTargetAssignmentEvent.class, count = 1),
-            @Expect(type = ActionUpdatedEvent.class, count = 1), 
+            @Expect(type = ActionUpdatedEvent.class, count = 1),
             @Expect(type = TargetUpdatedEvent.class, count = 1),
             @Expect(type = TargetPollEvent.class, count = 2) })
     void receiveCancelUpdateMessageAfterAssignmentWasCanceled() {
@@ -691,14 +685,14 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
-            @Expect(type = ActionUpdatedEvent.class, count = 1), 
+            @Expect(type = ActionUpdatedEvent.class, count = 1),
             @Expect(type = ActionCreatedEvent.class, count = 1),
             @Expect(type = DistributionSetCreatedEvent.class, count = 1),
             @Expect(type = SoftwareModuleCreatedEvent.class, count = 3),
             @Expect(type = DistributionSetUpdatedEvent.class, count = 1), // implicit lock
             @Expect(type = SoftwareModuleUpdatedEvent.class, count = 9), // implicit lock
             @Expect(type = CancelTargetAssignmentEvent.class, count = 1),
-            @Expect(type = TargetUpdatedEvent.class, count = 1), 
+            @Expect(type = TargetUpdatedEvent.class, count = 1),
             @Expect(type = TargetPollEvent.class, count = 1) })
     void actionNotExists() {
         final String controllerId = TARGET_PREFIX + "actionNotExists";
@@ -722,7 +716,7 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
             @Expect(type = SoftwareModuleCreatedEvent.class, count = 3),
             @Expect(type = DistributionSetUpdatedEvent.class, count = 1), // implicit lock
             @Expect(type = SoftwareModuleUpdatedEvent.class, count = 9), // implicit lock
-            @Expect(type = TargetUpdatedEvent.class, count = 1), 
+            @Expect(type = TargetUpdatedEvent.class, count = 1),
             @Expect(type = TargetPollEvent.class, count = 1) })
     void canceledRejectedNotAllowActionStatus() {
         final String controllerId = TARGET_PREFIX + "canceledRejectedNotAllowActionStatus";
@@ -738,13 +732,13 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
             @Expect(type = CancelTargetAssignmentEvent.class, count = 1),
-            @Expect(type = ActionUpdatedEvent.class, count = 2), 
+            @Expect(type = ActionUpdatedEvent.class, count = 2),
             @Expect(type = ActionCreatedEvent.class, count = 1),
             @Expect(type = DistributionSetCreatedEvent.class, count = 1),
             @Expect(type = SoftwareModuleCreatedEvent.class, count = 3),
             @Expect(type = DistributionSetUpdatedEvent.class, count = 1), // implicit lock
             @Expect(type = SoftwareModuleUpdatedEvent.class, count = 9), // implicit lock
-            @Expect(type = TargetUpdatedEvent.class, count = 1), 
+            @Expect(type = TargetUpdatedEvent.class, count = 1),
             @Expect(type = TargetPollEvent.class, count = 1) })
     void canceledRejectedActionStatus() {
         final String controllerId = TARGET_PREFIX + "canceledRejectedActionStatus";
@@ -766,26 +760,20 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     @Test
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
-            @Expect(type = TargetUpdatedEvent.class, count = 4), 
+            @Expect(type = TargetUpdatedEvent.class, count = 4),
             @Expect(type = TargetPollEvent.class, count = 1) })
     void updateAttributesWithDifferentUpdateModes() {
         final String controllerId = TARGET_PREFIX + "updateAttributes";
-
         // setup
         registerAndAssertTargetWithExistingTenant(controllerId);
-
         // no update mode specified
         updateAttributesWithoutUpdateMode();
-
         // update mode REPLACE
         updateAttributesWithUpdateModeReplace();
-
         // update mode MERGE
         updateAttributesWithUpdateModeMerge();
-
         // update mode REMOVE
         updateAttributesWithUpdateModeRemove();
-
     }
 
     /**
@@ -794,7 +782,7 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     @Test
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
-            @Expect(type = TargetUpdatedEvent.class), 
+            @Expect(type = TargetUpdatedEvent.class),
             @Expect(type = TargetPollEvent.class, count = 1) })
     void updateAttributesWithNoThingId() {
         final String controllerId = TARGET_PREFIX + "updateAttributesWithNoThingId";
@@ -822,12 +810,12 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     @Test
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
-            @Expect(type = TargetUpdatedEvent.class), 
+            @Expect(type = TargetUpdatedEvent.class),
             @Expect(type = TargetPollEvent.class, count = 1) })
     void updateAttributesWithWrongBody() {
         // setup
         registerAndAssertTargetWithExistingTenant(UPDATE_ATTR_TEST_CONTROLLER_ID);
-        final Message createUpdateAttributesMessageWrongBody = createUpdateAttributesMessageWrongBody( UPDATE_ATTR_TEST_CONTROLLER_ID);
+        final Message createUpdateAttributesMessageWrongBody = createUpdateAttributesMessageWrongBody(UPDATE_ATTR_TEST_CONTROLLER_ID);
 
         // test
         getDmfClient().send(createUpdateAttributesMessageWrongBody);
@@ -857,14 +845,14 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
-            @Expect(type = ActionUpdatedEvent.class, count = 1), 
+            @Expect(type = ActionUpdatedEvent.class, count = 1),
             @Expect(type = ActionCreatedEvent.class, count = 1),
             @Expect(type = DistributionSetCreatedEvent.class, count = 1),
             @Expect(type = SoftwareModuleCreatedEvent.class, count = 3),
             @Expect(type = DistributionSetUpdatedEvent.class, count = 1), // implicit lock
             @Expect(type = SoftwareModuleUpdatedEvent.class, count = 9), // implicit lock
             @Expect(type = TargetAttributesRequestedEvent.class, count = 1),
-            @Expect(type = TargetUpdatedEvent.class, count = 2), 
+            @Expect(type = TargetUpdatedEvent.class, count = 2),
             @Expect(type = TargetPollEvent.class, count = 1) })
     void downloadOnlyAssignmentFinishesActionWhenTargetReportsDownloaded() throws IOException {
         // create target
@@ -893,17 +881,16 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
-            @Expect(type = ActionUpdatedEvent.class, count = 2), 
+            @Expect(type = ActionUpdatedEvent.class, count = 2),
             @Expect(type = ActionCreatedEvent.class, count = 1),
             @Expect(type = DistributionSetCreatedEvent.class, count = 1),
             @Expect(type = SoftwareModuleCreatedEvent.class, count = 3),
             @Expect(type = DistributionSetUpdatedEvent.class, count = 1), // implicit lock
             @Expect(type = SoftwareModuleUpdatedEvent.class, count = 9), // implicit lock
             @Expect(type = TargetAttributesRequestedEvent.class, count = 2),
-            @Expect(type = TargetUpdatedEvent.class, count = 3), 
+            @Expect(type = TargetUpdatedEvent.class, count = 3),
             @Expect(type = TargetPollEvent.class, count = 1) })
-    void downloadOnlyAssignmentAllowsActionStatusUpdatesWhenTargetReportsFinishedAndUpdatesInstalledDS()
-            throws IOException {
+    void downloadOnlyAssignmentAllowsActionStatusUpdatesWhenTargetReportsFinishedAndUpdatesInstalledDS() throws IOException {
         // create target
         final String controllerId = TARGET_PREFIX + "registerTargets_1";
         final DistributionSet distributionSet = createTargetAndDistributionSetAndAssign(controllerId, DOWNLOAD_ONLY);
@@ -950,7 +937,7 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
                 amqpMessageHandlerService.setControllerManagement(mockedControllerManagement);
                 createAndSendThingCreated(controllerId);
                 verifyOneDeadLetterMessage();
-                assertThat(targetManagement.getByControllerID(controllerId)).isEmpty();
+                assertThat(targetManagement.findByControllerId(controllerId)).isEmpty();
             }
         } finally {
             amqpMessageHandlerService.setControllerManagement(controllerManagement);
@@ -1098,7 +1085,7 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     @ExpectEvents({
             @Expect(type = TargetCreatedEvent.class, count = 1),
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
-            @Expect(type = ActionUpdatedEvent.class), 
+            @Expect(type = ActionUpdatedEvent.class),
             @Expect(type = ActionCreatedEvent.class, count = 1),
             @Expect(type = DistributionSetCreatedEvent.class, count = 1),
             @Expect(type = SoftwareModuleCreatedEvent.class, count = 3),
@@ -1125,10 +1112,8 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     }
 
     private void updateAttributesWithUpdateModeRemove() {
-
         // assemble the expected attributes
-        final Map<String, String> expectedAttributes = targetManagement
-                .getControllerAttributes(DMF_ATTR_TEST_CONTROLLER_ID);
+        final Map<String, String> expectedAttributes = targetManagement.getControllerAttributes(DMF_ATTR_TEST_CONTROLLER_ID);
         expectedAttributes.remove("k1");
         expectedAttributes.remove("k3");
 
@@ -1192,7 +1177,7 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     }
 
     private void verifyAssignedDsAndInstalledDs(final Long assignedDsId, final Long installedDsId) {
-        final Optional<Target> target = controllerManagement.getByControllerId(DMF_REGISTER_TEST_CONTROLLER_ID);
+        final Optional<Target> target = controllerManagement.findByControllerId(DMF_REGISTER_TEST_CONTROLLER_ID);
         assertThat(target).isPresent();
 
         // verify the DS was assigned to the Target
@@ -1231,7 +1216,7 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     private void assertAction(final Long actionId, final int messages, final Status... expectedActionStates) {
         await().untilAsserted(() -> {
             try {
-                SecurityContextSwitch.runAsPrivileged(() -> {
+                SecurityContextSwitch.asPrivileged(() -> {
                     final List<ActionStatus> actionStatusList = deploymentManagement.findActionStatusByAction(actionId, PAGE).getContent();
 
                     // Check correlation ID
@@ -1256,8 +1241,7 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     }
 
     private void sendUpdateAttributeMessage(final DmfAttributeUpdate attributeUpdate) {
-        final Message updateMessage = createUpdateAttributesMessage(DMF_ATTR_TEST_CONTROLLER_ID,
-                AbstractAmqpServiceIntegrationTest.TENANT_EXIST, attributeUpdate);
+        final Message updateMessage = createUpdateAttributesMessage(DMF_ATTR_TEST_CONTROLLER_ID, TENANT_EXIST, attributeUpdate);
         getDmfClient().send(updateMessage);
     }
 
@@ -1265,9 +1249,8 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
             final Status... expectedActionStates) {
         await().untilAsserted(() -> {
             try {
-                SecurityContextSwitch.runAsPrivileged(() -> {
-                    final List<ActionStatus> actionStatusList = deploymentManagement
-                            .findActionStatusByAction(actionId, PAGE).getContent();
+                SecurityContextSwitch.asPrivileged(() -> {
+                    final List<ActionStatus> actionStatusList = deploymentManagement.findActionStatusByAction(actionId, PAGE).getContent();
                     assertThat(actionStatusList).hasSize(statusListCount);
 
                     final List<Status> status = actionStatusList.stream().map(ActionStatus::getStatus)
@@ -1283,9 +1266,8 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
     }
 
     private int getAuthenticationMessageCount() {
-        return Integer
-                .parseInt(Objects.requireNonNull(getRabbitAdmin().getQueueProperties(amqpProperties.getReceiverQueue()))
-                        .get(RabbitAdmin.QUEUE_MESSAGE_COUNT).toString());
+        return Integer.parseInt(Objects.requireNonNull(
+                getRabbitAdmin().getQueueProperties(amqpProperties.getReceiverQueue())).get(RabbitAdmin.QUEUE_MESSAGE_COUNT).toString());
     }
 
     private void assertEmptyReceiverQueueCount() {
@@ -1298,8 +1280,7 @@ class AmqpMessageHandlerServiceIntegrationTest extends AbstractAmqpServiceIntegr
 
     private void verifyNumberOfDeadLetterMessages(final int numberOfInvocations) {
         assertEmptyReceiverQueueCount();
-        await().untilAsserted(
-                () -> Mockito.verify(getDeadletterListener(), Mockito.times(numberOfInvocations)).handleMessage(Mockito.any()));
+        await().untilAsserted(() -> Mockito.verify(getDeadletterListener(), Mockito.times(numberOfInvocations)).handleMessage(Mockito.any()));
         Mockito.reset(getDeadletterListener());
     }
 }

@@ -20,14 +20,20 @@ import org.springframework.security.test.context.support.WithSecurityContext;
 import org.springframework.security.test.context.support.WithSecurityContextFactory;
 
 /**
- * Annotation to run test classes or test methods with a specific user with
- * specific permissions.
+ * Annotation to run test classes or test methods with a specific user with specific permissions.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.METHOD, ElementType.TYPE })
 @WithSecurityContext(factory = WithUser.WithTenantAwareUserSecurityContextFactory.class)
 @Inherited
 public @interface WithUser {
+
+    /**
+     * Gets the test tenant id.
+     *
+     * @return test tenant id
+     */
+    String tenant() default "DEFAULT";
 
     /**
      * Gets the test principal.
@@ -44,20 +50,6 @@ public @interface WithUser {
     String credentials() default "TestCredentials";
 
     /**
-     * Gets the test tenant id.
-     *
-     * @return test tenant id
-     */
-    String tenantId() default "DEFAULT";
-
-    /**
-     * Should tenant auto created.
-     *
-     * @return <code>true</code> = auto create <code>false</code> not create
-     */
-    boolean autoCreateTenant() default true;
-
-    /**
      * Gets the test authorities.
      *
      * @return authorities
@@ -65,18 +57,11 @@ public @interface WithUser {
     String[] authorities() default {};
 
     /**
-     * Gets the test all permissions.
+     * Should tenant auto created.
      *
-     * @return permissions
+     * @return <code>true</code> = auto create <code>false</code> not create
      */
-    boolean allSpPermissions() default false;
-
-    /**
-     * Gets the test removeFromAllPermission.
-     *
-     * @return removeFromAllPermission
-     */
-    String[] removeFromAllPermission() default {};
+    boolean autoCreateTenant() default true;
 
     boolean controller() default false;
 

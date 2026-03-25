@@ -15,13 +15,12 @@ import static org.eclipse.hawkbit.repository.model.Action.Status.FINISHED;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.hawkbit.repository.QuotaManagement;
 import org.eclipse.hawkbit.repository.RepositoryProperties;
-import org.eclipse.hawkbit.repository.exception.EntityNotFoundException;
-import org.eclipse.hawkbit.repository.jpa.builder.JpaActionStatusCreate;
 import org.eclipse.hawkbit.repository.jpa.model.AbstractJpaBaseEntity_;
 import org.eclipse.hawkbit.repository.jpa.model.JpaAction;
 import org.eclipse.hawkbit.repository.jpa.model.JpaActionStatus;
@@ -31,6 +30,7 @@ import org.eclipse.hawkbit.repository.jpa.repository.ActionStatusRepository;
 import org.eclipse.hawkbit.repository.jpa.specifications.ActionSpecifications;
 import org.eclipse.hawkbit.repository.jpa.utils.QuotaHelper;
 import org.eclipse.hawkbit.repository.model.Action;
+import org.eclipse.hawkbit.repository.model.Action.ActionStatusCreate;
 import org.eclipse.hawkbit.repository.model.ActionStatus;
 import org.eclipse.hawkbit.repository.model.TargetUpdateStatus;
 import org.springframework.data.domain.PageRequest;
@@ -47,7 +47,7 @@ public class JpaActionManagement {
     protected final QuotaManagement quotaManagement;
     protected final RepositoryProperties repositoryProperties;
 
-    public JpaActionManagement(
+    protected JpaActionManagement(
             final ActionRepository actionRepository, final ActionStatusRepository actionStatusRepository, final QuotaManagement quotaManagement,
             final RepositoryProperties repositoryProperties) {
         this.actionRepository = actionRepository;
@@ -56,7 +56,7 @@ public class JpaActionManagement {
         this.repositoryProperties = repositoryProperties;
     }
 
-    public int getWeightConsideringDefault(final Action action) {
+    protected int getWeightConsideringDefault(final Action action) {
         return action.getWeight().orElse(repositoryProperties.getActionWeightIfAbsent());
     }
 
@@ -64,34 +64,38 @@ public class JpaActionManagement {
         return DOWNLOAD_ONLY == action.getActionType();
     }
 
+    protected static JpaActionStatus buildJpaActionStatus(final ActionStatusCreate create) {
+        final JpaActionStatus actionStatus = new JpaActionStatus(
+                create.getStatus(),
+                Optional.ofNullable(create.getTimestamp()).orElseGet(System::currentTimeMillis));
+        Optional.ofNullable(create.getMessages()).ifPresent(messages -> messages.forEach(actionStatus::addMessage));
+        actionStatus.setCode(create.getCode());
+        return actionStatus;
+    }
+
     protected List<JpaAction> findActiveActionsHavingStatus(final String controllerId, final Action.Status status) {
         return actionRepository.findAll(ActionSpecifications.byTargetControllerIdAndIsActiveAndStatus(controllerId, status));
     }
 
-    protected Action addActionStatus(final JpaActionStatusCreate statusCreate) {
-        final Long actionId = statusCreate.getActionId();
-        final JpaActionStatus actionStatus = statusCreate.build();
-        final JpaAction action = getActionAndThrowExceptionIfNotFound(actionId);
+    protected Action addActionStatus(final ActionStatusCreate create) {
+        final Long actionId = create.getActionId();
+        final JpaAction action = actionRepository.getById(actionId);
 
-        if (isUpdatingActionStatusAllowed(action, actionStatus)) {
-            return handleAddUpdateActionStatus(actionStatus, action);
+        if (isUpdatingActionStatusAllowed(action, create)) {
+            return handleAddUpdateActionStatus(create, action);
         }
 
         log.debug(
                 "Update of actionStatus {} for action {} not possible since action not active anymore and not allowed as an action terminating.",
-                actionStatus.getStatus(), action.getId());
+                create.getStatus(), action.getId());
         return action;
-    }
-
-    protected JpaAction getActionAndThrowExceptionIfNotFound(final Long actionId) {
-        return actionRepository.findById(actionId).orElseThrow(() -> new EntityNotFoundException(Action.class, actionId));
     }
 
     protected void onActionStatusUpdate(final JpaActionStatus newActionStatus, final JpaAction action) {
         // can be overwritten to intercept the persistence of the action status
     }
 
-    protected void assertActionStatusQuota(final JpaActionStatus newActionStatus, final JpaAction action) {
+    protected void assertActionStatusQuota(final ActionStatusCreate newActionStatus, final JpaAction action) {
         if (isIntermediateStatus(newActionStatus)) {// check for quota only for intermediate statuses
             QuotaHelper.assertAssignmentQuota(action.getId(), 1, quotaManagement.getMaxStatusEntriesPerAction(),
                     ActionStatus.class, Action.class, actionStatusRepository::countByActionId);
@@ -123,7 +127,7 @@ public class JpaActionManagement {
                 .toList();
     }
 
-    private static boolean isIntermediateStatus(final JpaActionStatus actionStatus) {
+    private static boolean isIntermediateStatus(final ActionStatusCreate actionStatus) {
         return FINISHED != actionStatus.getStatus() && ERROR != actionStatus.getStatus();
     }
 
@@ -134,7 +138,7 @@ public class JpaActionManagement {
      * Status.FINISHED are allowed. In the case of a DOWNLOAD_ONLY action, we accept
      * status updates only once.
      */
-    private boolean isUpdatingActionStatusAllowed(final JpaAction action, final JpaActionStatus actionStatus) {
+    private boolean isUpdatingActionStatusAllowed(final JpaAction action, final ActionStatusCreate actionStatus) {
         if (action.isActive()) {
             return true;
         }
@@ -151,9 +155,11 @@ public class JpaActionManagement {
     /**
      * Sets {@link TargetUpdateStatus} based on given {@link ActionStatus}.
      */
-    private Action handleAddUpdateActionStatus(final JpaActionStatus actionStatus, final JpaAction action) {
+    private Action handleAddUpdateActionStatus(final ActionStatusCreate create, final JpaAction action) {
         // information status entry - check for a potential DOS attack
-        assertActionStatusQuota(actionStatus, action);
+        assertActionStatusQuota(create, action);
+
+        final JpaActionStatus actionStatus = buildJpaActionStatus(create);
         assertActionStatusMessageQuota(actionStatus);
         actionStatus.setAction(action);
 

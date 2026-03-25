@@ -9,6 +9,8 @@
  */
 package org.eclipse.hawkbit.repository.jpa.specifications;
 
+import java.util.List;
+
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.ListJoin;
 import jakarta.persistence.criteria.SetJoin;
@@ -24,6 +26,7 @@ import org.eclipse.hawkbit.repository.jpa.model.JpaDistributionSet;
 import org.eclipse.hawkbit.repository.jpa.model.JpaDistributionSet_;
 import org.eclipse.hawkbit.repository.jpa.model.JpaSoftwareModule;
 import org.eclipse.hawkbit.repository.jpa.model.JpaSoftwareModule_;
+import org.eclipse.hawkbit.repository.jpa.model.JpaTarget;
 import org.eclipse.hawkbit.repository.jpa.model.JpaTarget_;
 import org.eclipse.hawkbit.repository.model.Action;
 import org.springframework.data.jpa.domain.Specification;
@@ -78,14 +81,36 @@ public final class ActionSpecifications {
                 isNull ? cb.isNull(root.get(JpaAction_.weight)) : cb.isNotNull(root.get(JpaAction_.weight)));
     }
 
-    public static Specification<JpaAction> byDistributionSetId(final Long distributionSetId) {
-        return (root, query, cb) -> cb.equal(root.get(JpaAction_.distributionSet).get(AbstractJpaBaseEntity_.id), distributionSetId);
-    }
-
     public static Specification<JpaAction> byDistributionSetIdAndActive(final Long distributionSetId) {
         return (root, query, cb) -> cb.and(
                 cb.equal(root.get(JpaAction_.distributionSet).get(AbstractJpaBaseEntity_.id), distributionSetId),
                 cb.equal(root.get(JpaAction_.active), true));
+    }
+
+    public static Specification<JpaAction> byRolloutIdAndActive(final Long rolloutId) {
+        return (root,  query,  cb) -> cb.and(
+                cb.equal(root.get(JpaAction_.rollout).get(AbstractJpaBaseEntity_.id), rolloutId),
+                cb.equal(root.get(JpaAction_.active), true)
+        );
+    }
+
+    public static Specification<JpaAction> byRolloutIdAndActiveAndStatusIsNot(final Long rolloutId, final List<Action.Status> statuses) {
+        return (root, query, cb) -> cb.and(
+                cb.equal(root.get(JpaAction_.rollout).get(AbstractJpaBaseEntity_.id), rolloutId),
+                cb.equal(root.get(JpaAction_.active), true),
+                cb.not(root.get(JpaAction_.status).in(statuses))
+        );
+    }
+
+    public static Specification<JpaAction> byControllerIdAndIdIn(final String controllerId, final List<Long> actionIds) {
+        return ((root, query, cb) -> {
+                final Join<JpaAction, JpaTarget> targetJoin = root.join(JpaAction_.target);
+                return cb.and(
+                        cb.equal(targetJoin.get(JpaTarget_.controllerId), controllerId),
+                        root.get(AbstractJpaBaseEntity_.id).in(actionIds)
+                );
+        });
+
     }
 
     public static Specification<JpaAction> byDistributionSetIdAndActiveAndStatusIsNot(final Long distributionSetId, final Action.Status status) {

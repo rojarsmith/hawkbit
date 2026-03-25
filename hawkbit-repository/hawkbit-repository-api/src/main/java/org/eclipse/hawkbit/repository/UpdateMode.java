@@ -9,12 +9,8 @@
  */
 package org.eclipse.hawkbit.repository;
 
-import java.util.Arrays;
-import java.util.Optional;
-
 /**
- * Enumerates the supported update modes. Each mode represents an attribute
- * update strategy.
+ * Enumerates the supported update modes. Each mode represents an attribute update strategy.
  *
  * @see ControllerManagement
  */
@@ -34,9 +30,4 @@ public enum UpdateMode {
      * Removal update strategy
      */
     REMOVE;
-
-    public static Optional<UpdateMode> valueOfIgnoreCase(final String name) {
-        return Arrays.stream(values()).filter(mode -> mode.name().equalsIgnoreCase(name)).findAny();
-    }
-
 }

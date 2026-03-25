@@ -9,8 +9,6 @@
  */
 package org.eclipse.hawkbit.repository.jpa.repository;
 
-import java.util.Optional;
-
 import jakarta.persistence.EntityManager;
 
 import org.eclipse.hawkbit.repository.jpa.model.JpaTargetTag;
@@ -26,14 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(readOnly = true)
 public interface TargetTagRepository extends BaseEntityRepository<JpaTargetTag> {
-
-    /**
-     * find {@link TargetTag} by its name.
-     *
-     * @param tagName to filter on
-     * @return the {@link TargetTag} if found, otherwise null
-     */
-    Optional<TargetTag> findByNameEquals(String tagName);
 
     /**
      * Deletes all {@link TenantAwareBaseEntity} of a given tenant. For safety

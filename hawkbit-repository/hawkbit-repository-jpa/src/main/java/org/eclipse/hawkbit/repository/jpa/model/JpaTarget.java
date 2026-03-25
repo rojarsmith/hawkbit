@@ -9,8 +9,6 @@
  */
 package org.eclipse.hawkbit.repository.jpa.model;
 
-import java.io.Serial;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -21,14 +19,11 @@ import java.util.Set;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
-import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Converter;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.ForeignKey;
-import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
@@ -40,7 +35,6 @@ import jakarta.persistence.NamedEntityGraphs;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrimaryKeyJoinColumn;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -49,12 +43,13 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.eclipse.hawkbit.im.authentication.SpPermission;
+import org.eclipse.hawkbit.auth.SpPermission;
+import org.eclipse.hawkbit.context.AccessContext;
 import org.eclipse.hawkbit.repository.event.EventPublisherHolder;
 import org.eclipse.hawkbit.repository.event.remote.TargetDeletedEvent;
 import org.eclipse.hawkbit.repository.event.remote.entity.TargetCreatedEvent;
 import org.eclipse.hawkbit.repository.event.remote.entity.TargetUpdatedEvent;
-import org.eclipse.hawkbit.repository.jpa.model.helper.SecurityTokenGeneratorHolder;
+import org.eclipse.hawkbit.repository.helper.TenantConfigHelper;
 import org.eclipse.hawkbit.repository.jpa.utils.MapAttributeConverter;
 import org.eclipse.hawkbit.repository.model.Action;
 import org.eclipse.hawkbit.repository.model.PollStatus;
@@ -62,9 +57,6 @@ import org.eclipse.hawkbit.repository.model.Target;
 import org.eclipse.hawkbit.repository.model.TargetTag;
 import org.eclipse.hawkbit.repository.model.TargetType;
 import org.eclipse.hawkbit.repository.model.TargetUpdateStatus;
-import org.eclipse.hawkbit.repository.model.helper.SystemSecurityContextHolder;
-import org.eclipse.hawkbit.repository.model.helper.TenantConfigurationManagementHolder;
-import org.eclipse.hawkbit.security.SystemSecurityContext;
 import org.springframework.util.ObjectUtils;
 
 /**
@@ -73,14 +65,7 @@ import org.springframework.util.ObjectUtils;
 @NoArgsConstructor // Default constructor for JPA
 @Slf4j
 @Entity
-@Table(name = "sp_target",
-        indexes = {
-                @Index(name = "sp_idx_target_01", columnList = "tenant,name,assigned_distribution_set"),
-                @Index(name = "sp_idx_target_03", columnList = "tenant,controller_id,assigned_distribution_set"),
-                @Index(name = "sp_idx_target_04", columnList = "tenant,created_at"),
-                @Index(name = "sp_idx_target_05", columnList = "tenant,last_modified_at"),
-                @Index(name = "sp_idx_target_prim", columnList = "tenant,id") },
-        uniqueConstraints = @UniqueConstraint(columnNames = { "controller_id", "tenant" }, name = "uk_target_controller_id"))
+@Table(name = "sp_target")
 @NamedEntityGraphs({
         @NamedEntityGraph(name = "Target.details", attributeNodes = {
                 @NamedAttributeNode("targetType"),
@@ -98,9 +83,8 @@ import org.springframework.util.ObjectUtils;
 @SuppressWarnings({ "squid:S2160", "java:S1710" })
 public class JpaTarget extends AbstractJpaNamedEntity implements Target, EventAwareEntity {
 
-    @Serial
-    private static final long serialVersionUID = 1L;
-
+    @Setter
+    @Getter
     @Column(name = "controller_id", length = Target.CONTROLLER_ID_MAX_SIZE, updatable = false, nullable = false)
     @Size(min = 1, max = Target.CONTROLLER_ID_MAX_SIZE)
     @NotNull
@@ -115,6 +99,7 @@ public class JpaTarget extends AbstractJpaNamedEntity implements Target, EventAw
     private String securityToken;
 
     @Setter
+    @Getter
     @Column(name = "address", length = Target.ADDRESS_MAX_SIZE)
     @Size(max = Target.ADDRESS_MAX_SIZE)
     private String address;
@@ -139,13 +124,13 @@ public class JpaTarget extends AbstractJpaNamedEntity implements Target, EventAw
     @Setter
     @Getter
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "installed_distribution_set", foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_target_inst_ds"))
+    @JoinColumn(name = "installed_distribution_set")
     private JpaDistributionSet installedDistributionSet;
 
     @Setter
     @Getter
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "assigned_distribution_set", foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_target_assign_ds"))
+    @JoinColumn(name = "assigned_distribution_set")
     private JpaDistributionSet assignedDistributionSet;
 
     @Setter
@@ -153,6 +138,11 @@ public class JpaTarget extends AbstractJpaNamedEntity implements Target, EventAw
     @Column(name = "request_controller_attributes", nullable = false)
     // set default request controller attributes to true, because we want to request them the first time
     private boolean requestControllerAttributes = true;
+
+    @Setter
+    @Getter
+    @Column(name = "target_group")
+    private String group;
 
     // actually it is OneToOne - but lazy loading is not supported for OneToOne (at least for hibernate 6.6.2)
     @OneToMany(fetch = FetchType.LAZY, mappedBy = "target", cascade = { CascadeType.ALL }, orphanRemoval = true)
@@ -162,21 +152,15 @@ public class JpaTarget extends AbstractJpaNamedEntity implements Target, EventAw
     @Setter
     @Getter
     @ManyToOne(fetch = FetchType.LAZY, targetEntity = JpaTargetType.class)
-    @JoinColumn(name = "target_type", foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_target_relation_target_type"))
+    @JoinColumn(name = "target_type")
     private TargetType targetType;
 
     @ManyToMany(targetEntity = JpaTargetTag.class)
     @JoinTable(
             name = "sp_target_target_tag",
-            joinColumns = {
-                    @JoinColumn(
-                            name = "target", nullable = false,
-                            foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_target_target_tag_target")) },
-            inverseJoinColumns = {
-                    @JoinColumn(
-                            name = "tag", nullable = false,
-                            foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_target_target_tag_tag"))
-            })
+            joinColumns = { @JoinColumn(name = "target", nullable = false) },
+            inverseJoinColumns = { @JoinColumn(name = "tag", nullable = false) }
+    )
     private Set<TargetTag> tags;
 
     // no cascade option on an ElementCollection, the target objects are always persisted, merged, removed with their parent
@@ -184,8 +168,8 @@ public class JpaTarget extends AbstractJpaNamedEntity implements Target, EventAw
     @ElementCollection
     @CollectionTable(
             name = "sp_target_attributes",
-            joinColumns = { @JoinColumn(name = "target", nullable = false) },
-            foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_target_attributes_target"))
+            joinColumns = { @JoinColumn(name = "target", nullable = false) }
+    )
     @MapKeyColumn(name = "attribute_key", length = Target.CONTROLLER_ATTRIBUTE_MAX_KEY_SIZE)
     @Column(name = "attribute_value", length = Target.CONTROLLER_ATTRIBUTE_MAX_VALUE_SIZE)
     private Map<String, String> controllerAttributes;
@@ -195,8 +179,8 @@ public class JpaTarget extends AbstractJpaNamedEntity implements Target, EventAw
     @ElementCollection
     @CollectionTable(
             name = "sp_target_metadata",
-            joinColumns = { @JoinColumn(name = "target", nullable = false) },
-            foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_target_metadata_target"))
+            joinColumns = { @JoinColumn(name = "target", nullable = false) }
+    )
     @MapKeyColumn(name = "meta_key", length = Target.METADATA_MAX_KEY_SIZE)
     @Column(name = "meta_value", length = Target.METADATA_MAX_VALUE_SIZE)
     private Map<String, String> metadata;
@@ -207,41 +191,12 @@ public class JpaTarget extends AbstractJpaNamedEntity implements Target, EventAw
     @OneToMany(mappedBy = "target", fetch = FetchType.LAZY, cascade = { CascadeType.PERSIST, CascadeType.REMOVE })
     private List<RolloutTargetGroup> rolloutTargetGroup;
 
-    public JpaTarget(final String controllerId, final String securityToken) {
-        this.controllerId = controllerId;
-        // truncate controller ID to max name length (if too big)
-        setName(controllerId != null && controllerId.length() > NAME_MAX_SIZE ? controllerId.substring(0, NAME_MAX_SIZE) : controllerId);
-        this.securityToken = ObjectUtils.isEmpty(securityToken) ? SecurityTokenGeneratorHolder.getInstance().generateToken() : securityToken;
-    }
-
-    @Override
-    public String getControllerId() {
-        return controllerId;
-    }
-
     @Override
     public String getSecurityToken() {
-        final SystemSecurityContext systemSecurityContext = SystemSecurityContextHolder.getInstance().getSystemSecurityContext();
-        if (systemSecurityContext.isCurrentThreadSystemCode() || systemSecurityContext.hasPermission(SpPermission.READ_TARGET_SEC_TOKEN)) {
+        if (AccessContext.isCurrentThreadSystemCode() || SpPermission.hasPermission(SpPermission.READ_TARGET_SECURITY_TOKEN)) {
             return securityToken;
         }
         return null;
-    }
-
-    /**
-     * @return the ipAddress
-     */
-    @Override
-    public URI getAddress() {
-        if (address == null) {
-            return null;
-        }
-        try {
-            return URI.create(address);
-        } catch (final IllegalArgumentException e) {
-            log.warn("Invalid address provided. Cloud not be configured to URI", e);
-            return null;
-        }
     }
 
     /**
@@ -254,7 +209,7 @@ public class JpaTarget extends AbstractJpaNamedEntity implements Target, EventAw
         if (lastTargetQuery == null) {
             return null;
         }
-        return TenantConfigurationManagementHolder.getInstance().getTenantConfigurationManagement()
+        return TenantConfigHelper.getTenantConfigurationManagement()
                 .pollStatusResolver()
                 .apply(this);
     }

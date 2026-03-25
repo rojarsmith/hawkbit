@@ -28,7 +28,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.eclipse.hawkbit.repository.jpa.model.helper.AfterTransactionCommitExecutorHolder;
+import org.eclipse.hawkbit.repository.jpa.executor.AfterTransactionCommitExecutor;
 import org.eclipse.hawkbit.repository.model.BaseEntity;
 import org.eclipse.hawkbit.tenancy.TenantAwareAuthenticationDetails;
 import org.springframework.data.annotation.CreatedBy;
@@ -173,7 +173,7 @@ public abstract class AbstractJpaBaseEntity implements BaseEntity {
 
     @Override
     public String toString() {
-        return getClass().getSimpleName() + " [id=" + getId() + "]";
+        return getClass().getSimpleName() + " [id=" + getId() + " / optLockRevision=" + getOptLockRevision() + "]";
     }
 
     @PostPersist
@@ -199,13 +199,13 @@ public abstract class AbstractJpaBaseEntity implements BaseEntity {
 
     protected static void doNotify(final Runnable runnable) {
         // fire events onl AFTER transaction commit
-        AfterTransactionCommitExecutorHolder.getInstance().getAfterCommit().afterCommit(runnable);
+        AfterTransactionCommitExecutor.afterCommit(runnable);
     }
 
     protected boolean isController() {
         return SecurityContextHolder.getContext().getAuthentication() != null
                 && SecurityContextHolder.getContext().getAuthentication()
                 .getDetails() instanceof TenantAwareAuthenticationDetails tenantAwareDetails
-                && tenantAwareDetails.isController();
+                && tenantAwareDetails.controller();
     }
 }

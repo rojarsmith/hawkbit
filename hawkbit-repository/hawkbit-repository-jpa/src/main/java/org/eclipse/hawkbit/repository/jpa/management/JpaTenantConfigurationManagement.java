@@ -9,52 +9,59 @@
  */
 package org.eclipse.hawkbit.repository.jpa.management;
 
-import static org.eclipse.hawkbit.tenancy.configuration.TenantConfigurationProperties.TenantConfigurationKey.BATCH_ASSIGNMENTS_ENABLED;
-import static org.eclipse.hawkbit.tenancy.configuration.TenantConfigurationProperties.TenantConfigurationKey.MULTI_ASSIGNMENTS_ENABLED;
+import static org.eclipse.hawkbit.auth.SpPermission.READ_GATEWAY_SECURITY_TOKEN;
+import static org.eclipse.hawkbit.tenancy.configuration.TenantConfigurationProperties.TenantConfigurationKey.AUTHENTICATION_GATEWAY_SECURITY_TOKEN_KEY;
+import static org.eclipse.hawkbit.tenancy.configuration.TenantConfigurationProperties.TenantConfigurationKey.POLLING_TIME;
 import static org.eclipse.hawkbit.tenancy.configuration.TenantConfigurationProperties.TenantConfigurationKey.REPOSITORY_ACTIONS_AUTOCLOSE_ENABLED;
 
-import java.io.Serializable;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
+import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
-import org.eclipse.hawkbit.im.authentication.SpPermission;
+import org.eclipse.hawkbit.auth.SpPermission;
+import org.eclipse.hawkbit.context.AccessContext;
+import org.eclipse.hawkbit.ql.jpa.QLSupport;
 import org.eclipse.hawkbit.repository.TenantConfigurationManagement;
 import org.eclipse.hawkbit.repository.exception.InsufficientPermissionException;
 import org.eclipse.hawkbit.repository.exception.TenantConfigurationValidatorException;
 import org.eclipse.hawkbit.repository.exception.TenantConfigurationValueChangeNotAllowedException;
+import org.eclipse.hawkbit.repository.helper.TenantConfigHelper;
 import org.eclipse.hawkbit.repository.jpa.configuration.Constants;
-import org.eclipse.hawkbit.repository.jpa.executor.AfterTransactionCommitExecutor;
+import org.eclipse.hawkbit.repository.jpa.model.JpaTarget;
 import org.eclipse.hawkbit.repository.jpa.model.JpaTenantConfiguration;
 import org.eclipse.hawkbit.repository.jpa.repository.TenantConfigurationRepository;
 import org.eclipse.hawkbit.repository.model.PollStatus;
 import org.eclipse.hawkbit.repository.model.Target;
 import org.eclipse.hawkbit.repository.model.TenantConfiguration;
 import org.eclipse.hawkbit.repository.model.TenantConfigurationValue;
-import org.eclipse.hawkbit.repository.model.helper.SystemSecurityContextHolder;
-import org.eclipse.hawkbit.security.SystemSecurityContext;
+import org.eclipse.hawkbit.repository.qfields.TargetFields;
+import org.eclipse.hawkbit.tenancy.TenantAwareCacheManager;
 import org.eclipse.hawkbit.tenancy.configuration.DurationHelper;
+import org.eclipse.hawkbit.tenancy.configuration.PollingTime;
+import org.eclipse.hawkbit.tenancy.configuration.PollingTime.PollingInterval;
 import org.eclipse.hawkbit.tenancy.configuration.TenantConfigurationProperties;
 import org.eclipse.hawkbit.tenancy.configuration.TenantConfigurationProperties.TenantConfigurationKey;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationListener;
+import org.springframework.context.event.ContextRefreshedEvent;
+import org.springframework.core.convert.ConversionException;
 import org.springframework.core.convert.support.ConfigurableConversionService;
 import org.springframework.core.convert.support.DefaultConversionService;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.ObjectUtils;
 import org.springframework.validation.annotation.Validated;
 
 /**
@@ -63,266 +70,215 @@ import org.springframework.validation.annotation.Validated;
 @Slf4j
 @Transactional(readOnly = true)
 @Validated
-public class JpaTenantConfigurationManagement implements TenantConfigurationManagement {
+@Service
+@ConditionalOnBooleanProperty(prefix = "hawkbit.jpa", name = { "enabled", "tenant-configuration-management" }, matchIfMissing = true)
+public class JpaTenantConfigurationManagement implements TenantConfigurationManagement, ApplicationListener<ContextRefreshedEvent> {
 
+    private static final String CACHE_TENANT_CONFIGURATION_NAME = JpaTenantConfiguration.class.getSimpleName();
     private static final ConfigurableConversionService CONVERSION_SERVICE = new DefaultConversionService();
 
     private final TenantConfigurationRepository tenantConfigurationRepository;
     private final TenantConfigurationProperties tenantConfigurationProperties;
     private final ApplicationContext applicationContext;
-    private final CacheManager cacheManager;
-    private final AfterTransactionCommitExecutor afterCommitExecutor;
 
     public JpaTenantConfigurationManagement(
             final TenantConfigurationRepository tenantConfigurationRepository,
             final TenantConfigurationProperties tenantConfigurationProperties,
-            final CacheManager cacheManager, final AfterTransactionCommitExecutor afterCommitExecutor,
             final ApplicationContext applicationContext) {
         this.tenantConfigurationRepository = tenantConfigurationRepository;
         this.tenantConfigurationProperties = tenantConfigurationProperties;
-        this.cacheManager = cacheManager;
-        this.afterCommitExecutor = afterCommitExecutor;
         this.applicationContext = applicationContext;
     }
 
     @Override
-    @CacheEvict(value = "tenantConfiguration", key = "#configurationKeyName")
-    @Transactional
-    @Retryable(retryFor = { ConcurrencyFailureException.class }, maxAttempts = Constants.TX_RT_MAX,
-            backoff = @Backoff(delay = Constants.TX_RT_DELAY))
-    public <T extends Serializable> TenantConfigurationValue<T> addOrUpdateConfiguration(
-            final String configurationKeyName, final T value) {
-        return addOrUpdateConfiguration0(Collections.singletonMap(configurationKeyName, value)).values().iterator().next();
+    public void onApplicationEvent(@NonNull final ContextRefreshedEvent event) {
+        // Sets the proxy / bean from the context in order to be used via proxy and onore things like @PreAuthorize and @Transactional
+        TenantConfigHelper.setTenantConfigurationManagement(applicationContext.getBean(JpaTenantConfigurationManagement.class));
     }
 
     @Override
     @Transactional
     @Retryable(retryFor = { ConcurrencyFailureException.class }, maxAttempts = Constants.TX_RT_MAX,
             backoff = @Backoff(delay = Constants.TX_RT_DELAY))
-    public <T extends Serializable> Map<String, TenantConfigurationValue<T>> addOrUpdateConfiguration(final Map<String, T> configurations) {
-        // Register a callback to be invoked after the transaction is committed - for cache eviction
-        afterCommitExecutor.afterCommit(() -> {
-            final Cache cache = cacheManager.getCache("tenantConfiguration");
-            if (cache != null) {
-                configurations.keySet().forEach(cache::evict);
-            }
-        });
-
-        return addOrUpdateConfiguration0(configurations);
+    public void addOrUpdateConfiguration(final String keyName, final Object value) {
+        addOrUpdateConfiguration0(Map.of(keyName, value));
     }
 
     @Override
-    @CacheEvict(value = "tenantConfiguration", key = "#configurationKeyName")
     @Transactional
     @Retryable(retryFor = { ConcurrencyFailureException.class }, maxAttempts = Constants.TX_RT_MAX,
             backoff = @Backoff(delay = Constants.TX_RT_DELAY))
-    public void deleteConfiguration(final String configurationKeyName) {
-        tenantConfigurationRepository.deleteByKey(configurationKeyName);
+    public void addOrUpdateConfiguration(final Map<String, Object> configurations) {
+        addOrUpdateConfiguration0(configurations);
     }
 
     @Override
-// TODO - check if cache works
-//    @Cacheable(value = "tenantConfiguration", key = "#configurationKeyName")
-    public <T extends Serializable> TenantConfigurationValue<T> getConfigurationValue(final String configurationKeyName) {
-        checkAccess(configurationKeyName);
-
-        final TenantConfigurationKey configurationKey = tenantConfigurationProperties.fromKeyName(configurationKeyName);
-
-        return getConfigurationValue(configurationKeyName, (Class<T>) configurationKey.getDataType());
+    public <T> TenantConfigurationValue<T> getConfigurationValue(final String keyName) {
+        return getConfigurationValue0(keyName, null);
     }
 
     @Override
-    @Cacheable(value = "tenantConfiguration", key = "#configurationKeyName")
-    public <T extends Serializable> TenantConfigurationValue<T> getConfigurationValue(
-            final String configurationKeyName, final Class<T> propertyType) {
-        checkAccess(configurationKeyName);
-
-        final TenantConfigurationKey configurationKey = tenantConfigurationProperties.fromKeyName(configurationKeyName);
-
-        validateTenantConfigurationDataType(configurationKey, propertyType);
-
-        final TenantConfiguration tenantConfiguration = tenantConfigurationRepository.findByKey(configurationKey.getKeyName());
-
-        return buildTenantConfigurationValueByKey(configurationKey, propertyType, tenantConfiguration);
+    public <T> TenantConfigurationValue<T> getConfigurationValue(final String keyName, final Class<T> propertyType) {
+        return getConfigurationValue0(keyName, propertyType);
     }
 
     @Override
-    public <T> T getGlobalConfigurationValue(final String configurationKeyName, final Class<T> propertyType) {
-        checkAccess(configurationKeyName);
-
-        final TenantConfigurationKey key = tenantConfigurationProperties.fromKeyName(configurationKeyName);
-
-        if (!key.getDataType().isAssignableFrom(propertyType)) {
-            throw new TenantConfigurationValidatorException(String.format(
-                    "Cannot parse the database value of type %s into the type %s.", key.getDataType(), propertyType));
-        }
-
-        return CONVERSION_SERVICE.convert(key.getDefaultValue(), propertyType);
+    @Transactional
+    @Retryable(retryFor = { ConcurrencyFailureException.class }, maxAttempts = Constants.TX_RT_MAX,
+            backoff = @Backoff(delay = Constants.TX_RT_DELAY))
+    public void deleteConfiguration(final String keyName) {
+        tenantConfigurationRepository.deleteByKey(keyName);
     }
 
     @Override
+    @SuppressWarnings("java:S3776") // java:S3776 - not really too complex
     public Function<Target, PollStatus> pollStatusResolver() {
-        final Duration pollTime = DurationHelper.formattedStringToDuration(
-                getConfigurationValue(TenantConfigurationKey.POLLING_TIME_INTERVAL, String.class).getValue());
-        final Duration overdueTime = DurationHelper.formattedStringToDuration(
-                getConfigurationValue(TenantConfigurationKey.POLLING_OVERDUE_TIME_INTERVAL, String.class)
+        final PollingTime pollingTime = new PollingTime(
+                Objects.requireNonNull(getConfigurationValue0(TenantConfigurationKey.POLLING_TIME, String.class),
+                                "Polling time shall always be non-null")
+                        .getValue());
+        final Duration pollingOverdueTime = DurationHelper.fromString(
+                Objects.requireNonNull(getConfigurationValue0(TenantConfigurationKey.POLLING_OVERDUE_TIME, String.class),
+                                "Polling overdue time shall always be non-null")
                         .getValue());
         return target -> {
             final Long lastTargetQuery = target.getLastTargetQuery();
             if (lastTargetQuery == null) {
                 return null;
             }
-            final LocalDateTime currentDate = LocalDateTime.now();
-            final LocalDateTime lastPollDate = LocalDateTime.ofInstant(Instant.ofEpochMilli(lastTargetQuery),
-                    ZoneId.systemDefault());
-            final LocalDateTime nextPollDate = lastPollDate.plus(pollTime);
-            final LocalDateTime overdueDate = nextPollDate.plus(overdueTime);
-            return new PollStatus(lastPollDate, nextPollDate, overdueDate, currentDate);
+
+            if (!ObjectUtils.isEmpty(pollingTime.getOverrides()) && target instanceof JpaTarget jpaTarget) {
+                for (final PollingTime.Override override : pollingTime.getOverrides()) {
+                    try {
+                        if (QLSupport.getInstance().entityMatcher(override.qlStr(), TargetFields.class).match(jpaTarget)) {
+                            return pollStatus(lastTargetQuery, override.pollingInterval(), pollingOverdueTime);
+                        }
+                    } catch (final Exception e) {
+                        log.warn("Error while evaluating polling override for target {}: {}", jpaTarget.getId(), e.getMessage());
+                    }
+                }
+            }
+            // returns default - no overrides or not applicable for the target
+            return pollStatus(lastTargetQuery, pollingTime.getPollingInterval(), pollingOverdueTime);
         };
     }
 
     /**
-     * Validates the data type of the tenant configuration. If it is possible to
-     * cast to the given data type.
-     *
-     * @param configurationKey the key
-     * @param propertyType the class
+     * Validates the data type of the tenant configuration. If it is possible to cast to the given data type.
      */
-    private static <T> void validateTenantConfigurationDataType(final TenantConfigurationKey configurationKey,
-            final Class<T> propertyType) {
-
+    private static <T> void validateTenantConfigurationDataType(final TenantConfigurationKey configurationKey, final Class<T> propertyType) {
         if (!configurationKey.getDataType().isAssignableFrom(propertyType)) {
-            throw new TenantConfigurationValidatorException(
-                    String.format("Cannot parse the database value of type %s into the type %s.",
-                            configurationKey.getDataType(), propertyType));
+            throw new TenantConfigurationValidatorException(String.format(
+                    "Cannot parse the database value of type %s into the type %s.", configurationKey.getDataType(), propertyType));
         }
     }
 
-    private void checkAccess(final String configurationKeyName) {
-        if (TenantConfigurationProperties.TenantConfigurationKey.AUTHENTICATION_MODE_GATEWAY_SECURITY_TOKEN_KEY
-                .equalsIgnoreCase(configurationKeyName)) {
-            final SystemSecurityContext systemSecurityContext =
-                    SystemSecurityContextHolder.getInstance().getSystemSecurityContext();
-            if (!systemSecurityContext.isCurrentThreadSystemCode() &&
-                    !systemSecurityContext.hasPermission(SpPermission.READ_GATEWAY_SEC_TOKEN)) {
-                throw new InsufficientPermissionException(
-                        "Can't read gateway security token! " + SpPermission.READ_GATEWAY_SEC_TOKEN + " is required!");
-            }
+    private void checkAccess(final String keyName) {
+        if (AUTHENTICATION_GATEWAY_SECURITY_TOKEN_KEY.equalsIgnoreCase(keyName)
+                && !AccessContext.isCurrentThreadSystemCode() && !SpPermission.hasPermission(READ_GATEWAY_SECURITY_TOKEN)) {
+            throw new InsufficientPermissionException("Can't read gateway security token! " + READ_GATEWAY_SECURITY_TOKEN + " is required!");
         }
     }
 
-    private <T extends Serializable> Map<String, TenantConfigurationValue<T>> addOrUpdateConfiguration0(Map<String, T> configurations) {
-        List<JpaTenantConfiguration> configurationList = new ArrayList<>();
-        configurations.forEach((configurationKeyName, value) -> {
-            final TenantConfigurationKey configurationKey = tenantConfigurationProperties.fromKeyName(configurationKeyName);
+    private void addOrUpdateConfiguration0(final Map<String, Object> configurations) {
+        tenantConfigurationRepository.saveAll(configurations.entrySet().stream().map(e -> {
+            final TenantConfigurationKey configurationKey = tenantConfigurationProperties.fromKeyName(e.getKey());
 
-            if (!configurationKey.getDataType().isAssignableFrom(value.getClass())) {
+            final Class<?> targetType = configurationKey.getDataType();
+            final Object convertedValue;
+            try {
+                convertedValue = CONVERSION_SERVICE.convert(e.getValue(), targetType);
+            } catch (final ConversionException | IllegalArgumentException ex) {
                 throw new TenantConfigurationValidatorException(String.format(
-                        "Cannot parse the value %s of type %s into the type %s defined by the configuration key.", value,
-                        value.getClass(), configurationKey.getDataType()));
+                        "Cannot convert the value %s of type %s to the type %s defined by the configuration key.",
+                        e.getValue(), e.getValue().getClass(), targetType));
             }
+            final String valueToString = Optional.ofNullable(convertedValue)
+                    .map(Object::toString)
+                    .orElse(null);
+            validateConfigurationValue(configurationKey, convertedValue);
 
-            configurationKey.validate(applicationContext, value);
-
-            JpaTenantConfiguration tenantConfiguration = tenantConfigurationRepository
-                    .findByKey(configurationKey.getKeyName());
-
+            JpaTenantConfiguration tenantConfiguration = tenantConfigurationRepository.findByKey(configurationKey.getKeyName());
             if (tenantConfiguration == null) {
-                tenantConfiguration = new JpaTenantConfiguration(configurationKey.getKeyName(), value.toString());
+                tenantConfiguration = new JpaTenantConfiguration(configurationKey.getKeyName(), valueToString);
             } else {
-                tenantConfiguration.setValue(value.toString());
+                tenantConfiguration.setValue(valueToString);
             }
 
-            assertValueChangeIsAllowed(configurationKeyName, tenantConfiguration);
-            configurationList.add(tenantConfiguration);
-        });
-
-        List<JpaTenantConfiguration> jpaTenantConfigurations = tenantConfigurationRepository
-                .saveAll(configurationList);
-
-        return jpaTenantConfigurations.stream().collect(Collectors.toMap(
-                JpaTenantConfiguration::getKey,
-                updatedTenantConfiguration -> {
-
-                    @SuppressWarnings("unchecked") final Class<T> clazzT = (Class<T>) configurations.get(updatedTenantConfiguration.getKey())
-                            .getClass();
-                    return TenantConfigurationValue.<T> builder().global(false)
-                            .createdBy(updatedTenantConfiguration.getCreatedBy())
-                            .createdAt(updatedTenantConfiguration.getCreatedAt())
-                            .lastModifiedAt(updatedTenantConfiguration.getLastModifiedAt())
-                            .lastModifiedBy(updatedTenantConfiguration.getLastModifiedBy())
-                            .value(CONVERSION_SERVICE.convert(updatedTenantConfiguration.getValue(), clazzT))
-                            .build();
-                }));
+            return tenantConfiguration;
+        }).toList());
     }
 
-    private <T extends Serializable> TenantConfigurationValue<T> buildTenantConfigurationValueByKey(
-            final TenantConfigurationKey configurationKey, final Class<T> propertyType,
-            final TenantConfiguration tenantConfiguration) {
+    private void validateConfigurationValue(final TenantConfigurationKey configurationKey, final Object value) {
+        configurationKey.validate(value, applicationContext);
+        // additional validation for specific configuration keys
+        if (POLLING_TIME.equals(configurationKey.getKeyName())) {
+            final PollingTime pollingTime = new PollingTime(String.valueOf(value));
+            if (!ObjectUtils.isEmpty(pollingTime.getOverrides())) {
+                // validate that the QL strings are valid RSQL queries,
+                // nevertheless always when parse them we shall be prepared to catch exceptions if the parsers
+                // has been changed in not backward compatible way
+                pollingTime.getOverrides().forEach(override -> QLSupport.getInstance().entityMatcher(override.qlStr(), TargetFields.class));
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> TenantConfigurationValue<T> getConfigurationValue0(final String keyName, final Class<T> propertyType) {
+        checkAccess(keyName);
+
+        final TenantConfigurationKey key = tenantConfigurationProperties.fromKeyName(keyName);
+        final Class<T> type;
+        if (propertyType == null) {
+            type = (Class<T>) key.getDataType();
+        } else {
+            validateTenantConfigurationDataType(key, propertyType);
+            type = propertyType;
+        }
+
+        final TenantConfiguration tenantConfiguration = TenantAwareCacheManager.getInstance()
+                .getCache(CACHE_TENANT_CONFIGURATION_NAME)
+                .get(key.getKeyName(), () -> tenantConfigurationRepository.findByKey(key.getKeyName()));
         if (tenantConfiguration != null) {
-            return TenantConfigurationValue.<T> builder().global(false).createdBy(tenantConfiguration.getCreatedBy())
+            return TenantConfigurationValue.<T> builder()
+                    .global(false)
+                    .createdBy(tenantConfiguration.getCreatedBy())
                     .createdAt(tenantConfiguration.getCreatedAt())
                     .lastModifiedAt(tenantConfiguration.getLastModifiedAt())
                     .lastModifiedBy(tenantConfiguration.getLastModifiedBy())
-                    .value(CONVERSION_SERVICE.convert(tenantConfiguration.getValue(), propertyType)).build();
-
-        } else if (configurationKey.getDefaultValue() != null) {
-
-            return TenantConfigurationValue.<T> builder().global(true).createdBy(null).createdAt(null)
-                    .lastModifiedAt(null).lastModifiedBy(null)
-                    .value(getGlobalConfigurationValue(configurationKey.getKeyName(), propertyType)).build();
-        }
-        return null;
-    }
-
-    /**
-     * Asserts that the requested configuration value change is allowed. Throws
-     * a {@link TenantConfigurationValueChangeNotAllowedException} otherwise.
-     *
-     * @param key The configuration key.
-     * @param valueChange The configuration to be validated.
-     * @throws TenantConfigurationValueChangeNotAllowedException if the requested configuration change is not allowed.
-     */
-    private void assertValueChangeIsAllowed(final String key, final JpaTenantConfiguration valueChange) {
-        assertMultiAssignmentsValueChange(key, valueChange);
-        assertAutoCloseValueChange(key, valueChange);
-        assertBatchAssignmentValueChange(key, valueChange);
-    }
-
-    @SuppressWarnings("squid:S1172")
-    private void assertAutoCloseValueChange(final String key, final JpaTenantConfiguration valueChange) {
-        if (REPOSITORY_ACTIONS_AUTOCLOSE_ENABLED.equals(key)
-                && Boolean.TRUE.equals(getConfigurationValue(MULTI_ASSIGNMENTS_ENABLED, Boolean.class).getValue())) {
-            log.debug(
-                    "The property '{}' must not be changed because the Multi-Assignments feature is currently enabled.",
-                    key);
-            throw new TenantConfigurationValueChangeNotAllowedException();
+                    .value(CONVERSION_SERVICE.convert(tenantConfiguration.getValue(), type))
+                    .build();
+        } else if (key.getDefaultValue() != null) {
+            return TenantConfigurationValue.<T> builder()
+                    .global(true)
+                    .value(getGlobalConfigurationValue0(key.getKeyName(), type))
+                    .build();
+        } else {
+            return null;
         }
     }
 
-    private void assertMultiAssignmentsValueChange(final String key, final JpaTenantConfiguration valueChange) {
-        if (MULTI_ASSIGNMENTS_ENABLED.equals(key) && !Boolean.parseBoolean(valueChange.getValue())) {
-            log.debug("The Multi-Assignments '{}' feature cannot be disabled.", key);
-            throw new TenantConfigurationValueChangeNotAllowedException();
+    private <T> T getGlobalConfigurationValue0(final String keyName, final Class<T> propertyType) {
+        checkAccess(keyName);
+
+        final TenantConfigurationKey key = tenantConfigurationProperties.fromKeyName(keyName);
+        if (!key.getDataType().isAssignableFrom(propertyType)) {
+            throw new TenantConfigurationValidatorException(
+                    String.format("Cannot parse the database value of type %s into the type %s.", key.getDataType(), propertyType));
         }
-        if (MULTI_ASSIGNMENTS_ENABLED.equals(key) && Boolean.parseBoolean(valueChange.getValue())) {
-            JpaTenantConfiguration batchConfig = tenantConfigurationRepository.findByKey(BATCH_ASSIGNMENTS_ENABLED);
-            if (batchConfig != null && Boolean.parseBoolean(batchConfig.getValue())) {
-                log.debug("The Multi-Assignments '{}' feature cannot be enabled as it contradicts with " +
-                        "The Batch-Assignments feature, which is already enabled .", key);
-                throw new TenantConfigurationValueChangeNotAllowedException();
-            }
-        }
+
+        return CONVERSION_SERVICE.convert(key.getDefaultValue(), propertyType);
     }
 
-    private void assertBatchAssignmentValueChange(final String key, final JpaTenantConfiguration valueChange) {
-        if (BATCH_ASSIGNMENTS_ENABLED.equals(key) && Boolean.parseBoolean(valueChange.getValue())) {
-            JpaTenantConfiguration multiConfig = tenantConfigurationRepository.findByKey(MULTI_ASSIGNMENTS_ENABLED);
-            if (multiConfig != null && Boolean.parseBoolean(multiConfig.getValue())) {
-                log.debug("The Batch-Assignments '{}' feature cannot be enabled as it contradicts with " +
-                        "The Multi-Assignments feature, which is already enabled .", key);
-                throw new TenantConfigurationValueChangeNotAllowedException();
-            }
+    private static PollStatus pollStatus(final long lastTargetQuery, final PollingInterval pollingInterval, final Duration pollingOverdueTime) {
+        final LocalDateTime currentDate = LocalDateTime.now();
+        final LocalDateTime lastPollDate = LocalDateTime.ofInstant(Instant.ofEpochMilli(lastTargetQuery), ZoneId.systemDefault());
+        LocalDateTime nextPollDate = lastPollDate.plus(pollingInterval.getInterval());
+        if (pollingInterval.getDeviationPercent() > 0) {
+            nextPollDate = nextPollDate.plus(
+                    pollingInterval.getInterval().toMillis() * pollingInterval.getDeviationPercent() / 100, ChronoUnit.MILLIS);
         }
+        final LocalDateTime overdueDate = nextPollDate.plus(pollingOverdueTime);
+        return new PollStatus(lastPollDate, nextPollDate, overdueDate, currentDate);
     }
 }

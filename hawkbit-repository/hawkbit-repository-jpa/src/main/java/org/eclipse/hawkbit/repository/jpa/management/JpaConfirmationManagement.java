@@ -9,26 +9,23 @@
  */
 package org.eclipse.hawkbit.repository.jpa.management;
 
+import static org.eclipse.hawkbit.repository.RepositoryConstants.SERVER_MESSAGE_PREFIX;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import jakarta.persistence.EntityManager;
 
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.hawkbit.repository.ConfirmationManagement;
-import org.eclipse.hawkbit.repository.EntityFactory;
 import org.eclipse.hawkbit.repository.QuotaManagement;
-import org.eclipse.hawkbit.repository.RepositoryConstants;
 import org.eclipse.hawkbit.repository.RepositoryProperties;
-import org.eclipse.hawkbit.repository.builder.ActionStatusCreate;
 import org.eclipse.hawkbit.repository.exception.AutoConfirmationAlreadyActiveException;
 import org.eclipse.hawkbit.repository.exception.InvalidConfirmationFeedbackException;
 import org.eclipse.hawkbit.repository.jpa.JpaManagementHelper;
-import org.eclipse.hawkbit.repository.jpa.builder.JpaActionStatusCreate;
 import org.eclipse.hawkbit.repository.jpa.configuration.Constants;
 import org.eclipse.hawkbit.repository.jpa.model.JpaAction;
 import org.eclipse.hawkbit.repository.jpa.model.JpaActionStatus;
@@ -39,12 +36,15 @@ import org.eclipse.hawkbit.repository.jpa.repository.ActionRepository;
 import org.eclipse.hawkbit.repository.jpa.repository.ActionStatusRepository;
 import org.eclipse.hawkbit.repository.jpa.repository.TargetRepository;
 import org.eclipse.hawkbit.repository.model.Action;
+import org.eclipse.hawkbit.repository.model.Action.ActionStatusCreate;
+import org.eclipse.hawkbit.repository.model.Action.ActionStatusCreate.ActionStatusCreateBuilder;
 import org.eclipse.hawkbit.repository.model.Action.Status;
 import org.eclipse.hawkbit.repository.model.AutoConfirmationStatus;
-import org.eclipse.hawkbit.repository.model.Target;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -56,23 +56,21 @@ import org.springframework.validation.annotation.Validated;
 @Slf4j
 @Transactional(readOnly = true)
 @Validated
+@Service
+@ConditionalOnBooleanProperty(prefix = "hawkbit.jpa", name = { "enabled", "confirmation-management" }, matchIfMissing = true)
 public class JpaConfirmationManagement extends JpaActionManagement implements ConfirmationManagement {
 
-    public static final String CONFIRMATION_CODE_MSG_PREFIX = "Confirmation status code: %d";
-
     private final EntityManager entityManager;
-    private final EntityFactory entityFactory;
     private final TargetRepository targetRepository;
 
-    public JpaConfirmationManagement(
+    protected JpaConfirmationManagement(
             final TargetRepository targetRepository,
             final ActionRepository actionRepository, final ActionStatusRepository actionStatusRepository,
             final RepositoryProperties repositoryProperties, final QuotaManagement quotaManagement,
-            final EntityManager entityManager, final EntityFactory entityFactory) {
+            final EntityManager entityManager) {
         super(actionRepository, actionStatusRepository, quotaManagement, repositoryProperties);
         this.targetRepository = targetRepository;
         this.entityManager = entityManager;
-        this.entityFactory = entityFactory;
     }
 
     @Override
@@ -109,17 +107,14 @@ public class JpaConfirmationManagement extends JpaActionManagement implements Co
             backoff = @Backoff(delay = Constants.TX_RT_DELAY))
     public Action confirmAction(final long actionId, final Integer code, final Collection<String> deviceMessages) {
         log.trace("Action with id {} confirm request is triggered.", actionId);
-        final Action action = getActionAndThrowExceptionIfNotFound(actionId);
+        final Action action = actionRepository.getById(actionId);
         assertActionCanAcceptFeedback(action);
         final List<String> messages = new ArrayList<>();
         if (deviceMessages != null) {
             messages.addAll(deviceMessages);
         }
-        messages.add(RepositoryConstants.SERVER_MESSAGE_PREFIX + "Target confirmed action."
-                + " Therefore, it will be set to the running state to proceed with the deployment.");
-        final ActionStatusCreate statusCreate = createConfirmationActionStatus(action.getId(), code, messages)
-                .status(Status.RUNNING);
-        return addActionStatus((JpaActionStatusCreate) statusCreate);
+        messages.add(SERVER_MESSAGE_PREFIX + "Target confirmed action. Therefore, it will be set to the running state to proceed with the deployment.");
+        return addActionStatus(createConfirmationActionStatus(action.getId(), code, messages).status(Status.RUNNING).build());
     }
 
     @Override
@@ -128,16 +123,14 @@ public class JpaConfirmationManagement extends JpaActionManagement implements Co
             backoff = @Backoff(delay = Constants.TX_RT_DELAY))
     public Action denyAction(final long actionId, final Integer code, final Collection<String> deviceMessages) {
         log.trace("Action with id {} deny request is triggered.", actionId);
-        final Action action = getActionAndThrowExceptionIfNotFound(actionId);
+        final Action action = actionRepository.getById(actionId);
         assertActionCanAcceptFeedback(action);
         final List<String> messages = new ArrayList<>();
         if (deviceMessages != null) {
             messages.addAll(deviceMessages);
         }
-        messages.add(RepositoryConstants.SERVER_MESSAGE_PREFIX + "Target rejected action. Action will stay in confirmation pending state.");
-        final ActionStatusCreate statusCreate = createConfirmationActionStatus(action.getId(), code, messages)
-                .status(Status.WAIT_FOR_CONFIRMATION);
-        return addActionStatus((JpaActionStatusCreate) statusCreate);
+        messages.add(SERVER_MESSAGE_PREFIX + "Target rejected action. Action will stay in confirmation pending state.");
+        return addActionStatus(createConfirmationActionStatus(action.getId(), code, messages).status(Status.WAIT_FOR_CONFIRMATION).build());
     }
 
     @Override
@@ -152,7 +145,7 @@ public class JpaConfirmationManagement extends JpaActionManagement implements Co
     }
 
     @Override
-    public Optional<AutoConfirmationStatus> getStatus(final String controllerId) {
+    public Optional<AutoConfirmationStatus> findStatus(final String controllerId) {
         return Optional.of(targetRepository.getWithDetailsByControllerId(controllerId, JpaTarget_.GRAPH_TARGET_AUTO_CONFIRMATION_STATUS))
                 .map(JpaTarget::getAutoConfirmationStatus);
     }
@@ -185,14 +178,22 @@ public class JpaConfirmationManagement extends JpaActionManagement implements Co
         }
     }
 
-    private ActionStatusCreate createConfirmationActionStatus(final long actionId, final Integer code, final Collection<String> messages) {
-        final ActionStatusCreate statusCreate = entityFactory.actionStatus().create(actionId);
-        if (!CollectionUtils.isEmpty(messages)) {
-            statusCreate.messages(messages);
-        }
-        if (code != null) {
+    private ActionStatusCreateBuilder createConfirmationActionStatus(
+            final long actionId, final Integer code, final Collection<String> messages) {
+        final ActionStatusCreateBuilder statusCreate = ActionStatusCreate.builder().actionId(actionId);
+        if (code == null) {
+            if (!CollectionUtils.isEmpty(messages)) {
+                statusCreate.messages(messages);
+            }
+        } else {
             statusCreate.code(code);
-            statusCreate.message(String.format(CONFIRMATION_CODE_MSG_PREFIX, code));
+            if (CollectionUtils.isEmpty(messages)) {
+                statusCreate.messages(List.of(String.format(CONFIRMATION_CODE_MSG_PREFIX, code)));
+            } else {
+                final List<String> messagesWithCode = new ArrayList<>(messages);
+                messagesWithCode.add(String.format(CONFIRMATION_CODE_MSG_PREFIX, code));
+                statusCreate.messages(messagesWithCode);
+            }
         }
         return statusCreate;
     }
@@ -208,11 +209,8 @@ public class JpaConfirmationManagement extends JpaActionManagement implements Co
             log.debug("Auto-confirming action is not necessary, since action {} is in RUNNING state already.", action.getId());
             return action;
         }
-        final JpaActionStatus actionStatus = (JpaActionStatus) entityFactory.actionStatus()
-                .create(action.getId())
-                .status(Status.RUNNING)
-                .messages(Collections.singletonList(autoConfirmationStatus.constructActionMessage()))
-                .build();
+        final JpaActionStatus actionStatus = new JpaActionStatus(Status.RUNNING, System.currentTimeMillis());
+        actionStatus.addMessage(autoConfirmationStatus.constructActionMessage());
         log.debug(
                 "Automatically confirm actionId '{}' due to active auto-confirmation initiated by '{}' and rollouts system user '{}'",
                 action.getId(), autoConfirmationStatus.getInitiator(), autoConfirmationStatus.getCreatedBy());

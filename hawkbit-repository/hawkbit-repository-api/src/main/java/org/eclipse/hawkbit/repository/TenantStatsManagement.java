@@ -9,8 +9,8 @@
  */
 package org.eclipse.hawkbit.repository;
 
-import org.eclipse.hawkbit.im.authentication.SpPermission.SpringEvalExpressions;
-import org.eclipse.hawkbit.repository.report.model.TenantUsage;
+import org.eclipse.hawkbit.auth.SpRole;
+import org.eclipse.hawkbit.repository.model.report.TenantUsage;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
@@ -24,11 +24,6 @@ public interface TenantStatsManagement {
      *
      * @return collected statistics
      */
-    @PreAuthorize(SpringEvalExpressions.HAS_AUTH_SYSTEM_ADMIN + SpringEvalExpressions.HAS_AUTH_OR
-            + SpringEvalExpressions.HAS_AUTH_READ_REPOSITORY + SpringEvalExpressions.HAS_AUTH_OR
-            + SpringEvalExpressions.HAS_AUTH_READ_TARGET + SpringEvalExpressions.HAS_AUTH_OR
-            + SpringEvalExpressions.HAS_AUTH_TENANT_CONFIGURATION_READ + SpringEvalExpressions.HAS_AUTH_OR
-            + SpringEvalExpressions.IS_SYSTEM_CODE)
+    @PreAuthorize("hasAuthority('" + SpRole.TENANT_ADMIN + "')")
     TenantUsage getStatsOfTenant();
-
 }

@@ -25,17 +25,11 @@ import org.eclipse.hawkbit.mgmt.rest.api.MgmtTargetTagRestApi;
 import org.eclipse.hawkbit.mgmt.rest.resource.mapper.MgmtTagMapper;
 import org.eclipse.hawkbit.mgmt.rest.resource.mapper.MgmtTargetMapper;
 import org.eclipse.hawkbit.mgmt.rest.resource.util.PagingUtility;
-import org.eclipse.hawkbit.repository.EntityFactory;
 import org.eclipse.hawkbit.repository.TargetManagement;
 import org.eclipse.hawkbit.repository.TargetTagManagement;
-import org.eclipse.hawkbit.repository.TenantConfigurationManagement;
 import org.eclipse.hawkbit.repository.exception.EntityNotFoundException;
 import org.eclipse.hawkbit.repository.model.Target;
 import org.eclipse.hawkbit.repository.model.TargetTag;
-import org.eclipse.hawkbit.security.SystemSecurityContext;
-import org.eclipse.hawkbit.utils.TenantConfigHelper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -49,26 +43,20 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class MgmtTargetTagResource implements MgmtTargetTagRestApi {
 
-    private final TargetTagManagement tagManagement;
-    private final TargetManagement targetManagement;
-    private final EntityFactory entityFactory;
-    private final TenantConfigHelper tenantConfigHelper;
+    private final TargetTagManagement<? extends TargetTag> tagManagement;
+    private final TargetManagement<? extends Target> targetManagement;
 
     MgmtTargetTagResource(
-            final TargetTagManagement tagManagement, final TargetManagement targetManagement,
-            final EntityFactory entityFactory,
-            final SystemSecurityContext securityContext, final TenantConfigurationManagement configurationManagement) {
+            final TargetTagManagement<? extends TargetTag> tagManagement, final TargetManagement<? extends Target> targetManagement) {
         this.tagManagement = tagManagement;
         this.targetManagement = targetManagement;
-        this.entityFactory = entityFactory;
-        tenantConfigHelper = TenantConfigHelper.usingContext(securityContext, configurationManagement);
     }
 
     @Override
     public ResponseEntity<PagedList<MgmtTag>> getTargetTags(
             final String rsqlParam, final int pagingOffsetParam, final int pagingLimitParam, final String sortParam) {
         final Pageable pageable = PagingUtility.toPageable(pagingOffsetParam, pagingLimitParam, sanitizeTagSortParam(sortParam));
-        final Page<TargetTag> findTargetsAll;
+        final Page<? extends TargetTag> findTargetsAll;
         if (rsqlParam == null) {
             findTargetsAll = this.tagManagement.findAll(pageable);
         } else {
@@ -92,7 +80,7 @@ public class MgmtTargetTagResource implements MgmtTargetTagRestApi {
     @Override
     public ResponseEntity<List<MgmtTag>> createTargetTags(final List<MgmtTagRequestBodyPut> tags) {
         log.debug("creating {} target tags", tags.size());
-        final List<TargetTag> createdTargetTags = this.tagManagement.create(MgmtTagMapper.mapTagFromRequest(entityFactory, tags));
+        final List<? extends TargetTag> createdTargetTags = tagManagement.create(MgmtTagMapper.mapTagFromRequest(tags));
         return new ResponseEntity<>(MgmtTagMapper.toResponse(createdTargetTags), HttpStatus.CREATED);
     }
 
@@ -101,8 +89,8 @@ public class MgmtTargetTagResource implements MgmtTargetTagRestApi {
         log.debug("update {} target tag", restTargetTagRest);
 
         final TargetTag updateTargetTag = tagManagement
-                .update(entityFactory.tag().update(targetTagId).name(restTargetTagRest.getName())
-                        .description(restTargetTagRest.getDescription()).colour(restTargetTagRest.getColour()));
+                .update(TargetTagManagement.Update.builder().id(targetTagId).name(restTargetTagRest.getName())
+                        .description(restTargetTagRest.getDescription()).colour(restTargetTagRest.getColour()).build());
 
         log.debug("target tag updated");
 
@@ -118,9 +106,9 @@ public class MgmtTargetTagResource implements MgmtTargetTagRestApi {
         log.debug("Delete {} target tag", targetTagId);
         final TargetTag targetTag = findTargetTagById(targetTagId);
 
-        this.tagManagement.delete(targetTag.getName());
+        this.tagManagement.delete(targetTag.getId());
 
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
     @Override
@@ -135,7 +123,7 @@ public class MgmtTargetTagResource implements MgmtTargetTagRestApi {
             findTargetsAll = targetManagement.findByRsqlAndTag(rsqlParam, targetTagId, pageable);
         }
 
-        final List<MgmtTarget> rest = MgmtTargetMapper.toResponse(findTargetsAll.getContent(), tenantConfigHelper);
+        final List<MgmtTarget> rest = MgmtTargetMapper.toResponse(findTargetsAll.getContent());
         return ResponseEntity.ok(new PagedList<>(rest, findTargetsAll.getTotalElements()));
     }
 
@@ -143,7 +131,7 @@ public class MgmtTargetTagResource implements MgmtTargetTagRestApi {
     public ResponseEntity<Void> assignTarget(final Long targetTagId, final String controllerId) {
         log.debug("Assign target {} for target tag {}", controllerId, targetTagId);
         this.targetManagement.assignTag(List.of(controllerId), targetTagId);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
     @Override
@@ -160,22 +148,15 @@ public class MgmtTargetTagResource implements MgmtTargetTagRestApi {
                 throw new EntityNotFoundException(Target.class, notFound.get());
             }
         }
-        return ResponseEntity.ok().build();
-    }
-
-    private static final Logger LOGGER = LoggerFactory.getLogger("DEPRECATED_USAGE");
-    @Override
-    public ResponseEntity<Void> assignTargetsPut(final Long targetTagId, final List<String> controllerIds, final OnNotFoundPolicy onNotFoundPolicy) {
-        LOGGER.debug("[DEPRECATED] Deprecated usage of assignTargetsPut. Use assignTargetsPut (POST) instead.");
-        return assignTargets(targetTagId, controllerIds, onNotFoundPolicy);
+        return ResponseEntity.noContent().build();
     }
 
     @Override
     @AuditLog(entity = "TargetTag", type = AuditLog.Type.UPDATE, description = "Unassign Target From Target Tag")
     public ResponseEntity<Void> unassignTarget(final Long targetTagId, final String controllerId) {
         log.debug("Unassign target {} for target tag {}", controllerId, targetTagId);
-        this.targetManagement.unassignTag(List.of(controllerId), targetTagId);
-        return ResponseEntity.ok().build();
+        targetManagement.unassignTag(List.of(controllerId), targetTagId);
+        return ResponseEntity.noContent().build();
     }
 
     @Override
@@ -184,19 +165,19 @@ public class MgmtTargetTagResource implements MgmtTargetTagRestApi {
             final Long targetTagId, final OnNotFoundPolicy onNotFoundPolicy, final List<String> controllerIds) {
         log.debug("Unassign {} targets for target tag {}", controllerIds.size(), targetTagId);
         if (onNotFoundPolicy == OnNotFoundPolicy.FAIL) {
-            this.targetManagement.unassignTag(controllerIds, targetTagId);
+            targetManagement.unassignTag(controllerIds, targetTagId);
         } else {
             final AtomicReference<Collection<String>> notFound = new AtomicReference<>();
-            this.targetManagement.unassignTag(controllerIds, targetTagId, notFound::set);
+            targetManagement.unassignTag(controllerIds, targetTagId, notFound::set);
             if (notFound.get() != null && onNotFoundPolicy == OnNotFoundPolicy.ON_WHAT_FOUND_AND_FAIL) {
                 // has not found and ON_WHAT_FOUND_AND_FAIL
                 throw new EntityNotFoundException(Target.class, notFound.get());
             }
         }
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
     private TargetTag findTargetTagById(final Long targetTagId) {
-        return tagManagement.get(targetTagId).orElseThrow(() -> new EntityNotFoundException(TargetTag.class, targetTagId));
+        return tagManagement.find(targetTagId).orElseThrow(() -> new EntityNotFoundException(TargetTag.class, targetTagId));
     }
 }

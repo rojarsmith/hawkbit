@@ -25,9 +25,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.eclipse.hawkbit.context.AccessContext;
 import org.eclipse.hawkbit.ddi.json.model.DdiResult;
 import org.eclipse.hawkbit.ddi.json.model.DdiStatus;
-import org.eclipse.hawkbit.ddi.rest.api.DdiRestConstants;
+import org.eclipse.hawkbit.ddi.rest.api.DdiRootControllerRestApi;
 import org.eclipse.hawkbit.repository.jpa.repository.ActionStatusRepository;
 import org.eclipse.hawkbit.repository.model.Action;
 import org.eclipse.hawkbit.repository.model.Action.Status;
@@ -66,11 +67,11 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
         // check that we can get the cancel action as CBOR
         final byte[] result = mvc
                 .perform(get("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction.getId(), tenantAware.getCurrentTenant())
-                        .accept(DdiRestConstants.MEDIA_TYPE_CBOR))
+                        + cancelAction.getId(), AccessContext.tenant())
+                        .accept(DdiRootControllerRestApi.MEDIA_TYPE_APPLICATION_CBOR))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
-                .andExpect(content().contentType(DdiRestConstants.MEDIA_TYPE_CBOR))
+                .andExpect(content().contentType(DdiRootControllerRestApi.MEDIA_TYPE_APPLICATION_CBOR))
                 .andReturn().getResponse()
                 .getContentAsByteArray();
         assertThat(JsonPathUtils.<String> evaluate(cborToJson(result), "$.id"))
@@ -80,9 +81,9 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
 
         // and submit feedback as CBOR
         mvc.perform(post("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction.getId() + "/feedback", tenantAware.getCurrentTenant())
+                        + cancelAction.getId() + "/feedback", AccessContext.tenant())
                         .content(jsonToCbor(getJsonProceedingCancelActionFeedback()))
-                        .contentType(DdiRestConstants.MEDIA_TYPE_CBOR).accept(DdiRestConstants.MEDIA_TYPE_CBOR))
+                        .contentType(DdiRootControllerRestApi.MEDIA_TYPE_APPLICATION_CBOR).accept(DdiRootControllerRestApi.MEDIA_TYPE_APPLICATION_CBOR))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk());
     }
@@ -104,7 +105,7 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
 
         // controller rejects cancellation
         mvc.perform(post("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction.getId() + "/feedback", tenantAware.getCurrentTenant())
+                        + cancelAction.getId() + "/feedback", AccessContext.tenant())
                         .content(getJsonRejectedCancelActionFeedback()).contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
@@ -115,7 +116,7 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
         // get update action anyway
         mvc.perform(
                         get("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/deploymentBase/" + actionId,
-                                tenantAware.getCurrentTenant()).accept(MediaType.APPLICATION_JSON))
+                                AccessContext.tenant()).accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
@@ -123,15 +124,15 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
                 .andExpect(jsonPath("$.deployment.download", equalTo("forced")))
                 .andExpect(jsonPath("$.deployment.update", equalTo("forced")))
                 .andExpect(jsonPath("$.deployment.chunks[?(@.part=='jvm')].version",
-                        contains(ds.findFirstModuleByType(runtimeType).get().getVersion())))
+                        contains(findFirstModuleByType(ds, runtimeType).orElseThrow().getVersion())))
                 .andExpect(jsonPath("$.deployment.chunks[?(@.part=='os')].version",
-                        contains(ds.findFirstModuleByType(osType).get().getVersion())))
+                        contains(findFirstModuleByType(ds, osType).orElseThrow().getVersion())))
                 .andExpect(jsonPath("$.deployment.chunks[?(@.part=='bApp')].version",
-                        contains(ds.findFirstModuleByType(appType).get().getVersion())));
+                        contains(findFirstModuleByType(ds, appType).orElseThrow().getVersion())));
 
         // and finish it
         mvc.perform(post("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/deploymentBase/"
-                        + actionId + "/feedback", tenantAware.getCurrentTenant()).content(
+                        + actionId + "/feedback", AccessContext.tenant()).content(
                                 getJsonActionFeedback(DdiStatus.ExecutionStatus.CLOSED, DdiResult.FinalResult.NONE,
                                         Collections.singletonList("message")))
                         .contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON))
@@ -139,18 +140,18 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
                 .andExpect(status().isOk());
 
         // check database after test
-        assertThat(deploymentManagement.getAssignedDistributionSet(TestdataFactory.DEFAULT_CONTROLLER_ID).get())
+        assertThat(deploymentManagement.findAssignedDistributionSet(TestdataFactory.DEFAULT_CONTROLLER_ID).orElseThrow())
                 .isEqualTo(ds);
-        assertThat(deploymentManagement.getInstalledDistributionSet(TestdataFactory.DEFAULT_CONTROLLER_ID).get())
+        assertThat(deploymentManagement.findInstalledDistributionSet(TestdataFactory.DEFAULT_CONTROLLER_ID).orElseThrow())
                 .isEqualTo(ds);
         assertThat(
-                targetManagement.getByControllerID(TestdataFactory.DEFAULT_CONTROLLER_ID).get().getInstallationDate())
+                targetManagement.getByControllerId(TestdataFactory.DEFAULT_CONTROLLER_ID).getInstallationDate())
                 .isGreaterThanOrEqualTo(current);
 
     }
 
     /**
-     * Test for cancel operation of a update action.
+     * Test for cancel operation of an update action.
      */
     @Test
     void rootRsCancelAction() throws Exception {
@@ -161,17 +162,17 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
                 assignDistributionSet(ds.getId(), savedTarget.getControllerId()));
 
         final long timeBeforeFirstPoll = System.currentTimeMillis();
-        mvc.perform(get("/{tenant}/controller/v1/{controller}", tenantAware.getCurrentTenant(),
+        mvc.perform(get("/{tenant}/controller/v1/{controller}", AccessContext.tenant(),
                         TestdataFactory.DEFAULT_CONTROLLER_ID).accept(MediaTypes.HAL_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaTypes.HAL_JSON))
                 .andExpect(jsonPath("$.config.polling.sleep", equalTo("00:01:00")))
                 .andExpect(jsonPath("$._links.deploymentBase.href",
-                        startsWith("http://localhost/" + tenantAware.getCurrentTenant() + "/controller/v1/"
+                        startsWith("http://localhost/" + AccessContext.tenant() + "/controller/v1/"
                                 + TestdataFactory.DEFAULT_CONTROLLER_ID + "/deploymentBase/" + actionId)));
         final long timeAfterFirstPoll = System.currentTimeMillis() + 1;
-        assertThat(targetManagement.getByControllerID(TestdataFactory.DEFAULT_CONTROLLER_ID).get().getLastTargetQuery())
+        assertThat(targetManagement.getByControllerId(TestdataFactory.DEFAULT_CONTROLLER_ID).getLastTargetQuery())
                 .isBetween(timeBeforeFirstPoll, timeAfterFirstPoll);
 
         // Retrieved is reported
@@ -192,32 +193,32 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
         assertThat(activeActionsByTarget.get(0).getStatus()).isEqualTo(Status.CANCELING);
 
         final long timeBefore2ndPoll = System.currentTimeMillis();
-        mvc.perform(get("/{tenant}/controller/v1/{controller}", tenantAware.getCurrentTenant(),
+        mvc.perform(get("/{tenant}/controller/v1/{controller}", AccessContext.tenant(),
                         TestdataFactory.DEFAULT_CONTROLLER_ID))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaTypes.HAL_JSON))
                 .andExpect(jsonPath("$.config.polling.sleep", equalTo("00:01:00")))
                 .andExpect(jsonPath("$._links.cancelAction.href",
-                        equalTo("http://localhost/" + tenantAware.getCurrentTenant() + "/controller/v1/"
+                        equalTo("http://localhost/" + AccessContext.tenant() + "/controller/v1/"
                                 + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/" + cancelAction.getId())));
         final long timeAfter2ndPoll = System.currentTimeMillis() + 1;
-        assertThat(targetManagement.getByControllerID(TestdataFactory.DEFAULT_CONTROLLER_ID).get().getLastTargetQuery())
+        assertThat(targetManagement.getByControllerId(TestdataFactory.DEFAULT_CONTROLLER_ID).getLastTargetQuery())
                 .isBetween(timeBefore2ndPoll, timeAfter2ndPoll);
 
         mvc.perform(get("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction.getId(), tenantAware.getCurrentTenant()).accept(MediaType.APPLICATION_JSON))
+                        + cancelAction.getId(), AccessContext.tenant()).accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.id", equalTo(String.valueOf(cancelAction.getId()))))
                 .andExpect(jsonPath("$.cancelAction.stopId", equalTo(String.valueOf(actionId))));
-        assertThat(targetManagement.getByControllerID(TestdataFactory.DEFAULT_CONTROLLER_ID).get().getLastTargetQuery())
+        assertThat(targetManagement.getByControllerId(TestdataFactory.DEFAULT_CONTROLLER_ID).getLastTargetQuery())
                 .isLessThanOrEqualTo(System.currentTimeMillis());
 
         // controller confirmed cancelled action, should not be active anymore
         mvc.perform(post("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction.getId() + "/feedback", tenantAware.getCurrentTenant()).accept(MediaType.APPLICATION_JSON)
+                        + cancelAction.getId() + "/feedback", AccessContext.tenant()).accept(MediaType.APPLICATION_JSON)
                         .content(getJsonClosedCancelActionFeedback()).contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
@@ -226,7 +227,7 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
         activeActionsByTarget = deploymentManagement.findActiveActionsByTarget(savedTarget.getControllerId(), PAGE)
                 .getContent();
         assertThat(activeActionsByTarget).isEmpty();
-        final Action canceledAction = deploymentManagement.findAction(cancelAction.getId()).get();
+        final Action canceledAction = deploymentManagement.findAction(cancelAction.getId()).orElseThrow();
         assertThat(canceledAction.isActive()).isFalse();
         assertThat(canceledAction.getStatus()).isEqualTo(Status.CANCELED);
 
@@ -240,22 +241,22 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
 
         // not allowed methods
         mvc.perform(post("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/1",
-                        tenantAware.getCurrentTenant()))
+                        AccessContext.tenant()))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isMethodNotAllowed());
 
         mvc.perform(put("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/1",
-                        tenantAware.getCurrentTenant()))
+                        AccessContext.tenant()))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isMethodNotAllowed());
 
         mvc.perform(delete("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/1",
-                        tenantAware.getCurrentTenant()))
+                        AccessContext.tenant()))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isMethodNotAllowed());
 
         // non existing target
-        mvc.perform(get("/{tenant}/controller/v1/34534543/cancelAction/1", tenantAware.getCurrentTenant())
+        mvc.perform(get("/{tenant}/controller/v1/34534543/cancelAction/1", AccessContext.tenant())
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isNotFound());
@@ -263,7 +264,7 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
         createCancelAction("34534543");
 
         // wrong media type
-        mvc.perform(get("/{tenant}/controller/v1/34534543/cancelAction/1", tenantAware.getCurrentTenant())
+        mvc.perform(get("/{tenant}/controller/v1/34534543/cancelAction/1", AccessContext.tenant())
                         .accept(MediaType.APPLICATION_ATOM_XML))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isNotAcceptable());
@@ -289,7 +290,7 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
 
         assertThat(deploymentManagement.findActiveActionsByTarget(savedTarget.getControllerId(), PAGE)).hasSize(1);
         mvc.perform(post("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction.getId() + "/feedback", tenantAware.getCurrentTenant())
+                        + cancelAction.getId() + "/feedback", AccessContext.tenant())
                         .content(getJsonProceedingCancelActionFeedback()).contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
@@ -299,7 +300,7 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
         assertThat(countActionStatusAll()).isEqualTo(3);
 
         mvc.perform(post("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction.getId() + "/feedback", tenantAware.getCurrentTenant())
+                        + cancelAction.getId() + "/feedback", AccessContext.tenant())
                         .content(getJsonResumedCancelActionFeedback()).contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
@@ -308,7 +309,7 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
         assertThat(countActionStatusAll()).isEqualTo(4);
 
         mvc.perform(post("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction.getId() + "/feedback", tenantAware.getCurrentTenant())
+                        + cancelAction.getId() + "/feedback", AccessContext.tenant())
                         .content(getJsonScheduledCancelActionFeedback()).contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
@@ -319,7 +320,7 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
         // cancellation canceled -> should remove the action from active
         assertThat(deploymentManagement.findActiveActionsByTarget(savedTarget.getControllerId(), PAGE)).hasSize(1);
         mvc.perform(post("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction.getId() + "/feedback", tenantAware.getCurrentTenant())
+                        + cancelAction.getId() + "/feedback", AccessContext.tenant())
                         .content(getJsonCanceledCancelActionFeedback()).contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
@@ -333,7 +334,7 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
         // error
         assertThat(deploymentManagement.findActiveActionsByTarget(savedTarget.getControllerId(), PAGE)).hasSize(1);
         mvc.perform(post("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction.getId() + "/feedback", tenantAware.getCurrentTenant())
+                        + cancelAction.getId() + "/feedback", AccessContext.tenant())
                         .content(getJsonRejectedCancelActionFeedback()).contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
@@ -343,7 +344,7 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
 
         // update closed -> should remove the action from active
         mvc.perform(post("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/deploymentBase/"
-                        + cancelAction.getId() + "/feedback", tenantAware.getCurrentTenant())
+                        + cancelAction.getId() + "/feedback", AccessContext.tenant())
                         .content(getJsonClosedCancelActionFeedback()).contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
@@ -355,6 +356,7 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
     /**
      * Tests the feeback chanel of for multiple open cancel operations on the same target.
      */
+    @SuppressWarnings("java:S5961")
     @Test
     void multipleCancelActionFeedback() throws Exception {
         final DistributionSet ds = testdataFactory.createDistributionSet("", true);
@@ -363,14 +365,11 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
 
         final Target savedTarget = testdataFactory.createTarget();
 
-        final Long actionId = getFirstAssignedActionId(
-                assignDistributionSet(ds.getId(), TestdataFactory.DEFAULT_CONTROLLER_ID));
+        final Long actionId = getFirstAssignedActionId(assignDistributionSet(ds.getId(), TestdataFactory.DEFAULT_CONTROLLER_ID));
         implicitLock(ds);
-        final Long actionId2 = getFirstAssignedActionId(
-                assignDistributionSet(ds2.getId(), TestdataFactory.DEFAULT_CONTROLLER_ID));
+        final Long actionId2 = getFirstAssignedActionId(assignDistributionSet(ds2.getId(), TestdataFactory.DEFAULT_CONTROLLER_ID));
         implicitLock(ds2);
-        final Long actionId3 = getFirstAssignedActionId(
-                assignDistributionSet(ds3.getId(), TestdataFactory.DEFAULT_CONTROLLER_ID));
+        final Long actionId3 = getFirstAssignedActionId(assignDistributionSet(ds3.getId(), TestdataFactory.DEFAULT_CONTROLLER_ID));
         implicitLock(ds3);
 
         assertThat(countActionStatusAll()).isEqualTo(3);
@@ -383,8 +382,9 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
 
         assertThat(deploymentManagement.findActiveActionsByTarget(savedTarget.getControllerId(), PAGE)).hasSize(3);
         assertThat(deploymentManagement.countActionsByTarget(savedTarget.getControllerId())).isEqualTo(3);
-        mvc.perform(get("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction.getId(), tenantAware.getCurrentTenant()).accept(MediaType.APPLICATION_JSON))
+        mvc.perform(get(
+                        "/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/" + cancelAction.getId(),
+                        AccessContext.tenant()).accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
@@ -392,19 +392,19 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
                 .andExpect(jsonPath("$.cancelAction.stopId", equalTo(String.valueOf(actionId))));
         assertThat(countActionStatusAll()).isEqualTo(6);
 
-        mvc.perform(get("/{tenant}/controller/v1/{controllerId}", tenantAware.getCurrentTenant(),
+        mvc.perform(get("/{tenant}/controller/v1/{controllerId}", AccessContext.tenant(),
                         TestdataFactory.DEFAULT_CONTROLLER_ID))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaTypes.HAL_JSON))
                 .andExpect(jsonPath("$.config.polling.sleep", equalTo("00:01:00")))
                 .andExpect(jsonPath("$._links.cancelAction.href",
-                        equalTo("http://localhost/" + tenantAware.getCurrentTenant() + "/controller/v1/"
+                        equalTo("http://localhost/" + AccessContext.tenant() + "/controller/v1/"
                                 + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/" + cancelAction.getId())));
 
         // now lets return feedback for the first cancelation
         mvc.perform(post("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction.getId() + "/feedback", tenantAware.getCurrentTenant())
+                        + cancelAction.getId() + "/feedback", AccessContext.tenant())
                         .content(getJsonClosedCancelActionFeedback()).contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
@@ -415,7 +415,7 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
         assertThat(deploymentManagement.findActiveActionsByTarget(savedTarget.getControllerId(), PAGE)).hasSize(2);
         assertThat(deploymentManagement.countActionsByTarget(savedTarget.getControllerId())).isEqualTo(3);
         mvc.perform(get("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction2.getId(), tenantAware.getCurrentTenant()).accept(MediaType.APPLICATION_JSON))
+                        + cancelAction2.getId(), AccessContext.tenant()).accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
@@ -423,30 +423,29 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
                 .andExpect(jsonPath("$.cancelAction.stopId", equalTo(String.valueOf(actionId2))));
         assertThat(countActionStatusAll()).isEqualTo(8);
 
-        mvc.perform(get("/{tenant}/controller/v1/{controller}", tenantAware.getCurrentTenant(),
+        mvc.perform(get("/{tenant}/controller/v1/{controller}", AccessContext.tenant(),
                         TestdataFactory.DEFAULT_CONTROLLER_ID))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaTypes.HAL_JSON))
                 .andExpect(jsonPath("$.config.polling.sleep", equalTo("00:01:00")))
                 .andExpect(jsonPath("$._links.cancelAction.href",
-                        equalTo("http://localhost/" + tenantAware.getCurrentTenant() + "/controller/v1/"
+                        equalTo("http://localhost/" + AccessContext.tenant() + "/controller/v1/"
                                 + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/" + cancelAction2.getId())));
 
         // now lets return feedback for the second cancelation
         mvc.perform(post("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction2.getId() + "/feedback", tenantAware.getCurrentTenant())
+                        + cancelAction2.getId() + "/feedback", AccessContext.tenant())
                         .content(getJsonClosedCancelActionFeedback()).contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk());
         assertThat(countActionStatusAll()).isEqualTo(9);
 
-        assertThat(deploymentManagement.getAssignedDistributionSet(TestdataFactory.DEFAULT_CONTROLLER_ID).get())
-                .isEqualTo(ds3);
+        assertThat(deploymentManagement.findAssignedDistributionSet(TestdataFactory.DEFAULT_CONTROLLER_ID).orElseThrow()).isEqualTo(ds3);
         mvc.perform(
                         get("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/deploymentBase/" + actionId3,
-                                tenantAware.getCurrentTenant()))
+                                AccessContext.tenant()))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk());
         assertThat(countActionStatusAll()).isEqualTo(10);
@@ -459,11 +458,11 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
         // action is in cancelling state
         assertThat(deploymentManagement.findActiveActionsByTarget(savedTarget.getControllerId(), PAGE)).hasSize(1);
         assertThat(deploymentManagement.countActionsByTarget(savedTarget.getControllerId())).isEqualTo(3);
-        assertThat(deploymentManagement.getAssignedDistributionSet(TestdataFactory.DEFAULT_CONTROLLER_ID).get())
-                .isEqualTo(ds3);
+        assertThat(deploymentManagement.findAssignedDistributionSet(TestdataFactory.DEFAULT_CONTROLLER_ID).orElseThrow()).isEqualTo(ds3);
 
-        mvc.perform(get("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction3.getId(), tenantAware.getCurrentTenant()).accept(MediaType.APPLICATION_JSON))
+        mvc.perform(get(
+                "/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/" + cancelAction3.getId(),
+                        AccessContext.tenant()).accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
@@ -473,7 +472,7 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
 
         // now lets return feedback for the third cancelation
         mvc.perform(post("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction3.getId() + "/feedback", tenantAware.getCurrentTenant())
+                        + cancelAction3.getId() + "/feedback", AccessContext.tenant())
                         .content(getJsonClosedCancelActionFeedback()).contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
@@ -504,15 +503,15 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
         // only 97 action status left
         for (int i = 0; i < 98; i++) {
             mvc.perform(post("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                            + cancelAction.getId() + "/feedback", tenantAware.getCurrentTenant()).content(feedback)
+                            + cancelAction.getId() + "/feedback", AccessContext.tenant()).content(feedback)
                             .contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON))
                     .andExpect(status().isOk());
         }
 
         mvc.perform(post("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction.getId() + "/feedback", tenantAware.getCurrentTenant()).content(feedback)
+                        + cancelAction.getId() + "/feedback", AccessContext.tenant()).content(feedback)
                         .contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isTooManyRequests());
     }
 
     /**
@@ -525,25 +524,25 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
 
         // not allowed methods
         mvc.perform(put("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction.getId() + "/feedback", tenantAware.getCurrentTenant())
+                        + cancelAction.getId() + "/feedback", AccessContext.tenant())
                         .content(getJsonClosedCancelActionFeedback()).contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isMethodNotAllowed());
 
         mvc.perform(delete("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction.getId() + "/feedback", tenantAware.getCurrentTenant()))
+                        + cancelAction.getId() + "/feedback", AccessContext.tenant()))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isMethodNotAllowed());
 
         mvc.perform(get("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction.getId() + "/feedback", tenantAware.getCurrentTenant()))
+                        + cancelAction.getId() + "/feedback", AccessContext.tenant()))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isMethodNotAllowed());
 
         // bad content type
         mvc.perform(post("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction.getId() + "/feedback", tenantAware.getCurrentTenant())
+                        + cancelAction.getId() + "/feedback", AccessContext.tenant())
                         .content(getJsonClosedCancelActionFeedback()).contentType(MediaType.APPLICATION_ATOM_XML)
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
@@ -552,14 +551,14 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
         // bad body
         String invalidFeedback = "{\"status\":{\"execution\":\"546456456\",\"result\":{\"finished\":\"none\",\"progress\":{\"cnt\":2,\"of\":5}},\"details\":\"none\"]}}";
         mvc.perform(post("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction.getId() + "/feedback", tenantAware.getCurrentTenant()).content(invalidFeedback)
+                        + cancelAction.getId() + "/feedback", AccessContext.tenant()).content(invalidFeedback)
                         .contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isBadRequest());
 
         // non existing target
         mvc.perform(post("/{tenant}/controller/v1/12345/cancelAction/" + cancelAction.getId() + "/feedback",
-                        tenantAware.getCurrentTenant()).content(getJsonClosedCancelActionFeedback())
+                        AccessContext.tenant()).content(getJsonClosedCancelActionFeedback())
                         .contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isNotFound());
@@ -567,14 +566,14 @@ class DdiCancelActionTest extends AbstractDDiApiIntegrationTest {
         // invalid action
         invalidFeedback = "{\"id\":\"sdfsdfsdfs\",\"status\":{\"execution\":\"closed\",\"result\":{\"finished\":\"none\",\"progress\":{\"cnt\":2,\"of\":5}},\"details\":\"details\"]}}";
         mvc.perform(post("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction.getId() + "/feedback", tenantAware.getCurrentTenant()).content(invalidFeedback)
+                        + cancelAction.getId() + "/feedback", AccessContext.tenant()).content(invalidFeedback)
                         .contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isBadRequest());
 
         // finaly, get it right :)
         mvc.perform(post("/{tenant}/controller/v1/" + TestdataFactory.DEFAULT_CONTROLLER_ID + "/cancelAction/"
-                        + cancelAction.getId() + "/feedback", tenantAware.getCurrentTenant())
+                        + cancelAction.getId() + "/feedback", AccessContext.tenant())
                         .content(getJsonClosedCancelActionFeedback()).contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())

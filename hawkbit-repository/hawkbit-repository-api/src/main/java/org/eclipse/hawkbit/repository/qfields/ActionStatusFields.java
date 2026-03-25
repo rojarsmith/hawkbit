@@ -1,0 +1,34 @@
+/**
+ * Copyright (c) 2015 Bosch Software Innovations GmbH and others
+ *
+ * This program and the accompanying materials are made
+ * available under the terms of the Eclipse Public License 2.0
+ * which is available at https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ */
+package org.eclipse.hawkbit.repository.qfields;
+
+import lombok.Getter;
+import org.eclipse.hawkbit.ql.QueryField;
+
+/**
+ * Sort and search fields for action status.
+ */
+@Getter
+public enum ActionStatusFields implements QueryField {
+
+    ID("id"),
+    // search fields in sync with entity specifics (timestamp & report time)
+    TIMESTAMP("timestamp"),
+    REPORTEDAT("createdAt"), // same as CREATEDAT
+    // fields for db records as in other fields - created at / by
+    CREATEDAT("createdAt"), // same as REPORTEDAT
+    CREATEDBY("createdBy");
+
+    private final String name;
+
+    ActionStatusFields(final String name) {
+        this.name = name;
+    }
+}

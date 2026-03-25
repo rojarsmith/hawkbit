@@ -9,7 +9,7 @@
 # SPDX-License-Identifier: EPL-2.0
 #
 
-#set -xe
+set -xe
 
 # Usage: builds all docker images. Use:
 # -v <version> to pass version
@@ -20,6 +20,8 @@
 VERSION=0-SNAPSHOT
 MVN_REPO=~/.m2/repository
 TAG=latest
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+cd "${SCRIPT_DIR}"
 
 while getopts v:r:t: option
 do
@@ -55,11 +57,13 @@ if [ -z "$1" ]; then
     build "hawkbit-ddi-server"
     build "hawkbit-dmf-server"
     build "hawkbit-mgmt-server"
-    build "hawkbit-simple-ui"
+    build "hawkbit-ui"
     # monolith
     build "hawkbit-update-server"
     # db init
     build "hawkbit-repository-jpa-init"
+    # mcp server
+    build "hawkbit-mcp-server"
 else
     echo "Build $1"
     build $1

@@ -1,7 +1,7 @@
 # set Java
-ARG JAVA_VERSION=21.0.7_6
+ARG JAVA_VERSION=21.0.10_7
 # extracts spring layers from the app jar (to optimize boot)
-FROM eclipse-temurin:${JAVA_VERSION}-jre-alpine as build
+FROM eclipse-temurin:${JAVA_VERSION}-jre-alpine AS build
 
 ARG HAWKBIT_APP=hawkbit-update-server
 ARG HAWKBIT_VERSION=0-SNAPSHOT
@@ -19,9 +19,10 @@ RUN set -x &&\
  rm /${APP}-${VERSION}.jar
 
 FROM eclipse-temurin:${JAVA_VERSION}-jre-alpine
-
+ARG APP_DIR=/app
+WORKDIR ${APP_DIR}
 RUN addgroup -S hawkbit_group && adduser -D hawkbit -G hawkbit_group
-RUN mkdir -p /artifactrepo && chown -R hawkbit /artifactrepo
+RUN mkdir -p artifactrepo && chown -R hawkbit artifactrepo
 USER hawkbit
 
 ENV BUILD_DIR=/opt/hawkbit_build
@@ -30,7 +31,7 @@ COPY --from=build ${BUILD_DIR}/spring-boot-loader/ ./
 COPY --from=build ${BUILD_DIR}/snapshot-dependencies/ ./
 COPY --from=build ${BUILD_DIR}/application/ ./
 
-VOLUME "/artifactrepo"
+VOLUME /${APP_DIR}/artifactrepo
 
 ARG CONTAINER_PORT=8080
 EXPOSE ${CONTAINER_PORT}

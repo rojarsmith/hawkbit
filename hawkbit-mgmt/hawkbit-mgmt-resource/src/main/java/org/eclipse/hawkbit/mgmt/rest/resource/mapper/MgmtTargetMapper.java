@@ -13,17 +13,18 @@ import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.linkTo;
 import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.ZoneId;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import lombok.AccessLevel;
-import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.eclipse.hawkbit.mgmt.json.model.MgmtMaintenanceWindow;
 import org.eclipse.hawkbit.mgmt.json.model.MgmtMetadata;
 import org.eclipse.hawkbit.mgmt.json.model.MgmtPollStatus;
@@ -38,11 +39,11 @@ import org.eclipse.hawkbit.mgmt.rest.api.MgmtRolloutRestApi;
 import org.eclipse.hawkbit.mgmt.rest.api.MgmtTargetRestApi;
 import org.eclipse.hawkbit.mgmt.rest.api.MgmtTargetTypeRestApi;
 import org.eclipse.hawkbit.mgmt.rest.api.SortDirection;
-import org.eclipse.hawkbit.repository.ActionFields;
-import org.eclipse.hawkbit.repository.ActionStatusFields;
 import org.eclipse.hawkbit.repository.DeploymentManagement;
-import org.eclipse.hawkbit.repository.EntityFactory;
-import org.eclipse.hawkbit.repository.builder.TargetCreate;
+import org.eclipse.hawkbit.repository.TargetManagement.Create;
+import org.eclipse.hawkbit.repository.TargetTypeManagement;
+import org.eclipse.hawkbit.repository.exception.EntityNotFoundException;
+import org.eclipse.hawkbit.repository.helper.TenantConfigHelper;
 import org.eclipse.hawkbit.repository.model.Action;
 import org.eclipse.hawkbit.repository.model.Action.ActionType;
 import org.eclipse.hawkbit.repository.model.ActionStatus;
@@ -51,17 +52,27 @@ import org.eclipse.hawkbit.repository.model.DistributionSet;
 import org.eclipse.hawkbit.repository.model.PollStatus;
 import org.eclipse.hawkbit.repository.model.Rollout;
 import org.eclipse.hawkbit.repository.model.Target;
+import org.eclipse.hawkbit.repository.model.TargetType;
+import org.eclipse.hawkbit.repository.qfields.ActionFields;
+import org.eclipse.hawkbit.repository.qfields.ActionStatusFields;
 import org.eclipse.hawkbit.rest.json.model.ResponseList;
-import org.eclipse.hawkbit.util.IpUtil;
-import org.eclipse.hawkbit.utils.TenantConfigHelper;
+import org.eclipse.hawkbit.utils.IpUtil;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
 import org.springframework.util.ObjectUtils;
 
 /**
  * A mapper which maps repository model to RESTful model representation and back.
  */
-@NoArgsConstructor(access = AccessLevel.PRIVATE)
+@Slf4j
+@Service
 public final class MgmtTargetMapper {
+
+    private final TargetTypeManagement<? extends TargetType> targetTypeManagement;
+
+    MgmtTargetMapper(final TargetTypeManagement<? extends TargetType> targetTypeManagement) {
+        this.targetTypeManagement = targetTypeManagement;
+    }
 
     /**
      * Add links to a target response.
@@ -70,24 +81,24 @@ public final class MgmtTargetMapper {
      */
     public static void addTargetLinks(final MgmtTarget response) {
         response.add(linkTo(methodOn(MgmtTargetRestApi.class).getAssignedDistributionSet(response.getControllerId()))
-                .withRel(MgmtRestConstants.TARGET_V1_ASSIGNED_DISTRIBUTION_SET).expand());
+                .withRel("assignedDS").expand());
         response.add(linkTo(methodOn(MgmtTargetRestApi.class).getInstalledDistributionSet(response.getControllerId()))
-                .withRel(MgmtRestConstants.TARGET_V1_INSTALLED_DISTRIBUTION_SET).expand());
+                .withRel("installedDS").expand());
         response.add(linkTo(methodOn(MgmtTargetRestApi.class).getAttributes(response.getControllerId()))
-                .withRel(MgmtRestConstants.TARGET_V1_ATTRIBUTES).expand());
+                .withRel("attributes").expand());
         response.add(linkTo(methodOn(MgmtTargetRestApi.class).getActionHistory(response.getControllerId(), null, 0,
                 MgmtRestConstants.REQUEST_PARAMETER_PAGING_DEFAULT_LIMIT_VALUE,
-                ActionFields.ID.getJpaEntityFieldName() + ":" + SortDirection.DESC))
-                .withRel(MgmtRestConstants.TARGET_V1_ACTIONS).expand());
+                ActionFields.ID.getName() + ":" + SortDirection.DESC))
+                .withRel(MgmtTarget.TARGET_V1_ACTIONS).expand());
         response.add(linkTo(methodOn(MgmtTargetRestApi.class).getMetadata(response.getControllerId()))
                 .withRel("metadata").expand());
         if (response.getTargetType() != null) {
             response.add(linkTo(methodOn(MgmtTargetTypeRestApi.class).getTargetType(response.getTargetType()))
-                    .withRel(MgmtRestConstants.TARGET_V1_ASSIGNED_TARGET_TYPE).expand());
+                    .withRel(MgmtTarget.TARGET_TYPE).expand());
         }
         if (response.getAutoConfirmActive() != null) {
             response.add(linkTo(methodOn(MgmtTargetRestApi.class).getAutoConfirmStatus(response.getControllerId()))
-                    .withRel(MgmtRestConstants.TARGET_V1_AUTO_CONFIRM).expand());
+                    .withRel(MgmtTarget.AUTO_CONFIRM).expand());
         }
     }
 
@@ -99,39 +110,25 @@ public final class MgmtTargetMapper {
             response.setInitiator(status.getInitiator());
             response.setRemark(status.getRemark());
             response.add(linkTo(methodOn(MgmtTargetRestApi.class).deactivateAutoConfirm(target.getControllerId()))
-                    .withRel(MgmtRestConstants.TARGET_V1_DEACTIVATE_AUTO_CONFIRM).expand());
+                    .withRel(MgmtTargetAutoConfirm.DEACTIVATE).expand());
         } else {
             response = MgmtTargetAutoConfirm.disabled();
             response.add(linkTo(methodOn(MgmtTargetRestApi.class).activateAutoConfirm(target.getControllerId(), null))
-                    .withRel(MgmtRestConstants.TARGET_V1_ACTIVATE_AUTO_CONFIRM).expand());
+                    .withRel(MgmtTargetAutoConfirm.ACTIVATE).expand());
         }
         return response;
     }
 
-    /**
-     * Create a response for targets.
-     *
-     * @param targets list of targets
-     * @return the response
-     */
-    public static List<MgmtTarget> toResponse(final Collection<Target> targets, final TenantConfigHelper configHelper) {
+    public static List<MgmtTarget> toResponse(final Collection<? extends Target> targets) {
         if (targets == null) {
             return Collections.emptyList();
         }
 
-        final Function<Target, PollStatus> pollStatusResolver = configHelper.pollStatusResolver();
-        return new ResponseList<>(
-                targets.stream().map(target -> toResponse(target, configHelper, pollStatusResolver)).toList());
+        final Function<Target, PollStatus> pollStatusResolver = TenantConfigHelper.pollStatusResolver();
+        return new ResponseList<>(targets.stream().map(target -> toResponse(target, pollStatusResolver)).toList());
     }
 
-    /**
-     * Create a response for target.
-     *
-     * @param target the target
-     * @return the response
-     */
-    public static MgmtTarget toResponse(
-            final Target target, final TenantConfigHelper configHelper, final Function<Target, PollStatus> pollStatusResolver) {
+    public static MgmtTarget toResponse(final Target target, final Function<Target, PollStatus> pollStatusResolver) {
         if (target == null) {
             return null;
         }
@@ -140,13 +137,19 @@ public final class MgmtTargetMapper {
         targetRest.setDescription(target.getDescription());
         targetRest.setName(target.getName());
         targetRest.setUpdateStatus(target.getUpdateStatus().name().toLowerCase());
+        targetRest.setGroup(target.getGroup());
 
-        final URI address = target.getAddress();
+        final String address = target.getAddress();
         if (address != null) {
-            if (IpUtil.isIpAddresKnown(address)) {
-                targetRest.setIpAddress(address.getHost());
+            try {
+                final URI addressURI = new URI(address);
+                if (IpUtil.isIpAddresKnown(addressURI)) {
+                    targetRest.setIpAddress(addressURI.getHost());
+                }
+            } catch (final URISyntaxException e) {
+                log.warn("Fail to parse address to URI: {}", e.getMessage());
             }
-            targetRest.setAddress(address.toString());
+            targetRest.setAddress(address);
         }
 
         targetRest.setCreatedBy(target.getCreatedBy());
@@ -172,23 +175,24 @@ public final class MgmtTargetMapper {
             targetRest.setTargetType(target.getTargetType().getId());
             targetRest.setTargetTypeName(target.getTargetType().getName());
         }
-        if (configHelper.isConfirmationFlowEnabled()) {
+
+        if (TenantConfigHelper.isUserConfirmationFlowEnabled()) {
             targetRest.setAutoConfirmActive(target.getAutoConfirmationStatus() != null);
         }
 
         targetRest.add(linkTo(methodOn(MgmtTargetRestApi.class).getTarget(target.getControllerId())).withSelfRel().expand());
 
-        addPollStatus(target, targetRest, pollStatusResolver == null ? configHelper.pollStatusResolver() : pollStatusResolver);
+        addPollStatus(target, targetRest, pollStatusResolver == null ? TenantConfigHelper.pollStatusResolver() : pollStatusResolver);
 
         return targetRest;
     }
 
-    public static List<TargetCreate> fromRequest(final EntityFactory entityFactory, final Collection<MgmtTargetRequestBody> targetsRest) {
+    public List<Create> fromRequest(final Collection<MgmtTargetRequestBody> targetsRest) {
         if (targetsRest == null) {
             return Collections.emptyList();
         }
 
-        return targetsRest.stream().map(targetRest -> fromRequest(entityFactory, targetRest)).toList();
+        return targetsRest.stream().map(this::fromRequest).toList();
     }
 
     public static Map<String, String> fromRequestMetadata(final List<MgmtMetadata> metadata) {
@@ -222,14 +226,8 @@ public final class MgmtTargetMapper {
         action.getWeight().ifPresent(result::setWeight);
         result.setForceType(MgmtRestModelMapper.convertActionType(action.getActionType()));
 
-        if (action.isActive()) {
-            result.setStatus(MgmtAction.ACTION_PENDING);
-        } else {
-            result.setStatus(MgmtAction.ACTION_FINISHED);
-        }
-
-        result.setDetailStatus(action.getStatus().toString().toLowerCase());
-
+        result.setActive(action.isActive());
+        result.setStatus(action.getStatus().toString().toLowerCase());
         action.getLastActionStatusCode().ifPresent(result::setLastStatusCode);
 
         final Rollout rollout = action.getRollout();
@@ -265,7 +263,7 @@ public final class MgmtTargetMapper {
 
         if (action.isCancelingOrCanceled()) {
             result.add(linkTo(methodOn(MgmtTargetRestApi.class).getAction(controllerId, action.getId()))
-                    .withRel(MgmtRestConstants.TARGET_V1_CANCELED_ACTION).expand());
+                    .withRel("canceledaction").expand());
         }
 
         result.add(linkTo(methodOn(MgmtTargetRestApi.class).getTarget(controllerId)).withRel("target")
@@ -278,13 +276,13 @@ public final class MgmtTargetMapper {
 
         result.add(linkTo(methodOn(MgmtTargetRestApi.class).getActionStatusList(controllerId, action.getId(), 0,
                 MgmtRestConstants.REQUEST_PARAMETER_PAGING_DEFAULT_LIMIT_VALUE,
-                ActionStatusFields.ID.getJpaEntityFieldName() + ":" + SortDirection.DESC))
-                .withRel(MgmtRestConstants.TARGET_V1_ACTION_STATUS).expand());
+                ActionStatusFields.ID.getName() + ":" + SortDirection.DESC))
+                .withRel(MgmtTarget.TARGET_V1_ACTION_STATUS).expand());
 
         final Rollout rollout = action.getRollout();
         if (rollout != null) {
             result.add(linkTo(methodOn(MgmtRolloutRestApi.class).getRollout(rollout.getId()))
-                    .withRel(MgmtRestConstants.TARGET_V1_ROLLOUT).withName(rollout.getName()).expand());
+                    .withRel("rollout").withName(rollout.getName()).expand());
         }
 
         return result;
@@ -314,18 +312,26 @@ public final class MgmtTargetMapper {
         if (pollStatus != null) {
             final MgmtPollStatus pollStatusRest = new MgmtPollStatus();
             pollStatusRest.setLastRequestAt(
-                    Date.from(pollStatus.getLastPollDate().atZone(ZoneId.systemDefault()).toInstant()).getTime());
+                    Date.from(pollStatus.lastPollDate().atZone(ZoneId.systemDefault()).toInstant()).getTime());
             pollStatusRest.setNextExpectedRequestAt(
-                    Date.from(pollStatus.getNextPollDate().atZone(ZoneId.systemDefault()).toInstant()).getTime());
+                    Date.from(pollStatus.nextPollDate().atZone(ZoneId.systemDefault()).toInstant()).getTime());
             pollStatusRest.setOverdue(pollStatus.isOverdue());
             targetRest.setPollStatus(pollStatusRest);
         }
     }
 
-    private static TargetCreate fromRequest(final EntityFactory entityFactory, final MgmtTargetRequestBody targetRest) {
-        return entityFactory.target().create().controllerId(targetRest.getControllerId()).name(targetRest.getName())
+    private Create fromRequest(final MgmtTargetRequestBody targetRest) {
+        return Create.builder()
+                .controllerId(targetRest.getControllerId()).name(targetRest.getName())
                 .description(targetRest.getDescription()).securityToken(targetRest.getSecurityToken())
-                .address(targetRest.getAddress()).targetType(targetRest.getTargetType());
+                .address(targetRest.getAddress())
+                .targetType(Optional.ofNullable(targetRest.getTargetType())
+                        .map(targetTypeId -> targetTypeManagement.find(targetTypeId)
+                                .orElseThrow(() -> new EntityNotFoundException(TargetType.class, targetTypeId)))
+                        .map(TargetType.class::cast)
+                        .orElse(null))
+                .group(targetRest.getGroup())
+                .build();
     }
 
     private static String getType(final Action action) {
@@ -343,9 +349,9 @@ public final class MgmtTargetMapper {
 
         result.setMessages(messages);
         result.setReportedAt(actionStatus.getCreatedAt());
-        result.setTimestamp(actionStatus.getOccurredAt());
+        result.setTimestamp(actionStatus.getTimestamp());
         result.setId(actionStatus.getId());
-        result.setType(actionStatus.getStatus().name().toLowerCase());
+        result.setType(MgmtActionStatus.Type.forValue(actionStatus.getStatus().name()));
         actionStatus.getCode().ifPresent(result::setCode);
 
         return result;

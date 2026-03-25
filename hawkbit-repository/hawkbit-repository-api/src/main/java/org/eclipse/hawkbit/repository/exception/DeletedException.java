@@ -11,6 +11,8 @@ package org.eclipse.hawkbit.repository.exception;
 
 import java.io.Serial;
 
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import org.eclipse.hawkbit.exception.AbstractServerRtException;
 import org.eclipse.hawkbit.exception.SpServerError;
 import org.eclipse.hawkbit.repository.model.BaseEntity;
@@ -18,6 +20,8 @@ import org.eclipse.hawkbit.repository.model.BaseEntity;
 /**
  * Thrown if assignment quota is exceeded
  */
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
 public class DeletedException extends AbstractServerRtException {
 
     @Serial
@@ -25,9 +29,7 @@ public class DeletedException extends AbstractServerRtException {
 
     private static final SpServerError THIS_ERROR = SpServerError.SP_DELETED;
 
-    public DeletedException(
-            final Class<? extends BaseEntity> type, final Object entityId) {
-        super(type.getSimpleName() + " with given identifier {" + entityId + "} is soft-deleted!",
-                THIS_ERROR);
+    public DeletedException(final Class<? extends BaseEntity> type, final Object entityId) {
+        super(THIS_ERROR, type.getSimpleName() + " with given identifier {" + entityId + "} is soft-deleted!");
     }
 }

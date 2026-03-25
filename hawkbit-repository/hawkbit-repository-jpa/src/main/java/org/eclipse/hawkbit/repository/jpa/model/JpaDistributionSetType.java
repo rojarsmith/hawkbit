@@ -9,9 +9,7 @@
  */
 package org.eclipse.hawkbit.repository.jpa.model;
 
-import java.io.Serial;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -19,10 +17,8 @@ import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.Index;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -33,7 +29,6 @@ import org.eclipse.hawkbit.repository.event.remote.entity.DistributionSetTypeCre
 import org.eclipse.hawkbit.repository.event.remote.entity.DistributionSetTypeUpdatedEvent;
 import org.eclipse.hawkbit.repository.model.DistributionSet;
 import org.eclipse.hawkbit.repository.model.DistributionSetType;
-import org.eclipse.hawkbit.repository.model.SoftwareModule;
 import org.eclipse.hawkbit.repository.model.SoftwareModuleType;
 
 /**
@@ -41,17 +36,10 @@ import org.eclipse.hawkbit.repository.model.SoftwareModuleType;
  */
 @NoArgsConstructor // Default constructor needed for JPA entities.
 @Entity
-@Table(name = "sp_distribution_set_type", indexes = {
-        @Index(name = "sp_idx_distribution_set_type_01", columnList = "tenant,deleted"),
-        @Index(name = "sp_idx_distribution_set_type_prim", columnList = "tenant,id") }, uniqueConstraints = {
-        @UniqueConstraint(columnNames = { "tenant", "type_key"}, name = "uk_sp_distribution_set_type_type_key"),
-        @UniqueConstraint(columnNames = { "tenant", "name" }, name = "uk_sp_distribution_set_type_name") })
+@Table(name = "sp_distribution_set_type")
 // exception squid:S2160 - BaseEntity equals/hashcode is handling correctly for sub entities
 @SuppressWarnings("squid:S2160")
 public class JpaDistributionSetType extends AbstractJpaTypeEntity implements DistributionSetType, EventAwareEntity {
-
-    @Serial
-    private static final long serialVersionUID = 1L;
 
     @OneToMany(
             mappedBy = "dsType", targetEntity = DistributionSetTypeElement.class,
@@ -88,29 +76,27 @@ public class JpaDistributionSetType extends AbstractJpaTypeEntity implements Dis
                 .collect(Collectors.toSet());
     }
 
-    @Override
-    public boolean checkComplete(final DistributionSet distributionSet) {
-        final List<SoftwareModuleType> smTypes = distributionSet.getModules().stream()
-                .map(SoftwareModule::getType)
-                .distinct()
-                .toList();
-        return !smTypes.isEmpty() && new HashSet<>(smTypes).containsAll(getMandatoryModuleTypes());
+    public JpaDistributionSetType setMandatoryModuleTypes(final Set<SoftwareModuleType> smType) {
+        return replaceOrAddModuleTypes(smType, true, true);
     }
 
-    public JpaDistributionSetType addOptionalModuleType(final SoftwareModuleType smType) {
-        return setModuleType(smType, false);
+    public JpaDistributionSetType setOptionalModuleTypes(final Set<SoftwareModuleType> smType) {
+        return replaceOrAddModuleTypes(smType, false, true);
     }
 
     public JpaDistributionSetType addMandatoryModuleType(final SoftwareModuleType smType) {
-        return setModuleType(smType, true);
+        return replaceOrAddModuleTypes(Set.of(smType), true, false);
     }
 
-    public JpaDistributionSetType removeModuleType(final Long smTypeId) {
-        // we search by id (standard equals compares also revision)
+    public JpaDistributionSetType addOptionalModuleType(final SoftwareModuleType smType) {
+        return replaceOrAddModuleTypes(Set.of(smType), false, false);
+    }
+
+    public JpaDistributionSetType removeModuleType(final SoftwareModuleType smType) {
         elements.stream()
-                .filter(element -> element.getSmType().getId().equals(smTypeId))
-                .findAny()
-                .ifPresent(elements::remove);
+                .filter(element -> smType.getId().equals(element.getSmType().getId()))
+                .toList() // collect to a list to avoid ConcurrentModificationException
+                .forEach(element -> elements.remove(element));
         return this;
     }
 
@@ -135,20 +121,31 @@ public class JpaDistributionSetType extends AbstractJpaTypeEntity implements Dis
                 .publishEvent(new DistributionSetTypeDeletedEvent(getTenant(), getId(), getClass()));
     }
 
-    private JpaDistributionSetType setModuleType(final SoftwareModuleType smType, final boolean mandatory) {
+    private JpaDistributionSetType replaceOrAddModuleTypes(final Set<SoftwareModuleType> smTypes, final boolean mandatory,
+            final boolean replace) {
+        if (smTypes == null) {
+            return this; // do not change
+        }
+
         if (elements.isEmpty()) {
-            elements.add(new DistributionSetTypeElement(this, (JpaSoftwareModuleType) smType, mandatory));
+            smTypes.forEach(smType -> elements.add(new DistributionSetTypeElement(this, (JpaSoftwareModuleType) smType, mandatory)));
             return this;
         }
 
-        // check if this was in the list before
-        elements.stream()
-                .filter(element -> element.getSmType().getKey().equals(smType.getKey()))
-                .findAny()
-                .ifPresentOrElse(
-                        element -> element.setMandatory(mandatory),
-                        () -> elements.add(new DistributionSetTypeElement(this, (JpaSoftwareModuleType) smType, mandatory)));
+        smTypes.stream()
+                .filter(smType -> !elements.contains(new DistributionSetTypeElement(this, (JpaSoftwareModuleType) smType, mandatory)))
+                .collect(Collectors.toSet())
+                .forEach(smType -> elements.add(new DistributionSetTypeElement(this, (JpaSoftwareModuleType) smType, mandatory)));
 
+        if (replace) {
+            final Set<Long> smTypeIds = smTypes.stream()
+                    .map(SoftwareModuleType::getId)
+                    .collect(Collectors.toSet());
+            elements.stream()
+                    .filter(element -> element.isMandatory() == mandatory && !smTypeIds.contains(element.getSmType().getId()))
+                    .collect(Collectors.toSet())
+                    .forEach(element -> elements.remove(element));
+        }
         return this;
     }
 }

@@ -10,48 +10,37 @@
 package org.eclipse.hawkbit.amqp;
 
 import java.sql.SQLException;
-import java.time.Duration;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Pattern;
 
 import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
-import org.eclipse.hawkbit.artifact.repository.urlhandler.ArtifactUrlHandler;
-import org.eclipse.hawkbit.dmf.amqp.api.AmqpSettings;
+import org.eclipse.hawkbit.artifact.urlresolver.ArtifactUrlResolver;
 import org.eclipse.hawkbit.repository.ConfirmationManagement;
 import org.eclipse.hawkbit.repository.ControllerManagement;
 import org.eclipse.hawkbit.repository.DeploymentManagement;
 import org.eclipse.hawkbit.repository.DistributionSetManagement;
-import org.eclipse.hawkbit.repository.EntityFactory;
 import org.eclipse.hawkbit.repository.SoftwareModuleManagement;
 import org.eclipse.hawkbit.repository.SystemManagement;
 import org.eclipse.hawkbit.repository.TargetManagement;
-import org.eclipse.hawkbit.repository.TenantConfigurationManagement;
-import org.eclipse.hawkbit.security.SystemSecurityContext;
-import org.springframework.amqp.core.Binding;
-import org.springframework.amqp.core.BindingBuilder;
-import org.springframework.amqp.core.FanoutExchange;
-import org.springframework.amqp.core.Queue;
-import org.springframework.amqp.core.QueueBuilder;
+import org.eclipse.hawkbit.repository.model.DistributionSet;
+import org.eclipse.hawkbit.repository.model.SoftwareModule;
+import org.eclipse.hawkbit.repository.model.Target;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
-import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.listener.ConditionalRejectingErrorHandler;
 import org.springframework.amqp.rabbit.listener.FatalExceptionStrategy;
 import org.springframework.amqp.rabbit.listener.RabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.amqp.SimpleRabbitListenerContainerFactoryConfigurer;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.cloud.bus.ServiceMatcher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.PropertySource;
 import org.springframework.retry.backoff.ExponentialBackOffPolicy;
 import org.springframework.retry.support.RetryTemplate;
@@ -62,28 +51,20 @@ import org.springframework.util.ErrorHandler;
  */
 @Slf4j
 @ComponentScan
-@EnableConfigurationProperties({ AmqpProperties.class, AmqpDeadletterProperties.class })
+@Import(DmfAmqpDeclarationConfiguration.class)
+@EnableConfigurationProperties(AmqpProperties.class)
 @ConditionalOnProperty(prefix = "hawkbit.dmf", name = "enabled", matchIfMissing = true)
 @PropertySource("classpath:/hawkbit-dmf-defaults.properties")
 public class DmfApiConfiguration {
 
     private final AmqpProperties amqpProperties;
-    private final AmqpDeadletterProperties amqpDeadletterProperties;
     private final ConnectionFactory rabbitConnectionFactory;
 
-    private ServiceMatcher serviceMatcher;
-
     public DmfApiConfiguration(
-            final AmqpProperties amqpProperties, final AmqpDeadletterProperties amqpDeadletterProperties,
+            final AmqpProperties amqpProperties,
             final ConnectionFactory rabbitConnectionFactory) {
         this.amqpProperties = amqpProperties;
-        this.amqpDeadletterProperties = amqpDeadletterProperties;
         this.rabbitConnectionFactory = rabbitConnectionFactory;
-    }
-
-    @Autowired(required = false) // spring setter injection
-    public void setServiceMatcher(final ServiceMatcher serviceMatcher) {
-        this.serviceMatcher = serviceMatcher;
     }
 
     @Bean
@@ -104,19 +85,6 @@ public class DmfApiConfiguration {
             final List<FatalExceptionStrategy> fatalExceptionStrategies,
             @Value("${hawkbit.dmf.rabbitmq.fatal-exception-types:}") final List<String> fatalExceptionTypes) {
         return new ConditionalRejectingErrorHandler(new RequeueExceptionStrategy(fatalExceptionStrategies, fatalExceptionTypes));
-    }
-
-    /**
-     * Create a {@link RabbitAdmin} and ignore declaration exceptions.
-     * {@link RabbitAdmin#setIgnoreDeclarationExceptions(boolean)}
-     *
-     * @return the bean
-     */
-    @Bean
-    public RabbitAdmin rabbitAdmin() {
-        final RabbitAdmin rabbitAdmin = new RabbitAdmin(rabbitConnectionFactory);
-        rabbitAdmin.setIgnoreDeclarationExceptions(true);
-        return rabbitAdmin;
     }
 
     /**
@@ -143,90 +111,11 @@ public class DmfApiConfiguration {
     }
 
     /**
-     * Create the DMF API receiver queue for retrieving DMF messages.
-     *
-     * @return the receiver queue
-     */
-    @Bean
-    public Queue dmfReceiverQueue() {
-        return new Queue(
-                amqpProperties.getReceiverQueue(),
-                true, false, false,
-                amqpDeadletterProperties.getDeadLetterExchangeArgs(amqpProperties.getDeadLetterExchange()));
-    }
-
-    /**
-     * Create the DMF API receiver queue for authentication requests called by 3rd
-     * party artifact storages for download authorization by devices.
-     *
-     * @return the receiver queue
-     */
-    @Bean
-    public Queue authenticationReceiverQueue() {
-        return QueueBuilder.nonDurable(amqpProperties.getAuthenticationReceiverQueue())
-                .autoDelete()
-                .withArguments(getTTLMaxArgsAuthenticationQueue())
-                .build();
-    }
-
-    /**
-     * Create DMF exchange.
-     *
-     * @return the fanout exchange
-     */
-    @Bean
-    public FanoutExchange dmfSenderExchange() {
-        return new FanoutExchange(AmqpSettings.DMF_EXCHANGE);
-    }
-
-    /**
-     * Create the Binding {@link DmfApiConfiguration#dmfReceiverQueue()} to
-     * {@link DmfApiConfiguration#dmfSenderExchange()}.
-     *
-     * @return the binding and create the queue and exchange
-     */
-    @Bean
-    public Binding bindDmfSenderExchangeToDmfQueue() {
-        return BindingBuilder.bind(dmfReceiverQueue()).to(dmfSenderExchange());
-    }
-
-    /**
-     * Create dead letter queue.
-     *
-     * @return the queue
-     */
-    @Bean
-    public Queue deadLetterQueue() {
-        return amqpDeadletterProperties.createDeadletterQueue(amqpProperties.getDeadLetterQueue());
-    }
-
-    /**
-     * Create the dead letter fanout exchange.
-     *
-     * @return the fanout exchange
-     */
-    @Bean
-    public FanoutExchange deadLetterExchange() {
-        return new FanoutExchange(amqpProperties.getDeadLetterExchange());
-    }
-
-    /**
-     * Create the Binding deadLetterQueue to deadLetterExchange.
-     *
-     * @return the binding
-     */
-    @Bean
-    public Binding bindDeadLetterQueueToDeadLetterExchange() {
-        return BindingBuilder.bind(deadLetterQueue()).to(deadLetterExchange());
-    }
-
-    /**
      * Create AMQP handler service bean.
      *
      * @param rabbitTemplate for converting messages
      * @param amqpMessageDispatcherService to sending events to DMF client
      * @param controllerManagement for target repo access
-     * @param entityFactory to create entities
      * @return handler service bean
      */
     @Bean
@@ -234,13 +123,10 @@ public class DmfApiConfiguration {
     public AmqpMessageHandlerService amqpMessageHandlerService(
             final RabbitTemplate rabbitTemplate,
             final AmqpMessageDispatcherService amqpMessageDispatcherService,
-            final ControllerManagement controllerManagement, final EntityFactory entityFactory,
-            final SystemSecurityContext systemSecurityContext,
-            final TenantConfigurationManagement tenantConfigurationManagement,
+            final ControllerManagement controllerManagement,
             final ConfirmationManagement confirmationManagement) {
         return new AmqpMessageHandlerService(
-                rabbitTemplate, amqpMessageDispatcherService, controllerManagement,
-                entityFactory, systemSecurityContext, tenantConfigurationManagement, confirmationManagement);
+                rabbitTemplate, amqpMessageDispatcherService, controllerManagement, confirmationManagement);
     }
 
     /**
@@ -273,21 +159,14 @@ public class DmfApiConfiguration {
     @ConditionalOnMissingBean(AmqpMessageDispatcherService.class)
     AmqpMessageDispatcherService amqpMessageDispatcherService(
             final RabbitTemplate rabbitTemplate,
-            final AmqpMessageSenderService amqpSenderService, final ArtifactUrlHandler artifactUrlHandler,
-            final SystemSecurityContext systemSecurityContext, final SystemManagement systemManagement,
-            final TargetManagement targetManagement, final DistributionSetManagement distributionSetManagement,
-            final SoftwareModuleManagement softwareModuleManagement, final DeploymentManagement deploymentManagement,
-            final TenantConfigurationManagement tenantConfigurationManagement) {
+            final AmqpMessageSenderService amqpSenderService, final ArtifactUrlResolver artifactUrlHandler,
+            final SystemManagement systemManagement,
+            final TargetManagement<? extends Target> targetManagement,
+            final DistributionSetManagement<? extends DistributionSet> distributionSetManagement,
+            final SoftwareModuleManagement<? extends SoftwareModule> softwareModuleManagement, final DeploymentManagement deploymentManagement) {
         return new AmqpMessageDispatcherService(rabbitTemplate, amqpSenderService, artifactUrlHandler,
-                systemSecurityContext, systemManagement, targetManagement, serviceMatcher, distributionSetManagement,
-                softwareModuleManagement, deploymentManagement, tenantConfigurationManagement);
-    }
-
-    private static Map<String, Object> getTTLMaxArgsAuthenticationQueue() {
-        final Map<String, Object> args = new HashMap<>(2);
-        args.put("x-message-ttl", Duration.ofSeconds(30).toMillis());
-        args.put("x-max-length", 1_000);
-        return args;
+                systemManagement, targetManagement, softwareModuleManagement, distributionSetManagement,
+                deploymentManagement);
     }
 
     @ToString
@@ -324,4 +203,5 @@ public class DmfApiConfiguration {
             return false;
         }
     }
+
 }

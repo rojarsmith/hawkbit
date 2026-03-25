@@ -11,30 +11,25 @@ package org.eclipse.hawkbit.repository.exception;
 
 import java.io.Serial;
 
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import org.eclipse.hawkbit.repository.model.DistributionSetType;
 import org.eclipse.hawkbit.repository.model.SoftwareModuleType;
 
 /**
- * the {@link SoftwareModuleTypeNotInDistributionSetTypeException} is thrown
- * when a {@link SoftwareModuleType} is requested as part of a
- * {@link DistributionSetType} but actually neither
- * {@link DistributionSetType#getMandatoryModuleTypes()} or
+ * The {@link SoftwareModuleTypeNotInDistributionSetTypeException} is thrown when a {@link SoftwareModuleType} is requested as part of a
+ * {@link DistributionSetType} but actually neither {@link DistributionSetType#getMandatoryModuleTypes()} or
  * {@link DistributionSetType#getOptionalModuleTypes()}.
  */
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
 public class SoftwareModuleTypeNotInDistributionSetTypeException extends EntityNotFoundException {
 
     @Serial
     private static final long serialVersionUID = 1L;
 
-    /**
-     * Constructor
-     *
-     * @param moduleTypeId that is not part of given {@link DistributionSetType}
-     * @param distributionSetTypeId of the {@link DistributionSetType} where given {@link SoftwareModuleType} is not part of
-     */
-    public SoftwareModuleTypeNotInDistributionSetTypeException(final Long moduleTypeId,
-            final Long distributionSetTypeId) {
-        super(SoftwareModuleType.class.getSimpleName() + " with id {" + moduleTypeId + "} is not part of "
-                + DistributionSetType.class.getSimpleName() + " with id {" + distributionSetTypeId + "}.");
+    public SoftwareModuleTypeNotInDistributionSetTypeException(final Long moduleTypeId, final Long distributionSetTypeId) {
+        super(SoftwareModuleType.class.getSimpleName() + " with id {" + moduleTypeId + "} is not part of " +
+                DistributionSetType.class.getSimpleName() + " with id {" + distributionSetTypeId + "}.");
     }
 }

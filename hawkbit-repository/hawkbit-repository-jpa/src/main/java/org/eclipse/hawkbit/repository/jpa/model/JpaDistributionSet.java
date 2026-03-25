@@ -9,22 +9,19 @@
  */
 package org.eclipse.hawkbit.repository.jpa.model;
 
-import java.io.Serial;
-import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
-import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.ForeignKey;
-import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
@@ -33,7 +30,6 @@ import jakarta.persistence.MapKeyColumn;
 import jakarta.persistence.NamedAttributeNode;
 import jakarta.persistence.NamedEntityGraph;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.NotNull;
 
 import lombok.Getter;
@@ -45,14 +41,15 @@ import org.eclipse.hawkbit.repository.event.remote.DistributionSetDeletedEvent;
 import org.eclipse.hawkbit.repository.event.remote.entity.DistributionSetCreatedEvent;
 import org.eclipse.hawkbit.repository.event.remote.entity.DistributionSetUpdatedEvent;
 import org.eclipse.hawkbit.repository.exception.DistributionSetTypeUndefinedException;
-import org.eclipse.hawkbit.repository.exception.IncompleteDistributionSetException;
 import org.eclipse.hawkbit.repository.exception.LockedException;
 import org.eclipse.hawkbit.repository.exception.UnsupportedSoftwareModuleForThisDistributionSetException;
 import org.eclipse.hawkbit.repository.model.DistributionSet;
 import org.eclipse.hawkbit.repository.model.DistributionSetTag;
 import org.eclipse.hawkbit.repository.model.DistributionSetType;
 import org.eclipse.hawkbit.repository.model.SoftwareModule;
+import org.eclipse.hawkbit.repository.model.SoftwareModuleType;
 import org.springframework.context.ApplicationEvent;
+import org.springframework.core.annotation.Order;
 
 /**
  * Jpa implementation of {@link DistributionSet}.
@@ -61,68 +58,45 @@ import org.springframework.context.ApplicationEvent;
 @Getter
 @ToString(callSuper = true)
 @Entity
-@Table(name = "sp_distribution_set",
-        uniqueConstraints = { @UniqueConstraint(columnNames = { "name", "version", "tenant" }, name = "uk_distribution_set") },
-        indexes = {
-                @Index(name = "sp_idx_distribution_set_01", columnList = "tenant,deleted,complete"),
-                @Index(name = "sp_idx_distribution_set_prim", columnList = "tenant,id") })
+@Table(name = "sp_distribution_set")
 @NamedEntityGraph(name = "DistributionSet.detail",
         attributeNodes = { @NamedAttributeNode("modules"), @NamedAttributeNode("tags"), @NamedAttributeNode("type") })
 // exception squid:S2160 - BaseEntity equals/hashcode is handling correctly for sub entities
 @SuppressWarnings("squid:S2160")
-public class JpaDistributionSet extends AbstractJpaNamedVersionedEntity implements DistributionSet, EventAwareEntity {
+public class JpaDistributionSet
+        extends AbstractJpaNamedVersionedEntity
+        implements DistributionSet, WithMetadata<String, String>, EventAwareEntity {
 
-    @Serial
-    private static final long serialVersionUID = 1L;
-
-    @Setter
     @ManyToOne(fetch = FetchType.LAZY, optional = false, targetEntity = JpaDistributionSetType.class)
-    @JoinColumn(
-            name = "ds_type", nullable = false, updatable = false,
-            foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_distribution_set_ds_type"))
+    @JoinColumn(name = "ds_type", nullable = false, updatable = false)
     @NotNull
     private DistributionSetType type;
 
     @ManyToMany(targetEntity = JpaSoftwareModule.class, fetch = FetchType.LAZY)
     @JoinTable(
             name = "sp_ds_sm",
-            joinColumns = {
-                    @JoinColumn(
-                            name = "ds_id", nullable = false,
-                            foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_ds_sm_ds_id")) },
-            inverseJoinColumns = {
-                    @JoinColumn(
-                            name = "sm_id", nullable = false,
-                            foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_ds_sm_sm_id")) })
-    private Set<SoftwareModule> modules = new HashSet<>();
+            joinColumns = { @JoinColumn(name = "ds_id", nullable = false) },
+            inverseJoinColumns = { @JoinColumn(name = "sm_id", nullable = false) })
+    private Set<JpaSoftwareModule> modules = new HashSet<>();
 
     @ManyToMany(targetEntity = JpaDistributionSetTag.class)
     @JoinTable(
             name = "sp_ds_tag",
-            joinColumns = {
-                    @JoinColumn(
-                            name = "ds", nullable = false,
-                            foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_ds_tag_ds")) },
-            inverseJoinColumns = {
-                    @JoinColumn(
-                            name = "tag", nullable = false,
-                            foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_ds_tag_tag")) })
-    private Set<DistributionSetTag> tags = new HashSet<>();
+            joinColumns = { @JoinColumn(name = "ds", nullable = false) },
+            inverseJoinColumns = { @JoinColumn(name = "tag", nullable = false) })
+    private Set<JpaDistributionSetTag> tags = new HashSet<>();
 
     // no cascade option on an ElementCollection, the target objects are always persisted, merged, removed with their parent
     @Getter
     @ElementCollection
     @CollectionTable(
             name = "sp_ds_metadata",
-            joinColumns = { @JoinColumn(name = "ds", nullable = false) },
-            foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_ds_metadata_ds"))
+            joinColumns = { @JoinColumn(name = "ds", nullable = false) })
     @MapKeyColumn(name = "meta_key", length = DistributionSet.METADATA_MAX_KEY_SIZE)
     @Column(name = "meta_value", length = DistributionSet.METADATA_MAX_VALUE_SIZE)
-    private Map<String, String> metadata;
+    private Map<String, String> metadata = new HashMap<>();
 
-    @Column(name = "complete")
-    private boolean complete;
-
+    @Setter
     @Column(name = "locked")
     private boolean locked;
 
@@ -133,32 +107,12 @@ public class JpaDistributionSet extends AbstractJpaNamedVersionedEntity implemen
     @Column(name = "valid")
     private boolean valid;
 
-    @Setter
     @Column(name = "required_migration_step")
     private boolean requiredMigrationStep;
 
-    public JpaDistributionSet(
-            final String name, final String version, final String description,
-            final DistributionSetType type, final Collection<SoftwareModule> moduleList,
-            final boolean requiredMigrationStep) {
-        super(name, version, description);
-
+    @Order(0)
+    public void setType(final DistributionSetType type) {
         this.type = type;
-        // modules shall be set before type.checkComplete call
-        if (moduleList != null) {
-            moduleList.forEach(this::addModule);
-        }
-        if (this.type != null) {
-            complete = this.type.checkComplete(this);
-        }
-
-        this.valid = true;
-        this.requiredMigrationStep = requiredMigrationStep;
-    }
-
-    public JpaDistributionSet(final String name, final String version, final String description,
-            final DistributionSetType type, final Collection<SoftwareModule> moduleList) {
-        this(name, version, description, type, moduleList, false);
     }
 
     @Override
@@ -166,30 +120,62 @@ public class JpaDistributionSet extends AbstractJpaNamedVersionedEntity implemen
         return Collections.unmodifiableSet(modules);
     }
 
-    public void addModule(final SoftwareModule softwareModule) {
+    @SuppressWarnings("java:S1144") // used via reflection copy utils
+    private JpaDistributionSet setModules(final Set<JpaSoftwareModule> modules) {
+        if (modules == null) {
+            return this; // do not change
+        }
+
+        modules.forEach(this::addModule); // skip if already present
+        this.modules.stream().filter(module -> !modules.contains(module)).toList().forEach(this::removeModule);
+        return this;
+    }
+
+    @SuppressWarnings("java:S1144") // used via reflection copy utils
+    private void setRequiredMigrationStep(final boolean requiredMigrationStep) {
+        if (this.requiredMigrationStep != requiredMigrationStep) {
+            if (isLocked()) {
+                throw new LockedException(JpaDistributionSet.class, getId(), "CHANGE_REQUIRED_MIGRATION_STEP");
+            }
+
+            this.requiredMigrationStep = requiredMigrationStep;
+        }
+    }
+
+    @Override
+    public boolean isComplete() {
+        return Optional.ofNullable(type).map(dsType -> {
+            if (getModules().stream().anyMatch(module -> !module.isComplete())) {
+                return false; // incomplete module
+            }
+            final List<SoftwareModuleType> smTypes = getModules().stream()
+                    .map(SoftwareModule::getType)
+                    .distinct()
+                    .toList();
+            return !smTypes.isEmpty() && new HashSet<>(smTypes).containsAll(dsType.getMandatoryModuleTypes());
+        }).orElse(true);
+    }
+
+    public void addModule(final JpaSoftwareModule softwareModule) {
         if (isLocked()) {
             throw new LockedException(JpaDistributionSet.class, getId(), "ADD_SOFTWARE_MODULE");
         }
 
         checkTypeCompatability(softwareModule);
 
-        final Optional<SoftwareModule> found = modules.stream()
+        final Optional<JpaSoftwareModule> found = modules.stream()
                 .filter(module -> module.getId().equals(softwareModule.getId())).findAny();
-
         if (found.isPresent()) {
             return;
         }
 
         final long already = modules.stream().filter(module -> module.getType().getKey().equals(softwareModule.getType().getKey())).count();
-
         if (already >= softwareModule.getType().getMaxAssignments()) {
             modules.stream().filter(module -> module.getType().getKey().equals(softwareModule.getType().getKey()))
                     .findAny().ifPresent(modules::remove);
         }
 
-        if (modules.add(softwareModule)) {
-            complete = type.checkComplete(this);
-        }
+        modules.add(softwareModule);
     }
 
     public void removeModule(final SoftwareModule softwareModule) {
@@ -197,8 +183,8 @@ public class JpaDistributionSet extends AbstractJpaNamedVersionedEntity implemen
             throw new LockedException(JpaDistributionSet.class, getId(), "REMOVE_SOFTWARE_MODULE");
         }
 
-        if (modules != null && modules.removeIf(m -> m.getId().equals(softwareModule.getId()))) {
-            complete = type.checkComplete(this);
+        if (modules != null) {
+            modules.removeIf(m -> m.getId().equals(softwareModule.getId()));
         }
     }
 
@@ -206,31 +192,17 @@ public class JpaDistributionSet extends AbstractJpaNamedVersionedEntity implemen
         return Collections.unmodifiableSet(tags);
     }
 
-    public boolean addTag(final DistributionSetTag tag) {
+    public void addTag(final JpaDistributionSetTag tag) {
         if (tags == null) {
             tags = new HashSet<>();
         }
-
-        return tags.add(tag);
+        tags.add(tag);
     }
 
-    public boolean removeTag(final DistributionSetTag tag) {
-        if (tags == null) {
-            return false;
+    public void removeTag(final JpaDistributionSetTag tag) {
+        if (tags != null) {
+            tags.remove(tag);
         }
-
-        return tags.remove(tag);
-    }
-
-    public void lock() {
-        if (!isComplete()) {
-            throw new IncompleteDistributionSetException("Could not be locked while incomplete!");
-        }
-        locked = true;
-    }
-
-    public void unlock() {
-        locked = false;
     }
 
     public void invalidate() {
@@ -239,14 +211,12 @@ public class JpaDistributionSet extends AbstractJpaNamedVersionedEntity implemen
 
     @Override
     public void fireCreateEvent() {
-        publishEventWithEventPublisher(
-                new DistributionSetCreatedEvent(this));
+        publishEventWithEventPublisher(new DistributionSetCreatedEvent(this));
     }
 
     @Override
     public void fireUpdateEvent() {
-        publishEventWithEventPublisher(
-                new DistributionSetUpdatedEvent(this, complete));
+        publishEventWithEventPublisher(new DistributionSetUpdatedEvent(this));
 
         if (deleted) {
             publishEventWithEventPublisher(new DistributionSetDeletedEvent(getTenant(), getId(), getClass()));

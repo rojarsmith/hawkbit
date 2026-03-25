@@ -11,9 +11,12 @@ package org.eclipse.hawkbit.repository.event.remote.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.Collections;
+import java.util.Set;
 import java.util.UUID;
 
+import org.eclipse.hawkbit.repository.DistributionSetManagement;
+import org.eclipse.hawkbit.repository.RolloutManagement.Create;
+import org.eclipse.hawkbit.repository.SoftwareModuleManagement;
 import org.eclipse.hawkbit.repository.model.DistributionSet;
 import org.eclipse.hawkbit.repository.model.Rollout;
 import org.eclipse.hawkbit.repository.model.RolloutGroup;
@@ -79,15 +82,22 @@ class RolloutGroupEventTest extends AbstractRemoteEntityEventTest<RolloutGroup> 
     protected RolloutGroup createEntity() {
         testdataFactory.createTarget(UUID.randomUUID().toString());
         final SoftwareModule module = softwareModuleManagement.create(
-                entityFactory.softwareModule().create().name("swm").version("2").description("desc").type("os"));
+                SoftwareModuleManagement.Create.builder()
+                        .type(softwareModuleTypeManagement.findByKey("os").orElseThrow())
+                        .name("swm").version("2").description("desc")
+                        .build());
         final DistributionSet ds = distributionSetManagement
-                .create(entityFactory.distributionSet().create().name("complete").version("2").description("complete")
-                        .type("os").modules(Collections.singletonList(module.getId())));
+                .create(DistributionSetManagement.Create.builder()
+                        .type(distributionSetTypeManagement.findByKey("os").orElseThrow())
+                        .name("complete").version("2").description("complete")
+                        .modules(Set.of(module))
+                        .build());
 
         final Rollout entity = rolloutManagement.create(
-                entityFactory.rollout().create().name("exampleRollout").targetFilterQuery("controllerId==*").distributionSetId(ds), 5,
-                false, new RolloutGroupConditionBuilder().withDefaults()
-                        .successCondition(RolloutGroupSuccessCondition.THRESHOLD, "10").build());
+                Create.builder().name("exampleRollout").targetFilterQuery("controllerId==*").distributionSet(ds).build(),
+                5,
+                false,
+                new RolloutGroupConditionBuilder().withDefaults().successCondition(RolloutGroupSuccessCondition.THRESHOLD, "10").build());
 
         return rolloutGroupManagement.findByRollout(entity.getId(), PAGE).getContent().get(0);
     }

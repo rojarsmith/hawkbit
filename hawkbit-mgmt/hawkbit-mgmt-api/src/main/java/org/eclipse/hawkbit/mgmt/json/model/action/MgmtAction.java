@@ -37,8 +37,8 @@ import org.eclipse.hawkbit.mgmt.json.model.distributionset.MgmtActionType;
           "lastModifiedBy" : "bumlux",
           "lastModifiedAt" : 1682408571265,
           "type" : "update",
+          "active" : false,
           "status" : "finished",
-          "detailStatus" : "finished",
           "rollout" : 1,
           "rolloutName" : "rollout",
           "_links" : {
@@ -74,24 +74,15 @@ public class MgmtAction extends MgmtBaseEntity {
      * API definition for action in canceling.
      */
     public static final String ACTION_CANCEL = "cancel";
-    /**
-     * API definition for action completed.
-     */
-    public static final String ACTION_FINISHED = "finished";
-    /**
-     * API definition for action still active.
-     */
-    public static final String ACTION_PENDING = "pending";
 
     @Schema(description = "ID of the action", example = "7")
     private Long id;
     @Schema(description = "Type of action", example = "update")
     private String type;
-    @Schema(description = "Status of action", example = "finished")
+    @Schema(description = "If acton is active")
+    private boolean active;
+    @Schema(description = "Status of action")
     private String status;
-
-    @Schema(description = "Detailed status of action", example = "finished")
-    private String detailStatus;
     @Schema(example = "1691065903238")
     private Long forceTime;
     private MgmtActionType forceType;
@@ -106,8 +97,7 @@ public class MgmtAction extends MgmtBaseEntity {
     @Schema(description = "The name of the rollout this action was created for", example = "rollout")
     private String rolloutName;
 
-    @Schema(description = "(Optional) Code provided as part of the last status update that was sent by the device.",
-            example = "200")
+    @Schema(description = "(Optional) Code provided as part of the last status update that was sent by the device.", example = "200")
     private Integer lastStatusCode;
 
     @Schema(description = "If created by external system this field contains the external reference for the action")

@@ -9,11 +9,12 @@
  */
 package org.eclipse.hawkbit.security.controller;
 
+import static org.eclipse.hawkbit.context.AccessContext.asTenant;
+import static org.eclipse.hawkbit.tenancy.configuration.TenantConfigurationProperties.TenantConfigurationKey.AUTHENTICATION_GATEWAY_SECURITY_TOKEN_ENABLED;
+import static org.eclipse.hawkbit.tenancy.configuration.TenantConfigurationProperties.TenantConfigurationKey.AUTHENTICATION_GATEWAY_SECURITY_TOKEN_KEY;
+
 import lombok.extern.slf4j.Slf4j;
-import org.eclipse.hawkbit.repository.TenantConfigurationManagement;
-import org.eclipse.hawkbit.security.SystemSecurityContext;
-import org.eclipse.hawkbit.tenancy.TenantAware;
-import org.eclipse.hawkbit.tenancy.configuration.TenantConfigurationProperties.TenantConfigurationKey;
+import org.eclipse.hawkbit.repository.helper.TenantConfigHelper;
 import org.slf4j.Logger;
 import org.springframework.security.core.Authentication;
 
@@ -29,23 +30,6 @@ public class GatewayTokenAuthenticator extends Authenticator.AbstractAuthenticat
 
     public static final String GATEWAY_SECURITY_TOKEN_AUTH_SCHEME = "GatewayToken ";
     private static final int OFFSET_GATEWAY_TOKEN = GATEWAY_SECURITY_TOKEN_AUTH_SCHEME.length();
-
-    private final TenantAware.TenantRunner<String> gatewaySecurityTokenKeyConfigRunner;
-
-    public GatewayTokenAuthenticator(
-            final TenantConfigurationManagement tenantConfigurationManagement, final TenantAware tenantAware,
-            final SystemSecurityContext systemSecurityContext) {
-        super(tenantConfigurationManagement, tenantAware, systemSecurityContext);
-        gatewaySecurityTokenKeyConfigRunner = () -> {
-            log.trace("retrieving configuration value for configuration key {}",
-                    TenantConfigurationKey.AUTHENTICATION_MODE_GATEWAY_SECURITY_TOKEN_KEY);
-
-            return systemSecurityContext
-                    .runAsSystem(() -> tenantConfigurationManagement
-                            .getConfigurationValue(TenantConfigurationKey.AUTHENTICATION_MODE_GATEWAY_SECURITY_TOKEN_KEY, String.class)
-                            .getValue());
-        };
-    }
 
     @Override
     public Authentication authenticate(final ControllerSecurityToken controllerSecurityToken) {
@@ -67,8 +51,10 @@ public class GatewayTokenAuthenticator extends Authenticator.AbstractAuthenticat
         final String presentedToken = authHeader.substring(OFFSET_GATEWAY_TOKEN);
 
         // validate if the presented token is the same as the gateway token
-        return presentedToken.equals(tenantAware.runAsTenant(controllerSecurityToken.getTenant(), gatewaySecurityTokenKeyConfigRunner))
-                ? authenticatedController(controllerSecurityToken.getTenant(), controllerSecurityToken.getControllerId()) : null;
+        return presentedToken.equals(asTenant(controllerSecurityToken.getTenant(), () -> {
+            log.trace("retrieving configuration value for configuration key {}", AUTHENTICATION_GATEWAY_SECURITY_TOKEN_KEY);
+            return TenantConfigHelper.getAsSystem(AUTHENTICATION_GATEWAY_SECURITY_TOKEN_KEY, String.class);
+        })) ? authenticatedController(controllerSecurityToken.getTenant(), controllerSecurityToken.getControllerId()) : null;
     }
 
     @Override
@@ -78,6 +64,6 @@ public class GatewayTokenAuthenticator extends Authenticator.AbstractAuthenticat
 
     @Override
     protected String getTenantConfigurationKey() {
-        return TenantConfigurationKey.AUTHENTICATION_MODE_GATEWAY_SECURITY_TOKEN_ENABLED;
+        return AUTHENTICATION_GATEWAY_SECURITY_TOKEN_ENABLED;
     }
 }

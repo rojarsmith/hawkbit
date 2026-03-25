@@ -12,23 +12,23 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: read
+  # needed for trivy scans upload
+  security-events: write
+
 jobs:
   trivy-scan:
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: read
-      # needed for trivy scans upload
-      security-events: write
-
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ inputs.ref }}
 
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: "temurin"
           java-version: 21
@@ -69,34 +69,34 @@ jobs:
           fi
 
       - name: Upload Docker image scan results to GitHub Security tab hawkbit-ddi-server
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'scans/eclipse-hawkbit/hawkbit/hawkbit-ddi-server:latest.sarif'
           category: "Container Images (hawkbit-ddi-server)"
       - name: Upload Docker image scan results to GitHub Security tab hawkbit-dmf-server
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'scans/eclipse-hawkbit/hawkbit/hawkbit-dmf-server:latest.sarif'
           category: "Container Images (hawkbit-dmf-server)"
       - name: Upload Docker image scan results to GitHub Security tab hawkbit-mgmt-server
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'scans/eclipse-hawkbit/hawkbit/hawkbit-mgmt-server:latest.sarif'
           category: "Container Images (hawkbit-mgmt-server)"
-      - name: Upload Docker image scan results to GitHub Security tab hawkbit-simple-ui
-        uses: github/codeql-action/upload-sarif@v3
+      - name: Upload Docker image scan results to GitHub Security tab hawkbit-ui
+        uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: 'scans/eclipse-hawkbit/hawkbit/hawkbit-simple-ui:latest.sarif'
-          category: "Container Images (hawkbit-simple-ui)"
+          sarif_file: 'scans/eclipse-hawkbit/hawkbit/hawkbit-ui:latest.sarif'
+          category: "Container Images (hawkbit-ui)"
 
       - name: Upload Docker image scan results to GitHub Security tab hawkbit-update-server
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'scans/eclipse-hawkbit/hawkbit/hawkbit-update-server:latest.sarif'
           category: "Container Images (hawkbit-update-server)"
 
       - name: Upload Docker image scan results to GitHub Security tab hawkbit-repository-jpa-init
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'scans/eclipse-hawkbit/hawkbit/hawkbit-repository-jpa-init:latest.sarif'
           category: "Container Images (hawkbit-repository-jpa-init)"

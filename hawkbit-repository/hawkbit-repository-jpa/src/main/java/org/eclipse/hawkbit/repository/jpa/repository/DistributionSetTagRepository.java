@@ -10,12 +10,10 @@
 package org.eclipse.hawkbit.repository.jpa.repository;
 
 import java.util.List;
-import java.util.Optional;
 
 import jakarta.persistence.EntityManager;
 
 import org.eclipse.hawkbit.repository.jpa.model.JpaDistributionSetTag;
-import org.eclipse.hawkbit.repository.model.DistributionSetTag;
 import org.eclipse.hawkbit.repository.model.TargetTag;
 import org.eclipse.hawkbit.repository.model.TenantAwareBaseEntity;
 import org.springframework.data.jpa.repository.Modifying;
@@ -29,14 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public interface DistributionSetTagRepository
         extends BaseEntityRepository<JpaDistributionSetTag> {
-
-    /**
-     * find {@link DistributionSetTag} by its name.
-     *
-     * @param tagName to filter on
-     * @return the {@link DistributionSetTag} if found, otherwise null
-     */
-    Optional<DistributionSetTag> findByNameEquals(String tagName);
 
     /**
      * Returns all instances of the type.

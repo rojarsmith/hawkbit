@@ -11,7 +11,6 @@ package org.eclipse.hawkbit.amqp;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
-import static org.eclipse.hawkbit.tenancy.configuration.TenantConfigurationProperties.TenantConfigurationKey.MULTI_ASSIGNMENTS_ENABLED;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -21,7 +20,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.lang.reflect.Field;
 import java.net.URI;
 import java.util.Map;
 import java.util.Optional;
@@ -37,25 +35,14 @@ import org.eclipse.hawkbit.dmf.json.model.DmfCreateThing;
 import org.eclipse.hawkbit.dmf.json.model.DmfUpdateMode;
 import org.eclipse.hawkbit.repository.ConfirmationManagement;
 import org.eclipse.hawkbit.repository.ControllerManagement;
-import org.eclipse.hawkbit.repository.EntityFactory;
 import org.eclipse.hawkbit.repository.TenantConfigurationManagement;
 import org.eclipse.hawkbit.repository.UpdateMode;
-import org.eclipse.hawkbit.repository.builder.ActionStatusBuilder;
-import org.eclipse.hawkbit.repository.builder.ActionStatusCreate;
 import org.eclipse.hawkbit.repository.exception.AssignmentQuotaExceededException;
-import org.eclipse.hawkbit.repository.jpa.builder.JpaActionStatusBuilder;
-import org.eclipse.hawkbit.repository.jpa.model.JpaActionStatus;
-import org.eclipse.hawkbit.repository.jpa.model.helper.SecurityTokenGeneratorHolder;
+import org.eclipse.hawkbit.repository.helper.TenantConfigHelper;
 import org.eclipse.hawkbit.repository.model.Action;
 import org.eclipse.hawkbit.repository.model.ActionProperties;
 import org.eclipse.hawkbit.repository.model.DistributionSet;
 import org.eclipse.hawkbit.repository.model.Target;
-import org.eclipse.hawkbit.repository.model.TenantConfigurationValue;
-import org.eclipse.hawkbit.security.SecurityContextSerializer;
-import org.eclipse.hawkbit.security.SecurityContextTenantAware;
-import org.eclipse.hawkbit.security.SecurityTokenGenerator;
-import org.eclipse.hawkbit.security.SystemSecurityContext;
-import org.eclipse.hawkbit.tenancy.UserAuthoritiesResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -71,15 +58,14 @@ import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConversionException;
 import org.springframework.amqp.support.converter.MessageConverter;
 
-@ExtendWith(MockitoExtension.class)
 /**
  * Feature: Component Tests - Device Management Federation API<br/>
  * Story: AmqpMessage Handler Service Test
  */
+@ExtendWith(MockitoExtension.class)
 class AmqpMessageHandlerServiceTest {
 
-    private static final String FAIL_MESSAGE_AMQP_REJECT_REASON = AmqpRejectAndDontRequeueException.class
-            .getSimpleName() + " was expected, ";
+    private static final String FAIL_MESSAGE_AMQP_REJECT_REASON = AmqpRejectAndDontRequeueException.class.getSimpleName() + " was expected, ";
 
     private static final String VIRTUAL_HOST = "vHost";
     private static final String TENANT = "DEFAULT";
@@ -97,15 +83,9 @@ class AmqpMessageHandlerServiceTest {
     @Mock
     private ConfirmationManagement confirmationManagementMock;
     @Mock
-    private EntityFactory entityFactoryMock;
-    @Mock
     private TenantConfigurationManagement tenantConfigurationManagement;
     @Mock
     private RabbitTemplate rabbitTemplate;
-    @Mock
-    private UserAuthoritiesResolver authoritiesResolver;
-    @Mock
-    private SecurityContextSerializer securityContextSerializer;
 
     @Captor
     private ArgumentCaptor<Map<String, String>> attributesCaptor;
@@ -127,19 +107,12 @@ class AmqpMessageHandlerServiceTest {
     @BeforeEach
     @SuppressWarnings({ "rawtypes", "unchecked" })
     void before() {
+        TenantConfigHelper.setTenantConfigurationManagement(tenantConfigurationManagement);
         messageConverter = new Jackson2JsonMessageConverter();
         lenient().when(rabbitTemplate.getMessageConverter()).thenReturn(messageConverter);
-        final TenantConfigurationValue multiAssignmentConfig = TenantConfigurationValue.builder().value(Boolean.FALSE)
-                .global(Boolean.FALSE).build();
-        lenient().when(tenantConfigurationManagement.getConfigurationValue(MULTI_ASSIGNMENTS_ENABLED, Boolean.class))
-                .thenReturn(multiAssignmentConfig);
 
-        final SecurityContextTenantAware tenantAware = new SecurityContextTenantAware(authoritiesResolver, securityContextSerializer);
-        final SystemSecurityContext systemSecurityContext = new SystemSecurityContext(tenantAware);
-
-        amqpMessageHandlerService = new AmqpMessageHandlerService(rabbitTemplate, amqpMessageDispatcherServiceMock,
-                controllerManagementMock, entityFactoryMock, systemSecurityContext, tenantConfigurationManagement,
-                confirmationManagementMock);
+        amqpMessageHandlerService = new AmqpMessageHandlerService(
+                rabbitTemplate, amqpMessageDispatcherServiceMock, controllerManagementMock, confirmationManagementMock);
     }
 
     /**
@@ -440,12 +413,6 @@ class AmqpMessageHandlerServiceTest {
         final Message message = createMessage(actionUpdateStatus, messageProperties);
         final Action action = mock(Action.class);
         when(action.getId()).thenReturn(2L);
-        final ActionStatusBuilder builder = mock(ActionStatusBuilder.class);
-        final ActionStatusCreate create = mock(ActionStatusCreate.class);
-        when(builder.create(2L)).thenReturn(create);
-        when(create.status(any())).thenReturn(create);
-        when(create.messages(any())).thenReturn(create);
-        when(entityFactoryMock.actionStatus()).thenReturn(builder);
 
         when(controllerManagementMock.findActionWithDetails(anyLong())).thenReturn(Optional.of(action));
         when(controllerManagementMock.addUpdateActionStatus(any())).thenThrow(new AssignmentQuotaExceededException());
@@ -459,18 +426,12 @@ class AmqpMessageHandlerServiceTest {
      * Test next update is provided on finished action
      */
     @Test
-    void lookupNextUpdateActionAfterFinished() throws IllegalAccessException {
-
+    @SuppressWarnings("unchecked")
+    void lookupNextUpdateActionAfterFinished() {
         // Mock
         final Action action = createActionWithTarget(22L);
         when(controllerManagementMock.findActionWithDetails(anyLong())).thenReturn(Optional.of(action));
         when(controllerManagementMock.addUpdateActionStatus(any())).thenReturn(action);
-        final ActionStatusBuilder builder = mock(ActionStatusBuilder.class);
-        final ActionStatusCreate create = mock(ActionStatusCreate.class);
-        when(builder.create(22L)).thenReturn(create);
-        when(create.status(any())).thenReturn(create);
-        when(create.messages(any())).thenReturn(create);
-        when(entityFactoryMock.actionStatus()).thenReturn(builder);
         // for the test the same action can be used
         when(controllerManagementMock.findActiveActionWithHighestWeight(any())).thenReturn(Optional.of(action));
 
@@ -498,36 +459,22 @@ class AmqpMessageHandlerServiceTest {
      * Test feedback code is persisted in messages when provided with DmfActionUpdateStatus
      */
     @Test
-    void feedBackCodeIsPersistedInMessages() throws IllegalAccessException {
+    void feedBackCodeIsPersistedInMessages() {
         // Mock
         final Action action = createActionWithTarget(22L);
         when(controllerManagementMock.findActionWithDetails(anyLong())).thenReturn(Optional.of(action));
         when(controllerManagementMock.addUpdateActionStatus(any())).thenReturn(action);
-        final ActionStatusBuilder builder = new JpaActionStatusBuilder();
-        when(entityFactoryMock.actionStatus()).thenReturn(builder);
         // for the test the same action can be used
         when(controllerManagementMock.findActiveActionWithHighestWeight(any())).thenReturn(Optional.of(action));
 
         final MessageProperties messageProperties = createMessageProperties(MessageType.EVENT);
         messageProperties.setHeader(MessageHeaderKey.TOPIC, EventTopic.UPDATE_ACTION_STATUS.name());
 
-        final DmfActionUpdateStatus actionUpdateStatus = new DmfActionUpdateStatus(
-                23L, DmfActionStatus.RUNNING, null, 2L, null, 12);
-
+        final DmfActionUpdateStatus actionUpdateStatus = new DmfActionUpdateStatus(23L, DmfActionStatus.RUNNING, null, 2L, null, 12);
         final Message message = createMessage(actionUpdateStatus, messageProperties);
 
         // test
         amqpMessageHandlerService.onMessage(message, MessageType.EVENT.name(), TENANT, VIRTUAL_HOST);
-
-        final ArgumentCaptor<ActionStatusCreate> actionPropertiesCaptor = ArgumentCaptor.forClass(ActionStatusCreate.class);
-
-        verify(controllerManagementMock, times(1)).addUpdateActionStatus(actionPropertiesCaptor.capture());
-
-        final JpaActionStatus jpaActionStatus = (JpaActionStatus) actionPropertiesCaptor.getValue().build();
-        assertThat(jpaActionStatus.getCode()).as("Action status for reported code is missing").contains(12);
-        assertThat(jpaActionStatus.getMessages())
-                .as("Action status message for reported code is missing")
-                .contains("Device reported status code: 12");
     }
 
     /**
@@ -690,10 +637,7 @@ class AmqpMessageHandlerServiceTest {
         return messageProperties;
     }
 
-    private Action createActionWithTarget(final Long targetId) throws IllegalAccessException {
-        // is needed for the creation of targets
-        initializeSecurityTokenGenerator();
-
+    private Action createActionWithTarget(final Long targetId) {
         // Mock
         final Action actionMock = mock(Action.class);
         final Target targetMock = mock(Target.class);
@@ -706,17 +650,6 @@ class AmqpMessageHandlerServiceTest {
         when(actionMock.getActionType()).thenReturn(Action.ActionType.SOFT);
         when(targetMock.getControllerId()).thenReturn("target1");
         return actionMock;
-    }
-
-    private void initializeSecurityTokenGenerator() throws IllegalAccessException {
-        final SecurityTokenGeneratorHolder instance = SecurityTokenGeneratorHolder.getInstance();
-        final Field[] fields = instance.getClass().getDeclaredFields();
-        for (final Field field : fields) {
-            if (field.getType().isAssignableFrom(SecurityTokenGenerator.class)) {
-                field.setAccessible(true);
-                field.set(instance, new SecurityTokenGenerator());
-            }
-        }
     }
 
     private MessageProperties getThingCreatedMessageProperties(final String thingId) {

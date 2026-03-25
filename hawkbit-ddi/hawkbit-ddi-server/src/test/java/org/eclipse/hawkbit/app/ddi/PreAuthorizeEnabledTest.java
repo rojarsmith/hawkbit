@@ -12,7 +12,8 @@ package org.eclipse.hawkbit.app.ddi;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
-import org.eclipse.hawkbit.im.authentication.SpPermission;
+import org.eclipse.hawkbit.auth.SpPermission;
+import org.eclipse.hawkbit.auth.SpRole;
 import org.eclipse.hawkbit.repository.test.util.WithUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -22,7 +23,7 @@ import org.springframework.test.context.TestPropertySource;
  * Feature: Integration Test - Security<br/>
  * Story: PreAuthorized enabled
  */
-@TestPropertySource(properties = { "spring.flyway.enabled=true" })
+@TestPropertySource(properties = { "spring.flyway.enabled=true", "hawkbit.acm.access-controller.enabled=false" })
 class PreAuthorizeEnabledTest extends AbstractSecurityTest {
 
     /**
@@ -39,7 +40,7 @@ class PreAuthorizeEnabledTest extends AbstractSecurityTest {
      * Tests whether request succeed if a role is granted for the user
      */
     @Test
-    @WithUser(authorities = { SpPermission.SpringEvalExpressions.CONTROLLER_ROLE }, autoCreateTenant = false)
+    @WithUser(authorities = { SpRole.CONTROLLER_ROLE }, autoCreateTenant = false)
     void successIfHasRole() throws Exception {
         mvc.perform(get("/DEFAULT/controller/v1/controllerId"))
                 .andExpect(result -> assertThat(result.getResponse().getStatus()).isEqualTo(HttpStatus.OK.value()));

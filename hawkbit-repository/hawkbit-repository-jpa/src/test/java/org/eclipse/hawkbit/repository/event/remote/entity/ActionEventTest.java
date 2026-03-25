@@ -11,6 +11,7 @@ package org.eclipse.hawkbit.repository.event.remote.entity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.eclipse.hawkbit.context.AccessContext;
 import org.eclipse.hawkbit.repository.jpa.model.JpaAction;
 import org.eclipse.hawkbit.repository.model.Action;
 import org.eclipse.hawkbit.repository.model.Action.ActionType;
@@ -86,9 +87,8 @@ class ActionEventTest extends AbstractRemoteEntityEventTest<Action> {
         generateAction.setTarget(target);
         generateAction.setDistributionSet(distributionSet);
         generateAction.setStatus(Status.RUNNING);
-        generateAction.setInitiatedBy(tenantAware.getCurrentUsername());
+        generateAction.setInitiatedBy(AccessContext.actor());
         generateAction.setWeight(1000);
         return actionRepository.save(generateAction);
     }
-
 }

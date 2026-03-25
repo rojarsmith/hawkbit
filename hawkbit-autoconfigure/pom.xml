@@ -19,7 +19,7 @@
     </parent>
 
     <artifactId>hawkbit-autoconfigure</artifactId>
-    <name>hawkBit :: Core :: Spring Boot Auto-configurations</name>
+    <name>hawkBit :: Auto-Configurations</name>
 
     <dependencies>
         <dependency>
@@ -29,22 +29,16 @@
             <optional>true</optional>
         </dependency>
         <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-web</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.eclipse.hawkbit</groupId>
             <artifactId>hawkbit-repository-jpa</artifactId>
             <version>${project.version}</version>
             <optional>true</optional>
         </dependency>
-        <dependency>
-            <groupId>org.eclipse.hawkbit</groupId>
-            <artifactId>hawkbit-security-core</artifactId>
-            <version>${project.version}</version>
-            <optional>true</optional>
-        </dependency>
 
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-context-support</artifactId>
-        </dependency>
         <dependency>
             <groupId>io.protostuff</groupId>
             <artifactId>protostuff-core</artifactId>

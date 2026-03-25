@@ -9,7 +9,6 @@
  */
 package org.eclipse.hawkbit.sdk;
 
-import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
 
 import lombok.Data;
@@ -27,7 +26,7 @@ public class Tenant {
     @NonNull
     private String tenantId = "DEFAULT";
 
-    // basic auth user, to access management api
+    // basic authentication user, to access management api
     @Nullable
     private String username = "admin";
     @ToString.Exclude
@@ -50,11 +49,11 @@ public class Tenant {
 
     // amqp settings (if DMF is used)
     @Nullable
-    private DMF dmf;
+    private Dmf dmf;
 
     @Data
     @ToString
-    public static class DMF {
+    public static class Dmf {
 
         @Nullable
         private String virtualHost;

@@ -9,11 +9,13 @@
  */
 package org.eclipse.hawkbit.repository.jpa.management;
 
-import java.util.Collection;
+import static org.eclipse.hawkbit.context.AccessContext.asSystem;
+
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 
 import lombok.extern.slf4j.Slf4j;
+import org.eclipse.hawkbit.context.AccessContext;
 import org.eclipse.hawkbit.repository.DeploymentManagement;
 import org.eclipse.hawkbit.repository.DistributionSetInvalidationManagement;
 import org.eclipse.hawkbit.repository.DistributionSetManagement;
@@ -22,60 +24,53 @@ import org.eclipse.hawkbit.repository.RolloutManagement;
 import org.eclipse.hawkbit.repository.TargetFilterQueryManagement;
 import org.eclipse.hawkbit.repository.exception.IncompleteDistributionSetException;
 import org.eclipse.hawkbit.repository.exception.StopRolloutException;
-import org.eclipse.hawkbit.repository.jpa.repository.ActionRepository;
 import org.eclipse.hawkbit.repository.jpa.utils.DeploymentHelper;
-import org.eclipse.hawkbit.repository.model.Action.Status;
+import org.eclipse.hawkbit.repository.model.ActionCancellationType;
 import org.eclipse.hawkbit.repository.model.DistributionSet;
 import org.eclipse.hawkbit.repository.model.DistributionSetInvalidation;
-import org.eclipse.hawkbit.repository.model.DistributionSetInvalidation.CancelationType;
-import org.eclipse.hawkbit.repository.model.DistributionSetInvalidationCount;
-import org.eclipse.hawkbit.security.SystemSecurityContext;
-import org.eclipse.hawkbit.tenancy.TenantAware;
+import org.eclipse.hawkbit.repository.model.TargetFilterQuery;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.integration.support.locks.LockRegistry;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 
 /**
  * Jpa implementation for {@link DistributionSetInvalidationManagement}
  */
 @Slf4j
+@Service
+@ConditionalOnBooleanProperty(prefix = "hawkbit.jpa", name = { "enabled", "distribution-set-invalidation-management" }, matchIfMissing = true)
 public class JpaDistributionSetInvalidationManagement implements DistributionSetInvalidationManagement {
 
-    private final DistributionSetManagement distributionSetManagement;
+    private final DistributionSetManagement<? extends DistributionSet> distributionSetManagement;
     private final RolloutManagement rolloutManagement;
     private final DeploymentManagement deploymentManagement;
-    private final TargetFilterQueryManagement targetFilterQueryManagement;
-    private final ActionRepository actionRepository;
+    private final TargetFilterQueryManagement<? extends TargetFilterQuery> targetFilterQueryManagement;
     private final PlatformTransactionManager txManager;
     private final RepositoryProperties repositoryProperties;
-    private final TenantAware tenantAware;
     private final LockRegistry lockRegistry;
-    private final SystemSecurityContext systemSecurityContext;
 
     @SuppressWarnings("java:S107")
-    public JpaDistributionSetInvalidationManagement(final DistributionSetManagement distributionSetManagement,
+    protected JpaDistributionSetInvalidationManagement(
+            final DistributionSetManagement<? extends DistributionSet> distributionSetManagement,
             final RolloutManagement rolloutManagement, final DeploymentManagement deploymentManagement,
-            final TargetFilterQueryManagement targetFilterQueryManagement, final ActionRepository actionRepository,
+            final TargetFilterQueryManagement<? extends TargetFilterQuery> targetFilterQueryManagement,
             final PlatformTransactionManager txManager, final RepositoryProperties repositoryProperties,
-            final TenantAware tenantAware, final LockRegistry lockRegistry,
-            final SystemSecurityContext systemSecurityContext) {
+            final LockRegistry lockRegistry) {
         this.distributionSetManagement = distributionSetManagement;
         this.rolloutManagement = rolloutManagement;
         this.deploymentManagement = deploymentManagement;
         this.targetFilterQueryManagement = targetFilterQueryManagement;
-        this.actionRepository = actionRepository;
         this.txManager = txManager;
         this.repositoryProperties = repositoryProperties;
-        this.tenantAware = tenantAware;
         this.lockRegistry = lockRegistry;
-        this.systemSecurityContext = systemSecurityContext;
     }
 
     @Override
     public void invalidateDistributionSet(final DistributionSetInvalidation distributionSetInvalidation) {
         log.debug("Invalidate distribution sets {}", distributionSetInvalidation.getDistributionSetIds());
-        final String tenant = tenantAware.getCurrentTenant();
-        if (shouldRolloutsBeCanceled(distributionSetInvalidation.getCancelationType(),
-                distributionSetInvalidation.isCancelRollouts())) {
+        final String tenant = AccessContext.tenant();
+        if (shouldRolloutsBeCanceled(distributionSetInvalidation.getActionCancellationType())) {
             final String handlerId = JpaRolloutManagement.createRolloutLockKey(tenant);
             final Lock lock = lockRegistry.obtain(handlerId);
             try {
@@ -98,90 +93,42 @@ public class JpaDistributionSetInvalidationManagement implements DistributionSet
         }
     }
 
-    @Override
-    public DistributionSetInvalidationCount countEntitiesForInvalidation(
-            final DistributionSetInvalidation distributionSetInvalidation) {
-        return systemSecurityContext.runAsSystem(() -> {
-            final Collection<Long> setIds = distributionSetInvalidation.getDistributionSetIds();
-            final long rolloutsCount = shouldRolloutsBeCanceled(distributionSetInvalidation.getCancelationType(),
-                    distributionSetInvalidation.isCancelRollouts()) ? countRolloutsForInvalidation(setIds) : 0;
-            final long autoAssignmentsCount = countAutoAssignmentsForInvalidation(setIds);
-            final long actionsCount = countActionsForInvalidation(setIds,
-                    distributionSetInvalidation.getCancelationType());
-
-            return new DistributionSetInvalidationCount(rolloutsCount, autoAssignmentsCount, actionsCount);
-        });
+    private static boolean shouldRolloutsBeCanceled(final ActionCancellationType cancelationType) {
+        return cancelationType != ActionCancellationType.NONE;
     }
 
-    private static boolean shouldRolloutsBeCanceled(final CancelationType cancelationType,
-            final boolean cancelRollouts) {
-        return cancelationType != CancelationType.NONE || cancelRollouts;
-    }
-
-    private void invalidateDistributionSetsInTransaction(final DistributionSetInvalidation distributionSetInvalidation,
-            final String tenant) {
+    private void invalidateDistributionSetsInTransaction(final DistributionSetInvalidation distributionSetInvalidation, final String tenant) {
         DeploymentHelper.runInNewTransaction(txManager, tenant + "-invalidateDS", status -> {
-            distributionSetInvalidation.getDistributionSetIds().forEach(setId -> invalidateDistributionSet(setId,
-                    distributionSetInvalidation.getCancelationType(), distributionSetInvalidation.isCancelRollouts()));
+            distributionSetInvalidation.getDistributionSetIds().forEach(
+                    setId -> invalidateDistributionSet(setId, distributionSetInvalidation.getActionCancellationType()));
             return 0;
         });
     }
 
-    private void invalidateDistributionSet(final long setId, final CancelationType cancelationType,
-            final boolean cancelRollouts) {
-        final DistributionSet distributionSet = distributionSetManagement.getOrElseThrowException(setId);
+    private void invalidateDistributionSet(final long setId, final ActionCancellationType cancelationType) {
+        final DistributionSet distributionSet = distributionSetManagement.get(setId);
         if (!distributionSet.isComplete()) {
-            throw new IncompleteDistributionSetException("Distribution set of type "
-                    + distributionSet.getType().getKey() + " is incomplete: " + distributionSet.getId());
+            throw new IncompleteDistributionSetException(
+                    "Distribution set of type " + distributionSet.getType().getKey() + " is incomplete: " + distributionSet.getId());
         }
         distributionSetManagement.invalidate(distributionSet);
         log.debug("Distribution set {} marked as invalid.", setId);
 
         // rollout cancellation should only be permitted with UPDATE_ROLLOUT permission
-        if (shouldRolloutsBeCanceled(cancelationType, cancelRollouts)) {
+        if (shouldRolloutsBeCanceled(cancelationType)) {
             log.debug("Cancel rollouts after ds invalidation. ID: {}", setId);
-            rolloutManagement.cancelRolloutsForDistributionSet(distributionSet);
+            rolloutManagement.cancelRolloutsForDistributionSet(distributionSet, cancelationType);
+        }
+
+        if (cancelationType != ActionCancellationType.NONE) {
+            log.debug("Cancel actions after ds invalidation. ID: {}", setId);
+            deploymentManagement.cancelActionsForDistributionSet(cancelationType, distributionSet);
         }
 
         // Do run as system to ensure all actions (even invisible) are canceled due to invalidation.
-        systemSecurityContext.runAsSystem(() -> {
-            if (cancelationType != CancelationType.NONE) {
-                log.debug("Cancel actions after ds invalidation. ID: {}", setId);
-                deploymentManagement.cancelActionsForDistributionSet(cancelationType, distributionSet);
-            }
-
+        asSystem(() -> {
             log.debug("Cancel auto assignments after ds invalidation. ID: {}", setId);
             targetFilterQueryManagement.cancelAutoAssignmentForDistributionSet(setId);
-            return null;
         });
-    }
-
-    private long countRolloutsForInvalidation(final Collection<Long> setIds) {
-        return setIds.stream().mapToLong(rolloutManagement::countByDistributionSetIdAndRolloutIsStoppable).sum();
-    }
-
-    private long countAutoAssignmentsForInvalidation(final Collection<Long> setIds) {
-        return setIds.stream().mapToLong(targetFilterQueryManagement::countByAutoAssignDistributionSetId).sum();
-    }
-
-    private long countActionsForInvalidation(final Collection<Long> setIds, final CancelationType cancelationType) {
-        long affectedActionsByDSInvalidation = 0;
-        if (cancelationType == CancelationType.FORCE) {
-            affectedActionsByDSInvalidation = countActionsForForcedInvalidation(setIds);
-        } else if (cancelationType == CancelationType.SOFT) {
-            affectedActionsByDSInvalidation = countActionsForSoftInvalidation(setIds);
-        }
-        return affectedActionsByDSInvalidation;
-    }
-
-    private long countActionsForForcedInvalidation(final Collection<Long> setIds) {
-        return setIds.stream().mapToLong(actionRepository::countByDistributionSetIdAndActiveIsTrue).sum();
-    }
-
-    private long countActionsForSoftInvalidation(final Collection<Long> setIds) {
-        return setIds.stream()
-                .mapToLong(distributionSet -> actionRepository
-                        .countByDistributionSetIdAndActiveIsTrueAndStatusIsNot(distributionSet, Status.CANCELING))
-                .sum();
     }
 }

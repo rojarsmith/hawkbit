@@ -54,24 +54,24 @@ import org.eclipse.hawkbit.mgmt.rest.resource.mapper.MgmtTargetMapper;
 import org.eclipse.hawkbit.mgmt.rest.resource.util.PagingUtility;
 import org.eclipse.hawkbit.repository.ConfirmationManagement;
 import org.eclipse.hawkbit.repository.DeploymentManagement;
-import org.eclipse.hawkbit.repository.EntityFactory;
 import org.eclipse.hawkbit.repository.TargetManagement;
-import org.eclipse.hawkbit.repository.TenantConfigurationManagement;
+import org.eclipse.hawkbit.repository.TargetTypeManagement;
 import org.eclipse.hawkbit.repository.exception.EntityNotFoundException;
 import org.eclipse.hawkbit.repository.exception.InvalidConfirmationFeedbackException;
+import org.eclipse.hawkbit.repository.helper.TenantConfigHelper;
 import org.eclipse.hawkbit.repository.model.Action;
 import org.eclipse.hawkbit.repository.model.ActionStatus;
 import org.eclipse.hawkbit.repository.model.DeploymentRequest;
 import org.eclipse.hawkbit.repository.model.DistributionSetAssignmentResult;
 import org.eclipse.hawkbit.repository.model.Target;
 import org.eclipse.hawkbit.repository.model.TargetTag;
-import org.eclipse.hawkbit.security.SystemSecurityContext;
-import org.eclipse.hawkbit.utils.TenantConfigHelper;
+import org.eclipse.hawkbit.repository.model.TargetType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.ObjectUtils;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -83,29 +83,30 @@ public class MgmtTargetResource implements MgmtTargetRestApi {
 
     private static final String ACTION_TARGET_MISSING_ASSIGN_WARN = "given action ({}) is not assigned to given target ({}).";
 
-    private final TargetManagement targetManagement;
+    private final TargetManagement<? extends Target> targetManagement;
+    private final TargetTypeManagement<? extends TargetType> targetTypeManagement;
     private final ConfirmationManagement confirmationManagement;
     private final DeploymentManagement deploymentManagement;
-    private final EntityFactory entityFactory;
-    private final TenantConfigHelper tenantConfigHelper;
+    private final MgmtTargetMapper mgmtTargetMapper;
+    private final MgmtDistributionSetMapper mgmtDistributionSetMapper;
 
     MgmtTargetResource(
-            final TargetManagement targetManagement, final DeploymentManagement deploymentManagement,
-            final ConfirmationManagement confirmationManagement, final EntityFactory entityFactory,
-            final SystemSecurityContext systemSecurityContext,
-            final TenantConfigurationManagement tenantConfigurationManagement) {
+            final TargetManagement<? extends Target> targetManagement, final TargetTypeManagement<? extends TargetType> targetTypeManagement,
+            final DeploymentManagement deploymentManagement, final ConfirmationManagement confirmationManagement,
+            final MgmtTargetMapper mgmtTargetMapper, final MgmtDistributionSetMapper mgmtDistributionSetMapper) {
         this.targetManagement = targetManagement;
+        this.targetTypeManagement = targetTypeManagement;
         this.deploymentManagement = deploymentManagement;
         this.confirmationManagement = confirmationManagement;
-        this.entityFactory = entityFactory;
-        this.tenantConfigHelper = TenantConfigHelper.usingContext(systemSecurityContext, tenantConfigurationManagement);
+        this.mgmtTargetMapper = mgmtTargetMapper;
+        this.mgmtDistributionSetMapper = mgmtDistributionSetMapper;
     }
 
     @Override
     public ResponseEntity<MgmtTarget> getTarget(final String targetId) {
-        final Target findTarget = findTargetWithExceptionIfNotFound(targetId);
+        final Target findTarget = targetManagement.getByControllerId(targetId);
         // to single response include poll status
-        final MgmtTarget response = MgmtTargetMapper.toResponse(findTarget, tenantConfigHelper, null);
+        final MgmtTarget response = MgmtTargetMapper.toResponse(findTarget, null);
         MgmtTargetMapper.addTargetLinks(response);
 
         return ResponseEntity.ok(response);
@@ -115,57 +116,52 @@ public class MgmtTargetResource implements MgmtTargetRestApi {
     public ResponseEntity<PagedList<MgmtTarget>> getTargets(
             final String rsqlParam, final int pagingOffsetParam, final int pagingLimitParam, final String sortParam) {
         final Pageable pageable = PagingUtility.toPageable(pagingOffsetParam, pagingLimitParam, sanitizeTargetSortParam(sortParam));
-        final Slice<Target> findTargetsAll;
-        final long countTargetsAll;
+        final Page<? extends Target> findTargetsAll;
         if (rsqlParam != null) {
             findTargetsAll = targetManagement.findByRsql(rsqlParam, pageable);
-            countTargetsAll = targetManagement.countByRsql(rsqlParam);
         } else {
             findTargetsAll = targetManagement.findAll(pageable);
-            countTargetsAll = targetManagement.count();
         }
 
-        final List<MgmtTarget> rest = MgmtTargetMapper.toResponse(findTargetsAll.getContent(), tenantConfigHelper);
-        return ResponseEntity.ok(new PagedList<>(rest, countTargetsAll));
+        final List<MgmtTarget> rest = MgmtTargetMapper.toResponse(findTargetsAll.getContent());
+        return ResponseEntity.ok(new PagedList<>(rest, findTargetsAll.getTotalElements()));
     }
 
     @Override
     public ResponseEntity<List<MgmtTarget>> createTargets(final List<MgmtTargetRequestBody> targets) {
         log.debug("creating {} targets", targets.size());
-        final Collection<Target> createdTargets = this.targetManagement.create(MgmtTargetMapper.fromRequest(entityFactory, targets));
+        final Collection<? extends Target> createdTargets = this.targetManagement.create(mgmtTargetMapper.fromRequest(targets));
         log.debug("{} targets created, return status {}", targets.size(), HttpStatus.CREATED);
-        return new ResponseEntity<>(MgmtTargetMapper.toResponse(createdTargets, tenantConfigHelper), HttpStatus.CREATED);
+        return new ResponseEntity<>(MgmtTargetMapper.toResponse(createdTargets), HttpStatus.CREATED);
     }
 
     @Override
     @AuditLog(entity = "Target", type = AuditLog.Type.UPDATE, description = "Update Target")
     public ResponseEntity<MgmtTarget> updateTarget(final String targetId, final MgmtTargetRequestBody targetRest) {
-        if (targetRest.getRequestAttributes() != null) {
-            if (Boolean.TRUE.equals(targetRest.getRequestAttributes())) {
-                targetManagement.requestControllerAttributes(targetId);
-            } else {
-                return ResponseEntity.badRequest().build();
-            }
+        if (targetRest.getRequestAttributes() != null && !targetRest.getRequestAttributes()) {
+            return ResponseEntity.badRequest().build();
         }
+        final Target targetToUpdate = targetManagement.getByControllerId(targetId);
+        final TargetType targetType = Optional.ofNullable(targetRest.getTargetType())
+                .map(targetTypeId -> {
+                    if (targetTypeId == -1L) {
+                        // if targetType in request is -1 - unassign targetType from target
+                        targetManagement.unassignType(targetId);
+                        return null;
+                    } else {
+                        return targetTypeManagement.find(targetRest.getTargetType())
+                                .orElseThrow(() -> new EntityNotFoundException(TargetType.class, targetRest.getTargetType()));
+                    }
+                })
+                .orElse(null);
+        final Target updateTarget = targetManagement.update(TargetManagement.Update.builder().id(targetToUpdate.getId())
+                .targetType(targetType)
+                .name(targetRest.getName()).description(targetRest.getDescription()).address(targetRest.getAddress())
+                .securityToken(targetRest.getSecurityToken())
+                .requestControllerAttributes(targetRest.getRequestAttributes())
+                .build());
 
-        final Target updateTarget;
-        if (targetRest.getTargetType() != null && targetRest.getTargetType() == -1L) {
-            // if targetType in request is -1 - unassign targetType from target
-            this.targetManagement.unassignType(targetId);
-            // update target without targetType here ...
-            updateTarget = this.targetManagement.update(entityFactory.target().update(targetId)
-                    .name(targetRest.getName()).description(targetRest.getDescription()).address(targetRest.getAddress())
-                    .securityToken(targetRest.getSecurityToken()).requestAttributes(targetRest.getRequestAttributes()));
-        } else {
-            updateTarget = this.targetManagement.update(
-                    entityFactory.target().update(targetId).name(targetRest.getName()).description(targetRest.getDescription())
-                            .address(targetRest.getAddress()).targetType(targetRest.getTargetType())
-                            .securityToken(targetRest.getSecurityToken())
-                            .requestAttributes(targetRest.getRequestAttributes()));
-
-        }
-
-        final MgmtTarget response = MgmtTargetMapper.toResponse(updateTarget, tenantConfigHelper, null);
+        final MgmtTarget response = MgmtTargetMapper.toResponse(updateTarget, null);
         MgmtTargetMapper.addTargetLinks(response);
 
         return ResponseEntity.ok(response);
@@ -174,23 +170,23 @@ public class MgmtTargetResource implements MgmtTargetRestApi {
     @Override
     @AuditLog(entity = "Target", type = AuditLog.Type.DELETE, description = "Delete Target")
     public ResponseEntity<Void> deleteTarget(final String targetId) {
-        this.targetManagement.deleteByControllerID(targetId);
+        this.targetManagement.deleteByControllerId(targetId);
         log.debug("{} target deleted, return status {}", targetId, HttpStatus.OK);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
     @Override
     @AuditLog(entity = "Target", type = AuditLog.Type.UPDATE, description = "Unassign Target Type")
     public ResponseEntity<Void> unassignTargetType(final String targetId) {
         this.targetManagement.unassignType(targetId);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
     @Override
     @AuditLog(entity = "Target", type = AuditLog.Type.UPDATE, description = "Assign Target")
     public ResponseEntity<Void> assignTargetType(final String targetId, final MgmtId targetTypeId) {
         this.targetManagement.assignType(targetId, targetTypeId.getId());
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
     @Override
@@ -210,7 +206,7 @@ public class MgmtTargetResource implements MgmtTargetRestApi {
     public ResponseEntity<PagedList<MgmtAction>> getActionHistory(
             final String targetId, final String rsqlParam,
             final int pagingOffsetParam, final int pagingLimitParam, final String sortParam) {
-        findTargetWithExceptionIfNotFound(targetId);
+        targetManagement.getByControllerId(targetId);
 
         final Pageable pageable = PagingUtility.toPageable(pagingOffsetParam, pagingLimitParam, sanitizeActionSortParam(sortParam));
         final Slice<Action> activeActions;
@@ -227,20 +223,30 @@ public class MgmtTargetResource implements MgmtTargetRestApi {
     }
 
     @Override
+    @AuditLog(entity = "Target", type = AuditLog.Type.DELETE, description = "Delete Actions For Target")
+    public ResponseEntity<Void> deleteActionsForTarget(final String targetId, final int keepLast, final List<Long> actionIds) {
+
+        if (keepLast < 0 && ObjectUtils.isEmpty(actionIds)) {
+            throw new IllegalArgumentException("Either keepLast OR action ID list should be provided!");
+        }
+
+        if (!ObjectUtils.isEmpty(actionIds)) {
+            if (keepLast >= 0) {
+                throw new IllegalArgumentException("Only one of the parameters should be provided!");
+            }
+            deploymentManagement.deleteTargetActionsByIds(targetId, actionIds);
+        } else {
+            deploymentManagement.deleteOldestTargetActions(targetId, keepLast);
+        }
+
+        return ResponseEntity.noContent().build();
+    }
+
+    @Override
     public ResponseEntity<MgmtAction> getAction(final String targetId, final Long actionId) {
         return getValidatedAction(targetId, actionId)
                 .map(action -> ResponseEntity.ok(MgmtTargetMapper.toResponseWithLinks(targetId, action)))
                 .orElseGet(() -> ResponseEntity.notFound().build());
-    }
-
-    private Optional<Action> getValidatedAction(final String targetId, final Long actionId) {
-        final Action action = deploymentManagement.findAction(actionId)
-                .orElseThrow(() -> new EntityNotFoundException(Action.class, actionId));
-        if (!action.getTarget().getControllerId().equals(targetId)) {
-            log.warn(ACTION_TARGET_MISSING_ASSIGN_WARN, action.getId(), targetId);
-            return Optional.empty();
-        }
-        return Optional.of(action);
     }
 
     @Override
@@ -290,7 +296,7 @@ public class MgmtTargetResource implements MgmtTargetRestApi {
         log.debug("updateActionConfirmation with data [targetId={}, actionId={}]: {}", targetId, actionId, actionConfirmation);
 
         return getValidatedAction(targetId, actionId)
-                .map(action -> {
+                .<ResponseEntity<Void>> map(action -> {
                     try {
                         switch (actionConfirmation.getConfirmation()) {
                             case CONFIRMED:
@@ -305,18 +311,18 @@ public class MgmtTargetResource implements MgmtTargetRestApi {
                                 confirmationManagement.denyAction(actionId, actionConfirmation.getCode(), actionConfirmation.getDetails());
                                 break;
                         }
-                        return new ResponseEntity<Void>(HttpStatus.OK);
+                        return ResponseEntity.noContent().build();
                     } catch (final InvalidConfirmationFeedbackException e) {
                         if (e.getReason() == InvalidConfirmationFeedbackException.Reason.ACTION_CLOSED) {
                             log.warn("Updating action {} with confirmation {} not possible since action not active anymore.",
                                     action.getId(), actionConfirmation.getConfirmation(), e);
-                            return new ResponseEntity<Void>(HttpStatus.GONE);
+                            return new ResponseEntity<>(HttpStatus.GONE);
                         } else if (e.getReason() == InvalidConfirmationFeedbackException.Reason.NOT_AWAITING_CONFIRMATION) {
                             log.debug("Action is not waiting for confirmation, deny request.", e);
-                            return new ResponseEntity<Void>(HttpStatus.NOT_FOUND);
+                            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
                         } else {
                             log.debug("Action confirmation failed with unknown reason.", e);
-                            return new ResponseEntity<Void>(HttpStatus.BAD_REQUEST);
+                            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
                         }
                     }
                 })
@@ -330,7 +336,7 @@ public class MgmtTargetResource implements MgmtTargetRestApi {
     public ResponseEntity<PagedList<MgmtActionStatus>> getActionStatusList(
             final String targetId, final Long actionId,
             final int pagingOffsetParam, final int pagingLimitParam, final String sortParam) {
-        final Target target = findTargetWithExceptionIfNotFound(targetId);
+        final Target target = targetManagement.getByControllerId(targetId);
 
         final Action action = deploymentManagement.findAction(actionId)
                 .orElseThrow(() -> new EntityNotFoundException(Action.class, actionId));
@@ -349,7 +355,7 @@ public class MgmtTargetResource implements MgmtTargetRestApi {
 
     @Override
     public ResponseEntity<MgmtDistributionSet> getAssignedDistributionSet(final String targetId) {
-        final MgmtDistributionSet distributionSetRest = deploymentManagement.getAssignedDistributionSet(targetId)
+        final MgmtDistributionSet distributionSetRest = deploymentManagement.findAssignedDistributionSet(targetId)
                 .map(ds -> {
                     final MgmtDistributionSet response = MgmtDistributionSetMapper.toResponse(ds);
                     MgmtDistributionSetMapper.addLinks(ds, response);
@@ -371,39 +377,33 @@ public class MgmtTargetResource implements MgmtTargetRestApi {
             final List<Entry<String, Long>> offlineAssignments = dsAssignments.stream()
                     .map(dsAssignment -> new SimpleEntry<>(targetId, dsAssignment.getId()))
                     .collect(Collectors.toList());
-            return ResponseEntity.ok(MgmtDistributionSetMapper
+            return ResponseEntity.ok(mgmtDistributionSetMapper
                     .toResponse(deploymentManagement.offlineAssignedDistributionSets(offlineAssignments)));
         }
-        findTargetWithExceptionIfNotFound(targetId);
+        targetManagement.getByControllerId(targetId);
 
         final List<DeploymentRequest> deploymentRequests = dsAssignments.stream().map(dsAssignment -> {
             final boolean isConfirmationRequired = dsAssignment.getConfirmationRequired() == null
-                    ? tenantConfigHelper.isConfirmationFlowEnabled()
+                    ? TenantConfigHelper.isUserConfirmationFlowEnabled()
                     : dsAssignment.getConfirmationRequired();
             return MgmtDeploymentRequestMapper.createAssignmentRequestBuilder(dsAssignment, targetId)
-                    .setConfirmationRequired(isConfirmationRequired).build();
+                    .confirmationRequired(isConfirmationRequired).build();
         }).toList();
 
-        final List<DistributionSetAssignmentResult> assignmentResults = deploymentManagement
-                .assignDistributionSets(deploymentRequests);
-        return ResponseEntity.ok(MgmtDistributionSetMapper.toResponse(assignmentResults));
+        final List<DistributionSetAssignmentResult> assignmentResults = deploymentManagement.assignDistributionSets(deploymentRequests, null);
+        return ResponseEntity.ok(mgmtDistributionSetMapper.toResponse(assignmentResults));
     }
 
     @Override
     public ResponseEntity<MgmtDistributionSet> getInstalledDistributionSet(final String targetId) {
-        final MgmtDistributionSet distributionSetRest = deploymentManagement.getInstalledDistributionSet(targetId)
+        return deploymentManagement.findInstalledDistributionSet(targetId)
                 .map(set -> {
                     final MgmtDistributionSet response = MgmtDistributionSetMapper.toResponse(set);
                     MgmtDistributionSetMapper.addLinks(set, response);
-
                     return response;
-                }).orElse(null);
-
-        if (distributionSetRest == null) {
-            return ResponseEntity.noContent().build();
-        }
-
-        return ResponseEntity.ok(distributionSetRest);
+                })
+                .map(distributionSetRest -> ResponseEntity.ok(distributionSetRest))
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     @Override
@@ -413,8 +413,9 @@ public class MgmtTargetResource implements MgmtTargetRestApi {
     }
 
     @Override
-    public void createMetadata(final String targetId, final List<MgmtMetadata> metadataRest) {
+    public ResponseEntity<Void> createMetadata(final String targetId, final List<MgmtMetadata> metadataRest) {
         targetManagement.createMetadata(targetId, MgmtTargetMapper.fromRequestMetadata(metadataRest));
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     @Override
@@ -433,14 +434,16 @@ public class MgmtTargetResource implements MgmtTargetRestApi {
     }
 
     @Override
-    public void updateMetadata(final String targetId, final String metadataKey, final MgmtMetadataBodyPut metadata) {
-        targetManagement.updateMetadata(targetId, metadataKey, metadata.getValue());
+    public ResponseEntity<Void> updateMetadata(final String targetId, final String metadataKey, final MgmtMetadataBodyPut metadata) {
+        targetManagement.createMetadata(targetId, metadataKey, metadata.getValue());
+        return ResponseEntity.noContent().build();
     }
 
     @Override
     @AuditLog(entity = "Target", type = AuditLog.Type.DELETE, description = "Delete Target Metadata")
-    public void deleteMetadata(final String targetId, final String metadataKey) {
+    public ResponseEntity<Void> deleteMetadata(final String targetId, final String metadataKey) {
         targetManagement.deleteMetadata(targetId, metadataKey);
+        return ResponseEntity.noContent().build();
     }
 
     @Override
@@ -456,22 +459,27 @@ public class MgmtTargetResource implements MgmtTargetRestApi {
         final String initiator = getNullIfEmpty(update, MgmtTargetAutoConfirmUpdate::getInitiator);
         final String remark = getNullIfEmpty(update, MgmtTargetAutoConfirmUpdate::getRemark);
         confirmationManagement.activateAutoConfirmation(targetId, initiator, remark);
-        return new ResponseEntity<>(HttpStatus.OK);
+        return ResponseEntity.noContent().build();
     }
 
     @Override
     @AuditLog(entity = "Target", type = AuditLog.Type.UPDATE, description = "Deactivate Target Auto Confirmation")
     public ResponseEntity<Void> deactivateAutoConfirm(final String targetId) {
         confirmationManagement.deactivateAutoConfirmation(targetId);
-        return new ResponseEntity<>(HttpStatus.OK);
+        return ResponseEntity.noContent().build();
     }
 
-    private Target findTargetWithExceptionIfNotFound(final String targetId) {
-        return targetManagement.getByControllerID(targetId)
-                .orElseThrow(() -> new EntityNotFoundException(Target.class, targetId));
+    private Optional<Action> getValidatedAction(final String targetId, final Long actionId) {
+        final Action action = deploymentManagement.findAction(actionId)
+                .orElseThrow(() -> new EntityNotFoundException(Action.class, actionId));
+        if (!action.getTarget().getControllerId().equals(targetId)) {
+            log.warn(ACTION_TARGET_MISSING_ASSIGN_WARN, action.getId(), targetId);
+            return Optional.empty();
+        }
+        return Optional.of(action);
     }
 
     private <T, R> R getNullIfEmpty(final T object, final Function<T, R> extractMethod) {
-        return object == null ? null : extractMethod.apply(object);
+        return ObjectUtils.isEmpty(object) ? null : extractMethod.apply(object);
     }
 }

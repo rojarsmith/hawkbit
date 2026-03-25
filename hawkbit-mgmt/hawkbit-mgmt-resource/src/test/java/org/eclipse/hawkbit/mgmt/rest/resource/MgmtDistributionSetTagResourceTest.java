@@ -21,14 +21,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 
+import org.eclipse.hawkbit.mgmt.rest.api.MgmtDistributionSetTagRestApi;
 import org.eclipse.hawkbit.mgmt.rest.api.MgmtRestConstants;
 import org.eclipse.hawkbit.mgmt.rest.resource.util.ResourceUtility;
+import org.eclipse.hawkbit.repository.DistributionSetTagManagement;
 import org.eclipse.hawkbit.repository.event.remote.DistributionSetTagDeletedEvent;
 import org.eclipse.hawkbit.repository.event.remote.entity.DistributionSetCreatedEvent;
 import org.eclipse.hawkbit.repository.event.remote.entity.DistributionSetTagCreatedEvent;
@@ -42,7 +42,6 @@ import org.eclipse.hawkbit.repository.model.Tag;
 import org.eclipse.hawkbit.repository.test.matcher.Expect;
 import org.eclipse.hawkbit.repository.test.matcher.ExpectEvents;
 import org.eclipse.hawkbit.rest.json.model.ExceptionInfo;
-import org.eclipse.hawkbit.rest.util.JsonBuilder;
 import org.eclipse.hawkbit.rest.util.MockMvcResultPrinter;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -54,8 +53,7 @@ import org.springframework.test.web.servlet.ResultActions;
  */
 class MgmtDistributionSetTagResourceTest extends AbstractManagementApiIntegrationTest {
 
-    private static final String DISTRIBUTIONSETTAGS_ROOT = "http://localhost" + MgmtRestConstants.DISTRIBUTIONSET_TAG_V1_REQUEST_MAPPING + "/";
-    private static final Random RND = new Random();
+    private static final String DISTRIBUTIONSETTAGS_ROOT = "http://localhost" + MgmtDistributionSetTagRestApi.DISTRIBUTIONSETTAGS_V1 + "/";
 
     /**
      * Verifies that a paged result list of DS tags reflects the content on the repository side.
@@ -67,7 +65,7 @@ class MgmtDistributionSetTagResourceTest extends AbstractManagementApiIntegratio
         final DistributionSetTag assigned = tags.get(0);
         final DistributionSetTag unassigned = tags.get(1);
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_TAG_V1_REQUEST_MAPPING).accept(MediaType.APPLICATION_JSON))
+        mvc.perform(get(MgmtDistributionSetTagRestApi.DISTRIBUTIONSETTAGS_V1).accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
@@ -86,7 +84,7 @@ class MgmtDistributionSetTagResourceTest extends AbstractManagementApiIntegratio
     @Test
     void getDistributionSetTagsWithParameters() throws Exception {
         testdataFactory.createDistributionSetTags(2);
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_TAG_V1_REQUEST_MAPPING + "?limit=10&sort=name:ASC&offset=0&q=name==DsTag"))
+        mvc.perform(get(MgmtDistributionSetTagRestApi.DISTRIBUTIONSETTAGS_V1 + "?limit=10&sort=name:ASC&offset=0&q=name==DsTag"))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk());
     }
@@ -105,7 +103,7 @@ class MgmtDistributionSetTagResourceTest extends AbstractManagementApiIntegratio
         distributionSetManagement.assignTag(List.of(distributionSet1.getId(), distributionSet2.getId()), tag1.getId());
         distributionSetManagement.assignTag(List.of(distributionSet1.getId()), tag2.getId());
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_TAG_V1_REQUEST_MAPPING)
+        mvc.perform(get(MgmtDistributionSetTagRestApi.DISTRIBUTIONSETTAGS_V1)
                         .queryParam(MgmtRestConstants.REQUEST_PARAMETER_SEARCH, "distributionset.id==" + distributionSet1.getId())
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
@@ -119,7 +117,7 @@ class MgmtDistributionSetTagResourceTest extends AbstractManagementApiIntegratio
                 .andExpect(jsonPath(MgmtTargetResourceTest.JSON_PATH_PAGED_LIST_SIZE, equalTo(2)))
                 .andExpect(jsonPath(MgmtTargetResourceTest.JSON_PATH_PAGED_LIST_CONTENT, hasSize(2)));
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_TAG_V1_REQUEST_MAPPING)
+        mvc.perform(get(MgmtDistributionSetTagRestApi.DISTRIBUTIONSETTAGS_V1)
                         .queryParam(MgmtRestConstants.REQUEST_PARAMETER_SEARCH, "distributionset.id==" + distributionSet2.getId())
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
@@ -148,7 +146,7 @@ class MgmtDistributionSetTagResourceTest extends AbstractManagementApiIntegratio
 
         // pass here q directly as a pure string because .queryParam method delimiters the parameters in q with ,
         // which is logical OR, we want AND here
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_TAG_V1_REQUEST_MAPPING
+        mvc.perform(get(MgmtDistributionSetTagRestApi.DISTRIBUTIONSETTAGS_V1
                         + "?" + MgmtRestConstants.REQUEST_PARAMETER_SEARCH +
                         "=distributionset.id==" + distributionSet1.getId() + ";description==" + tag1.getDescription())
                         .accept(MediaType.APPLICATION_JSON))
@@ -171,7 +169,7 @@ class MgmtDistributionSetTagResourceTest extends AbstractManagementApiIntegratio
         final List<DistributionSetTag> tags = testdataFactory.createDistributionSetTags(2);
         final DistributionSetTag assigned = tags.get(0);
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_TAG_V1_REQUEST_MAPPING + "/" + assigned.getId())
+        mvc.perform(get(MgmtDistributionSetTagRestApi.DISTRIBUTIONSETTAGS_V1 + "/" + assigned.getId())
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
@@ -188,14 +186,16 @@ class MgmtDistributionSetTagResourceTest extends AbstractManagementApiIntegratio
     @Test
     @ExpectEvents({ @Expect(type = DistributionSetTagCreatedEvent.class, count = 2) })
     void createDistributionSetTags() throws Exception {
-        final Tag tagOne = entityFactory.tag().create().colour("testcol1").description("its a test1").name("thetest1")
+        final DistributionSetTagManagement.Create tagOne = DistributionSetTagManagement.Create.builder()
+                .colour("testcol1").description("its a test1").name("thetest1")
                 .build();
-        final Tag tagTwo = entityFactory.tag().create().colour("testcol2").description("its a test2").name("thetest2")
+        final DistributionSetTagManagement.Create tagTwo = DistributionSetTagManagement.Create.builder()
+                .colour("testcol2").description("its a test2").name("thetest2")
                 .build();
 
         final ResultActions result = mvc
-                .perform(post(MgmtRestConstants.DISTRIBUTIONSET_TAG_V1_REQUEST_MAPPING)
-                        .content(JsonBuilder.tags(Arrays.asList(tagOne, tagTwo)))
+                .perform(post(MgmtDistributionSetTagRestApi.DISTRIBUTIONSETTAGS_V1)
+                        .content(toJson(List.of(tagOne, tagTwo)))
                         .contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isCreated())
@@ -210,8 +210,7 @@ class MgmtDistributionSetTagResourceTest extends AbstractManagementApiIntegratio
         assertThat(createdTwo.getDescription()).isEqualTo(tagTwo.getDescription());
         assertThat(createdTwo.getColour()).isEqualTo(tagTwo.getColour());
 
-        result.andExpect(applyTagMatcherOnArrayResult(createdOne))
-                .andExpect(applyTagMatcherOnArrayResult(createdTwo));
+        result.andExpect(applyTagMatcherOnArrayResult(createdOne)).andExpect(applyTagMatcherOnArrayResult(createdTwo));
     }
 
     /**
@@ -225,12 +224,13 @@ class MgmtDistributionSetTagResourceTest extends AbstractManagementApiIntegratio
         final List<DistributionSetTag> tags = testdataFactory.createDistributionSetTags(1);
         final DistributionSetTag original = tags.get(0);
 
-        final Tag update = entityFactory.tag().create().name("updatedName").colour("updatedCol")
-                .description("updatedDesc").build();
+        final DistributionSetTagManagement.Update update = DistributionSetTagManagement.Update.builder()
+                .name("updatedName").colour("updatedCol").description("updatedDesc")
+                .build();
 
         final ResultActions result = mvc
-                .perform(put(MgmtRestConstants.DISTRIBUTIONSET_TAG_V1_REQUEST_MAPPING + "/" + original.getId())
-                        .content(JsonBuilder.tag(update)).contentType(MediaType.APPLICATION_JSON)
+                .perform(put(MgmtDistributionSetTagRestApi.DISTRIBUTIONSETTAGS_V1 + "/" + original.getId())
+                        .content(toJson(update)).contentType(MediaType.APPLICATION_JSON)
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
@@ -256,11 +256,11 @@ class MgmtDistributionSetTagResourceTest extends AbstractManagementApiIntegratio
         final List<DistributionSetTag> tags = testdataFactory.createDistributionSetTags(1);
         final DistributionSetTag original = tags.get(0);
 
-        mvc.perform(delete(MgmtRestConstants.DISTRIBUTIONSET_TAG_V1_REQUEST_MAPPING + "/" + original.getId()))
+        mvc.perform(delete(MgmtDistributionSetTagRestApi.DISTRIBUTIONSETTAGS_V1 + "/" + original.getId()))
                 .andDo(MockMvcResultPrinter.print())
-                .andExpect(status().isOk());
+                .andExpect(status().isNoContent());
 
-        assertThat(distributionSetTagManagement.get(original.getId())).isNotPresent();
+        assertThat(distributionSetTagManagement.find(original.getId())).isNotPresent();
     }
 
     /**
@@ -277,7 +277,7 @@ class MgmtDistributionSetTagResourceTest extends AbstractManagementApiIntegratio
         final List<DistributionSet> sets = testdataFactory.createDistributionSetsWithoutModules(setsAssigned);
         distributionSetManagement.assignTag(sets.stream().map(BaseEntity::getId).toList(), tag.getId());
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_TAG_V1_REQUEST_MAPPING + "/" + tag.getId() + "/assigned"))
+        mvc.perform(get(MgmtDistributionSetTagRestApi.DISTRIBUTIONSETTAGS_V1 + "/" + tag.getId() + "/assigned"))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath(MgmtTargetResourceTest.JSON_PATH_PAGED_LIST_TOTAL, equalTo(setsAssigned)))
@@ -300,7 +300,7 @@ class MgmtDistributionSetTagResourceTest extends AbstractManagementApiIntegratio
         final List<DistributionSet> sets = testdataFactory.createDistributionSetsWithoutModules(setsAssigned);
         distributionSetManagement.assignTag(sets.stream().map(BaseEntity::getId).toList(), tag.getId());
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_TAG_V1_REQUEST_MAPPING + "/" + tag.getId() + "/assigned")
+        mvc.perform(get(MgmtDistributionSetTagRestApi.DISTRIBUTIONSETTAGS_V1 + "/" + tag.getId() + "/assigned")
                         .param(MgmtRestConstants.REQUEST_PARAMETER_PAGING_LIMIT, String.valueOf(limitSize)))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
@@ -326,7 +326,7 @@ class MgmtDistributionSetTagResourceTest extends AbstractManagementApiIntegratio
         final List<DistributionSet> sets = testdataFactory.createDistributionSetsWithoutModules(setsAssigned);
         distributionSetManagement.assignTag(sets.stream().map(BaseEntity::getId).toList(), tag.getId());
 
-        mvc.perform(get(MgmtRestConstants.DISTRIBUTIONSET_TAG_V1_REQUEST_MAPPING + "/" + tag.getId() + "/assigned")
+        mvc.perform(get(MgmtDistributionSetTagRestApi.DISTRIBUTIONSETTAGS_V1 + "/" + tag.getId() + "/assigned")
                         .param(MgmtRestConstants.REQUEST_PARAMETER_PAGING_OFFSET, String.valueOf(offsetParam))
                         .param(MgmtRestConstants.REQUEST_PARAMETER_PAGING_LIMIT, String.valueOf(setsAssigned)))
                 .andDo(MockMvcResultPrinter.print())
@@ -348,12 +348,12 @@ class MgmtDistributionSetTagResourceTest extends AbstractManagementApiIntegratio
         final DistributionSetTag tag = testdataFactory.createDistributionSetTags(1).get(0);
         final DistributionSet set = testdataFactory.createDistributionSetsWithoutModules(1).get(0);
 
-        mvc.perform(post(MgmtRestConstants.DISTRIBUTIONSET_TAG_V1_REQUEST_MAPPING + "/" + tag.getId() + "/assigned/" +
+        mvc.perform(post(MgmtDistributionSetTagRestApi.DISTRIBUTIONSETTAGS_V1 + "/" + tag.getId() + "/assigned/" +
                         set.getId()))
                 .andDo(MockMvcResultPrinter.print())
-                .andExpect(status().isOk());
+                .andExpect(status().isNoContent());
 
-        final List<DistributionSet> updated = distributionSetManagement.findByTag(tag.getId(), PAGE).getContent();
+        final List<? extends DistributionSet> updated = distributionSetManagement.findByTag(tag.getId(), PAGE).getContent();
         assertThat(updated.stream().map(DistributionSet::getId).toList()).containsOnly(set.getId());
     }
 
@@ -369,13 +369,13 @@ class MgmtDistributionSetTagResourceTest extends AbstractManagementApiIntegratio
         final DistributionSetTag tag = testdataFactory.createDistributionSetTags(1).get(0);
         final List<DistributionSet> sets = testdataFactory.createDistributionSetsWithoutModules(2);
 
-        mvc.perform(post(MgmtRestConstants.DISTRIBUTIONSET_TAG_V1_REQUEST_MAPPING + "/" + tag.getId() + "/assigned")
-                        .content(JsonBuilder.toArray(sets.stream().map(DistributionSet::getId).toList()))
+        mvc.perform(post(MgmtDistributionSetTagRestApi.DISTRIBUTIONSETTAGS_V1 + "/" + tag.getId() + "/assigned")
+                        .content(toJson(sets.stream().map(DistributionSet::getId).toList()))
                         .contentType(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
-                .andExpect(status().isOk());
+                .andExpect(status().isNoContent());
 
-        final List<DistributionSet> updated = distributionSetManagement.findByTag(tag.getId(), PAGE).getContent();
+        final List<? extends DistributionSet> updated = distributionSetManagement.findByTag(tag.getId(), PAGE).getContent();
         assertThat(updated.stream().map(DistributionSet::getId).toList())
                 .containsAll(sets.stream().map(DistributionSet::getId).toList());
     }
@@ -397,12 +397,12 @@ class MgmtDistributionSetTagResourceTest extends AbstractManagementApiIntegratio
 
         distributionSetManagement.assignTag(sets.stream().map(BaseEntity::getId).toList(), tag.getId());
 
-        mvc.perform(delete(MgmtRestConstants.DISTRIBUTIONSET_TAG_V1_REQUEST_MAPPING + "/" + tag.getId() + "/assigned/" +
+        mvc.perform(delete(MgmtDistributionSetTagRestApi.DISTRIBUTIONSETTAGS_V1 + "/" + tag.getId() + "/assigned/" +
                         unassigned.getId()))
                 .andDo(MockMvcResultPrinter.print())
-                .andExpect(status().isOk());
+                .andExpect(status().isNoContent());
 
-        final List<DistributionSet> updated = distributionSetManagement.findByTag(tag.getId(), PAGE).getContent();
+        final List<? extends DistributionSet> updated = distributionSetManagement.findByTag(tag.getId(), PAGE).getContent();
         assertThat(updated.stream().map(DistributionSet::getId).toList())
                 .containsOnly(assigned.getId());
     }
@@ -424,13 +424,13 @@ class MgmtDistributionSetTagResourceTest extends AbstractManagementApiIntegratio
 
         distributionSetManagement.assignTag(sets.stream().map(DistributionSet::getId).toList(), tag.getId());
 
-        mvc.perform(delete(MgmtRestConstants.DISTRIBUTIONSET_TAG_V1_REQUEST_MAPPING + "/" + tag.getId() + "/assigned")
-                        .content(JsonBuilder.toArray(List.of(unassigned0.getId(), unassigned1.getId())))
+        mvc.perform(delete(MgmtDistributionSetTagRestApi.DISTRIBUTIONSETTAGS_V1 + "/" + tag.getId() + "/assigned")
+                        .content(toJson(List.of(unassigned0.getId(), unassigned1.getId())))
                         .contentType(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
-                .andExpect(status().isOk());
+                .andExpect(status().isNoContent());
 
-        final List<DistributionSet> updated = distributionSetManagement.findByTag(tag.getId(), PAGE).getContent();
+        final List<? extends DistributionSet> updated = distributionSetManagement.findByTag(tag.getId(), PAGE).getContent();
         assertThat(updated.stream().map(DistributionSet::getId).toList())
                 .containsOnly(assigned.getId());
     }
@@ -460,8 +460,8 @@ class MgmtDistributionSetTagResourceTest extends AbstractManagementApiIntegratio
         withMissing.addAll(missing);
 
         mvc.perform(
-                        post(MgmtRestConstants.DISTRIBUTIONSET_TAG_V1_REQUEST_MAPPING + "/" + tag.getId() + "/assigned")
-                                .content(JsonBuilder.toArray(withMissing))
+                        post(MgmtDistributionSetTagRestApi.DISTRIBUTIONSETTAGS_V1 + "/" + tag.getId() + "/assigned")
+                                .content(toJson(withMissing))
                                 .contentType(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isNotFound())
@@ -470,6 +470,7 @@ class MgmtDistributionSetTagResourceTest extends AbstractManagementApiIntegratio
                     final Map<String, Object> info = exceptionInfo.getInfo();
                     assertThat(info).isNotNull();
                     assertThat(info.get(EntityNotFoundException.TYPE)).isEqualTo(DistributionSet.class.getSimpleName());
+                    @SuppressWarnings("unchecked")
                     final List<String> notFound = (List<String>) info.get(EntityNotFoundException.ENTITY_ID);
                     Collections.sort(notFound);
                     assertThat(notFound).isEqualTo(missing);

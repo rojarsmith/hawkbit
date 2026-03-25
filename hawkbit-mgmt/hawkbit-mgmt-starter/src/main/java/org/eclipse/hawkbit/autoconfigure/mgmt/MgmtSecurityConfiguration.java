@@ -9,17 +9,20 @@
  */
 package org.eclipse.hawkbit.autoconfigure.mgmt;
 
+import static org.eclipse.hawkbit.context.AccessContext.asSystem;
+
 import java.io.Serial;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.eclipse.hawkbit.im.authentication.SpPermission;
+import org.eclipse.hawkbit.auth.SpPermission;
+import org.eclipse.hawkbit.context.Mdc;
 import org.eclipse.hawkbit.mgmt.rest.api.MgmtRestConstants;
 import org.eclipse.hawkbit.oidc.OidcProperties;
 import org.eclipse.hawkbit.oidc.OidcProperties.Oauth2.ResourceServer.Jwt.Claim;
@@ -27,8 +30,6 @@ import org.eclipse.hawkbit.repository.SystemManagement;
 import org.eclipse.hawkbit.rest.SecurityManagedConfiguration;
 import org.eclipse.hawkbit.rest.security.DosFilter;
 import org.eclipse.hawkbit.security.HawkbitSecurityProperties;
-import org.eclipse.hawkbit.security.MdcHandler;
-import org.eclipse.hawkbit.security.SystemSecurityContext;
 import org.eclipse.hawkbit.tenancy.TenantAwareAuthenticationDetails;
 import org.eclipse.hawkbit.tenancy.TenantAwareUser;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,7 +62,7 @@ import org.springframework.security.web.session.SessionManagementFilter;
  */
 @Slf4j
 @Configuration
-@EnableConfigurationProperties({HawkbitSecurityProperties.class, OidcProperties.class})
+@EnableConfigurationProperties({ HawkbitSecurityProperties.class, OidcProperties.class })
 @EnableWebSecurity
 public class MgmtSecurityConfiguration {
 
@@ -84,8 +85,8 @@ public class MgmtSecurityConfiguration {
         final FilterRegistrationBean<DosFilter> filterRegBean = SecurityManagedConfiguration.dosFilter(null,
                 securityProperties.getDos().getFilter(), securityProperties.getClients());
         filterRegBean.setUrlPatterns(List.of(
-                MgmtRestConstants.BASE_REST_MAPPING + "/*",
-                MgmtRestConstants.BASE_SYSTEM_MAPPING + "/admin/*"));
+                MgmtRestConstants.REST + "/*",
+                "/system/admin/*"));
         filterRegBean.setOrder(SecurityManagedConfiguration.DOS_FILTER_ORDER);
         filterRegBean.setName("dosMgmtFilter");
 
@@ -103,23 +104,17 @@ public class MgmtSecurityConfiguration {
     @Order(350)
     SecurityFilterChain filterChainREST(
             final HttpSecurity http,
-            @Autowired(required = false)
-            @Qualifier("hawkbitOAuth2ResourceServerCustomizer") final Customizer<OAuth2ResourceServerConfigurer<HttpSecurity>> oauth2ResourceServerCustomizer,
+            @Autowired(required = false) @Qualifier("hawkbitOAuth2ResourceServerCustomizer") final Customizer<OAuth2ResourceServerConfigurer<HttpSecurity>> oauth2ResourceServerCustomizer,
             // called just before build of the SecurityFilterChain.
             // could be used for instance to set authentication provider
             // Note: implementation of the customizer shall always take in account what is the already set by the hawkBit
-            @Autowired(required = false)
-            @Qualifier("hawkbitHttpSecurityCustomizer") final Customizer<HttpSecurity> httpSecurityCustomizer,
-            final SystemManagement systemManagement,
-            final SystemSecurityContext systemSecurityContext) throws Exception {
+            @Autowired(required = false) @Qualifier("hawkbitHttpSecurityCustomizer") final Customizer<HttpSecurity> httpSecurityCustomizer,
+            final SystemManagement systemManagement) throws Exception {
         http
-                .securityMatcher(MgmtRestConstants.BASE_REST_MAPPING + "/**", MgmtRestConstants.BASE_SYSTEM_MAPPING + "/admin/**")
-                .authorizeHttpRequests(amrmRegistry ->
-                        amrmRegistry
-                                .requestMatchers(MgmtRestConstants.BASE_SYSTEM_MAPPING + "/admin/**")
-                                .hasAnyAuthority(SpPermission.SYSTEM_ADMIN)
-                                .anyRequest()
-                                .authenticated())
+                .securityMatcher(MgmtRestConstants.REST + "/**")
+                .authorizeHttpRequests(amrmRegistry -> amrmRegistry
+                        .anyRequest()
+                        .authenticated())
                 .anonymous(AbstractHttpConfigurer::disable)
                 .csrf(AbstractHttpConfigurer::disable)
                 .addFilterAfter(
@@ -127,7 +122,7 @@ public class MgmtSecurityConfiguration {
                         (request, response, chain) -> {
                             final Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
                             if (authentication != null && authentication.isAuthenticated()) {
-                                systemSecurityContext.runAsSystem(systemManagement::getTenantMetadataWithoutDetails);
+                                asSystem(systemManagement::getTenantMetadataWithoutDetails);
                             }
                             chain.doFilter(request, response);
                         },
@@ -159,7 +154,7 @@ public class MgmtSecurityConfiguration {
             httpSecurityCustomizer.customize(http);
         }
 
-        MdcHandler.Filter.addMdcFilter(http);
+        Mdc.Filter.addMdcFilter(http);
 
         return http.build();
     }
@@ -178,7 +173,7 @@ public class MgmtSecurityConfiguration {
                 final String tenant = tenantClaim == null ? "DEFAULT" : followPathInJwtClaims(jwt, tenantClaim, String.class);
                 final Collection<GrantedAuthority> authorities = Optional
                         .ofNullable(followPathInJwtClaims(jwt, rolesClaim, Collection.class))
-                        .map(resourceRoles -> ((Collection<String>)resourceRoles).stream()
+                        .map(resourceRoles -> ((Collection<String>) resourceRoles).stream()
                                 .distinct()
                                 .map(SimpleGrantedAuthority::new)
                                 .map(GrantedAuthority.class::cast)
@@ -192,6 +187,9 @@ public class MgmtSecurityConfiguration {
         private static <T> T followPathInJwtClaims(final Jwt jwt, final String path, final Class<T> clazz) {
             final String[] chunks = path.split("\\.");
             Object current = jwt.getClaims();
+            if (current == null) {
+                return null;
+            }
             for (final String chunk : chunks) {
                 if (current instanceof Map<?, ?> map) {
                     current = map.get(chunk);
@@ -208,7 +206,7 @@ public class MgmtSecurityConfiguration {
                 return null;
             }
 
-            return (T)current;
+            return (T) current;
         }
 
         @Getter

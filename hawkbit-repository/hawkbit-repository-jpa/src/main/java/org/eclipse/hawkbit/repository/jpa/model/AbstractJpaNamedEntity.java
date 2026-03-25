@@ -9,8 +9,6 @@
  */
 package org.eclipse.hawkbit.repository.jpa.model;
 
-import java.io.Serial;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.MappedSuperclass;
 import jakarta.validation.constraints.NotNull;
@@ -20,6 +18,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.ToString;
 import org.eclipse.hawkbit.repository.model.NamedEntity;
 import org.eclipse.hawkbit.repository.model.TenantAwareBaseEntity;
 
@@ -29,13 +28,11 @@ import org.eclipse.hawkbit.repository.model.TenantAwareBaseEntity;
 @NoArgsConstructor(access = AccessLevel.PROTECTED) // Default constructor needed for JPA entities
 @Setter
 @Getter
+@ToString(callSuper = true)
 @MappedSuperclass
 // exception squid:S2160 - BaseEntity equals/hashcode is handling correctly for sub entities
 @SuppressWarnings("squid:S2160")
 public abstract class AbstractJpaNamedEntity extends AbstractJpaTenantAwareBaseEntity implements NamedEntity {
-
-    @Serial
-    private static final long serialVersionUID = 1L;
 
     @Column(name = "name", nullable = false, length = NAME_MAX_SIZE)
     @Size(min = 1, max = NAME_MAX_SIZE)

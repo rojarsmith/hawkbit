@@ -9,135 +9,120 @@
  */
 package org.eclipse.hawkbit.repository;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
+import static org.eclipse.hawkbit.auth.SpringEvalExpressions.HAS_READ_REPOSITORY;
 
-import jakarta.validation.Valid;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Optional;
+import java.util.Set;
+
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
-import org.eclipse.hawkbit.im.authentication.SpPermission;
-import org.eclipse.hawkbit.repository.builder.TargetTypeCreate;
-import org.eclipse.hawkbit.repository.builder.TargetTypeUpdate;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.ToString;
+import lombok.experimental.SuperBuilder;
+import org.eclipse.hawkbit.auth.SpPermission;
+import org.eclipse.hawkbit.auth.SpringEvalExpressions;
+import org.eclipse.hawkbit.repository.exception.TargetTypeKeyOrNameRequiredException;
+import org.eclipse.hawkbit.repository.model.DistributionSetType;
+import org.eclipse.hawkbit.repository.model.NamedEntity;
 import org.eclipse.hawkbit.repository.model.TargetType;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Slice;
+import org.eclipse.hawkbit.repository.model.Type;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 /**
  * Management service for {@link TargetType}s.
  */
-public interface TargetTypeManagement {
+public interface TargetTypeManagement<T extends TargetType>
+        extends RepositoryManagement<T, TargetTypeManagement.Create, TargetTypeManagement.Update> {
+
+    String HAS_UPDATE_TARGET_TYPE_AND_READ_DISTRIBUTION_SET_TYPE = SpringEvalExpressions.HAS_UPDATE_REPOSITORY + " and hasAuthority('READ_" + SpPermission.DISTRIBUTION_SET_TYPE + "')";
+
+    @Override
+    default String permissionGroup() {
+        return SpPermission.TARGET_TYPE;
+    }
 
     /**
      * @param key as {@link TargetType#getKey()}
      * @return {@link TargetType}
      */
-    @PreAuthorize(SpPermission.SpringEvalExpressions.HAS_AUTH_READ_TARGET)
-    Optional<TargetType> getByKey(@NotEmpty String key);
-
-    /**
-     * @param name as {@link TargetType#getName()}
-     * @return {@link TargetType}
-     */
-    @PreAuthorize(SpPermission.SpringEvalExpressions.HAS_AUTH_READ_TARGET)
-    Optional<TargetType> getByName(@NotEmpty String name);
-
-    /**
-     * @return total count
-     */
-    @PreAuthorize(SpPermission.SpringEvalExpressions.HAS_AUTH_READ_TARGET)
-    long count();
-
-    /**
-     * @param name as {@link TargetType#getName()}
-     * @return total count by name
-     */
-    @PreAuthorize(SpPermission.SpringEvalExpressions.HAS_AUTH_READ_TARGET)
-    long countByName(String name);
-
-    /**
-     * @param create TargetTypeCreate
-     * @return targetType
-     */
-    @PreAuthorize(SpPermission.SpringEvalExpressions.HAS_AUTH_CREATE_TARGET)
-    TargetType create(@NotNull @Valid TargetTypeCreate create);
-
-    /**
-     * @param creates List of TargetTypeCreate
-     * @return List of targetType
-     */
-    @PreAuthorize(SpPermission.SpringEvalExpressions.HAS_AUTH_CREATE_TARGET)
-    List<TargetType> create(@NotEmpty @Valid Collection<TargetTypeCreate> creates);
-
-    /**
-     * @param id targetTypeId
-     */
-    @PreAuthorize(SpPermission.SpringEvalExpressions.HAS_AUTH_DELETE_TARGET)
-    void delete(@NotNull Long id);
-
-    /**
-     * @param pageable Page
-     * @return TargetType page
-     */
-    @PreAuthorize(SpPermission.SpringEvalExpressions.HAS_AUTH_READ_TARGET)
-    Slice<TargetType> findAll(@NotNull Pageable pageable);
-
-    /**
-     * @param rsql query param
-     * @param pageable Page
-     * @return Target type
-     */
-    @PreAuthorize(SpPermission.SpringEvalExpressions.HAS_AUTH_READ_TARGET)
-    Page<TargetType> findByRsql(@NotEmpty String rsql, @NotNull Pageable pageable);
-
-    /**
-     * Retrieves {@link TargetType}s by filtering on the given parameters.
-     *
-     * @param name has text of filters to be applied.
-     * @param pageable page parameter
-     * @return the page of found {@link TargetType}
-     */
-    @PreAuthorize(SpPermission.SpringEvalExpressions.HAS_AUTH_READ_TARGET)
-    Slice<TargetType> findByName(String name, @NotNull Pageable pageable);
-
-    /**
-     * @param id Target type ID
-     * @return Target Type
-     */
-    @PreAuthorize(SpPermission.SpringEvalExpressions.HAS_AUTH_READ_TARGET)
-    Optional<TargetType> get(long id);
-
-    /**
-     * @param ids List of Target type ID
-     * @return Target type list
-     */
-    @PreAuthorize(SpPermission.SpringEvalExpressions.HAS_AUTH_READ_TARGET)
-    List<TargetType> get(@NotEmpty Collection<Long> ids);
-
-    /**
-     * @param update TargetTypeUpdate
-     * @return Target Type
-     */
-    @PreAuthorize(SpPermission.SpringEvalExpressions.HAS_AUTH_UPDATE_TARGET)
-    TargetType update(@NotNull @Valid TargetTypeUpdate update);
+    @PreAuthorize(HAS_READ_REPOSITORY)
+    Optional<TargetType> findByKey(@NotEmpty String key);
 
     /**
      * @param id Target type ID
      * @param distributionSetTypeIds Distribution set ID
      * @return Target type
      */
-    @PreAuthorize(SpPermission.SpringEvalExpressions.HAS_AUTH_READ_REPOSITORY_AND_UPDATE_TARGET)
-    TargetType assignCompatibleDistributionSetTypes(long id,
-            @NotEmpty Collection<Long> distributionSetTypeIds);
+    @PreAuthorize(HAS_UPDATE_TARGET_TYPE_AND_READ_DISTRIBUTION_SET_TYPE)
+    TargetType assignCompatibleDistributionSetTypes(long id, @NotEmpty Collection<Long> distributionSetTypeIds);
 
     /**
      * @param id Target type ID
      * @param distributionSetTypeIds Distribution set ID
      * @return Target type
      */
-    @PreAuthorize(SpPermission.SpringEvalExpressions.HAS_AUTH_READ_REPOSITORY_AND_UPDATE_TARGET)
+    @PreAuthorize(HAS_UPDATE_TARGET_TYPE_AND_READ_DISTRIBUTION_SET_TYPE)
     TargetType unassignDistributionSetType(long id, long distributionSetTypeIds);
+
+    @SuperBuilder
+    @Getter
+    @EqualsAndHashCode(callSuper = true)
+    @ToString(callSuper = true)
+    final class Create extends UpdateCreate {
+
+        @ValidString
+        @Size(min = 1, max = Type.KEY_MAX_SIZE)
+        @NotNull
+        private String key;
+
+        @ValidString
+        @Size(min = 1, max = NamedEntity.NAME_MAX_SIZE)
+        @NotNull
+        private String name;
+
+        private Set<DistributionSetType> distributionSetTypes;
+
+        @SuppressWarnings("java:S1144") // java:S1144 - constructor is actually used by SuperBuilder's build() method
+        private Create(final CreateBuilder<?, ?> builder) {
+            super(builder);
+            if (builder.key == null && builder.name == null) {
+                throw new TargetTypeKeyOrNameRequiredException("Key or name of the target type shall be specified!");
+            }
+            key = builder.key == null ? builder.name : builder.key;
+            name = builder.name == null ? builder.key : builder.name;
+            distributionSetTypes = builder.distributionSetTypes == null ? Collections.emptySet() : builder.distributionSetTypes;
+        }
+    }
+
+    @SuperBuilder
+    @Getter
+    @EqualsAndHashCode(callSuper = true)
+    @ToString(callSuper = true)
+    final class Update extends UpdateCreate implements Identifiable<Long> {
+
+        @NotNull
+        private Long id;
+
+        @ValidString
+        @Size(min = 1, max = NamedEntity.NAME_MAX_SIZE)
+        private String name;
+    }
+
+    @SuperBuilder
+    @Getter
+    class UpdateCreate {
+
+        @ValidString
+        @Size(max = NamedEntity.DESCRIPTION_MAX_SIZE)
+        private String description;
+
+        @ValidString
+        @Size(max = Type.COLOUR_MAX_SIZE)
+        private String colour;
+    }
 }

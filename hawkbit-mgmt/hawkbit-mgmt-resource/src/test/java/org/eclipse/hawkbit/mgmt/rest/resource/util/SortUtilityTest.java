@@ -17,7 +17,7 @@ import java.util.List;
 import org.eclipse.hawkbit.mgmt.rest.resource.exception.SortParameterSyntaxErrorException;
 import org.eclipse.hawkbit.mgmt.rest.resource.exception.SortParameterUnsupportedDirectionException;
 import org.eclipse.hawkbit.mgmt.rest.resource.exception.SortParameterUnsupportedFieldException;
-import org.eclipse.hawkbit.repository.TargetFields;
+import org.eclipse.hawkbit.repository.qfields.TargetFields;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Sort.Order;
 
@@ -63,7 +63,7 @@ class SortUtilityTest {
     }
 
     /**
-     * Sorting based on name with case sensitive is possible.
+     * Sorting based on name with case-sensitive is possible.
      */
     @Test
     @SuppressWarnings("squid:S2699") // assert no error

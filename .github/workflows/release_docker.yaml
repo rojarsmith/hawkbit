@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: "Release ${{ inputs.revision }}"
         run: echo "Releasing ${{ inputs.revision }}"
@@ -30,7 +30,7 @@ jobs:
         run: |
           ALL_APPS=(
             # microservices
-            "hawkbit-ddi-server",  "hawkbit-dmf-server", "hawkbit-mgmt-server", "hawkbit-simple-ui", 
+            "hawkbit-ddi-server",  "hawkbit-dmf-server", "hawkbit-mgmt-server", "hawkbit-ui", 
             # monolith
             "hawkbit-update-server",
             # db init
@@ -57,7 +57,7 @@ jobs:
           done
 
       - name: Log into Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}

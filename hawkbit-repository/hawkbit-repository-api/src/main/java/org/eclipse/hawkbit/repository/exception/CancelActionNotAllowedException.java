@@ -11,39 +11,23 @@ package org.eclipse.hawkbit.repository.exception;
 
 import java.io.Serial;
 
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import org.eclipse.hawkbit.exception.AbstractServerRtException;
 import org.eclipse.hawkbit.exception.SpServerError;
 
 /**
- * Thrown if cancellation of action is requested where the action cannot be
- * cancelled (e.g. the action is not active or is already a canceled action) or
- * controller provides cancellation feedback on an action that is actually not
- * in canceling state.
+ * Thrown if cancellation of action is requested where the action cannot be cancelled (e.g. the action is not active or is already a canceled
+ * action) or controller provides cancellation feedback on an action that is actually not in canceling state.
  */
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
 public final class CancelActionNotAllowedException extends AbstractServerRtException {
 
     @Serial
     private static final long serialVersionUID = 1L;
 
-    /**
-     * Creates a new CancelActionNotAllowed with
-     * {@link SpServerError#SP_ACTION_NOT_CANCELABLE} error.
-     */
-    public CancelActionNotAllowedException() {
-        super(SpServerError.SP_ACTION_NOT_CANCELABLE);
-    }
-
-    /**
-     * @param cause for the exception
-     */
-    public CancelActionNotAllowedException(final Throwable cause) {
-        super(SpServerError.SP_ACTION_NOT_CANCELABLE, cause);
-    }
-
-    /**
-     * @param message of the error
-     */
     public CancelActionNotAllowedException(final String message) {
-        super(message, SpServerError.SP_ACTION_NOT_CANCELABLE);
+        super(SpServerError.SP_ACTION_NOT_CANCELABLE, message);
     }
 }

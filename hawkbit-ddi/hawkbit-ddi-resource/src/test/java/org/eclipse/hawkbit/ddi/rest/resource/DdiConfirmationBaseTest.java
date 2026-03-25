@@ -10,7 +10,7 @@
 package org.eclipse.hawkbit.ddi.rest.resource;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.eclipse.hawkbit.repository.jpa.management.JpaConfirmationManagement.CONFIRMATION_CODE_MSG_PREFIX;
+import static org.eclipse.hawkbit.repository.ConfirmationManagement.CONFIRMATION_CODE_MSG_PREFIX;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
@@ -23,9 +23,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
+import org.eclipse.hawkbit.context.AccessContext;
 import org.eclipse.hawkbit.ddi.json.model.DdiActivateAutoConfirmation;
 import org.eclipse.hawkbit.ddi.json.model.DdiConfirmationFeedback;
-import org.eclipse.hawkbit.ddi.rest.api.DdiRestConstants;
+import org.eclipse.hawkbit.ddi.rest.api.DdiRootControllerRestApi;
 import org.eclipse.hawkbit.repository.event.remote.TargetAssignDistributionSetEvent;
 import org.eclipse.hawkbit.repository.event.remote.TargetPollEvent;
 import org.eclipse.hawkbit.repository.event.remote.entity.ActionCreatedEvent;
@@ -106,25 +107,24 @@ class DdiConfirmationBaseTest extends AbstractDDiApiIntegrationTest {
         final long current = System.currentTimeMillis();
         final String expectedConfirmationBaseLink = String.format(
                 "/%s/controller/v1/%s/confirmationBase/%d",
-                tenantAware.getCurrentTenant(), DEFAULT_CONTROLLER_ID, uaction.getId());
+                AccessContext.tenant(), DEFAULT_CONTROLLER_ID, uaction.getId());
 
-        performGet(CONTROLLER_BASE, MediaTypes.HAL_JSON, status().isOk(), tenantAware.getCurrentTenant(), DEFAULT_CONTROLLER_ID)
+        performGet(CONTROLLER_BASE, MediaTypes.HAL_JSON, status().isOk(), AccessContext.tenant(), DEFAULT_CONTROLLER_ID)
                 .andExpect(jsonPath("$.config.polling.sleep", equalTo("00:01:00")))
                 .andExpect(jsonPath("$._links.confirmationBase.href", containsString(expectedConfirmationBaseLink)))
                 .andExpect(jsonPath("$._links.deploymentBase.href").doesNotExist());
 
-        assertThat(targetManagement.getByControllerID(DEFAULT_CONTROLLER_ID).get().getLastTargetQuery())
-                .isGreaterThanOrEqualTo(current);
-        assertThat(targetManagement.getByControllerID(DEFAULT_CONTROLLER_ID).get().getLastTargetQuery())
+        assertThat(targetManagement.getByControllerId(DEFAULT_CONTROLLER_ID).getLastTargetQuery()).isGreaterThanOrEqualTo(current);
+        assertThat(targetManagement.getByControllerId(DEFAULT_CONTROLLER_ID).getLastTargetQuery())
                 .isLessThanOrEqualTo(System.currentTimeMillis());
         assertThat(actionStatusRepository.count()).isEqualTo(2);
 
-        final DistributionSet findDistributionSetByAction = distributionSetManagement.findByAction(action.getId()).get();
+        final DistributionSet findDistributionSetByAction = findDsByAction(action.getId()).orElseThrow();
 
         getAndVerifyConfirmationBasePayload(
                 DEFAULT_CONTROLLER_ID, MediaType.APPLICATION_JSON, ds, artifact,
                 artifactSignature, action.getId(),
-                findDistributionSetByAction.findFirstModuleByType(osType).get().getId(), "forced", "forced");
+                findFirstModuleByType(findDistributionSetByAction, osType).orElseThrow().getId(), "forced", "forced");
 
         // Retrieved is reported
         final Iterable<ActionStatus> actionStatus = deploymentManagement
@@ -142,7 +142,7 @@ class DdiConfirmationBaseTest extends AbstractDDiApiIntegrationTest {
         final Target target = testdataFactory.createTarget();
         final DistributionSet distributionSet = testdataFactory.createDistributionSet("");
 
-        final Long softwareModuleId = distributionSet.getModules().stream().findAny().get().getId();
+        final Long softwareModuleId = distributionSet.getModules().stream().findAny().orElseThrow().getId();
         testdataFactory.createArtifacts(softwareModuleId);
 
         assignDistributionSet(distributionSet.getId(), target.getName());
@@ -150,12 +150,12 @@ class DdiConfirmationBaseTest extends AbstractDDiApiIntegrationTest {
         final Action action = deploymentManagement.findActiveActionsByTarget(target.getControllerId(), PAGE).getContent().get(0);
 
         // get confirmation base
-        performGet(CONFIRMATION_BASE_ACTION, MediaType.parseMediaType(DdiRestConstants.MEDIA_TYPE_CBOR),
-                status().isOk(), tenantAware.getCurrentTenant(), target.getControllerId(), action.getId().toString());
+        performGet(CONFIRMATION_BASE_ACTION, MediaType.parseMediaType(DdiRootControllerRestApi.MEDIA_TYPE_APPLICATION_CBOR),
+                status().isOk(), AccessContext.tenant(), target.getControllerId(), action.getId().toString());
 
         // get artifacts
-        performGet(SOFTWARE_MODULE_ARTIFACTS, MediaType.parseMediaType(DdiRestConstants.MEDIA_TYPE_CBOR),
-                status().isOk(), tenantAware.getCurrentTenant(), target.getControllerId(),
+        performGet(SOFTWARE_MODULE_ARTIFACTS, MediaType.parseMediaType(DdiRootControllerRestApi.MEDIA_TYPE_APPLICATION_CBOR),
+                status().isOk(), AccessContext.tenant(), target.getControllerId(),
                 String.valueOf(softwareModuleId));
     }
 
@@ -171,12 +171,12 @@ class DdiConfirmationBaseTest extends AbstractDDiApiIntegrationTest {
         final String controllerId = savedTarget.getControllerId();
         final Action savedAction = deploymentManagement.findActiveActionsByTarget(controllerId, PAGE).getContent().get(0);
 
-        mvc.perform(get(CONTROLLER_BASE, tenantAware.getCurrentTenant(), controllerId).accept(MediaType.APPLICATION_JSON))
+        mvc.perform(get(CONTROLLER_BASE, AccessContext.tenant(), controllerId).accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$._links.confirmationBase.href").doesNotExist());
 
-        mvc.perform(get(CONFIRMATION_BASE_ACTION, tenantAware.getCurrentTenant(), controllerId, savedAction.getId())
+        mvc.perform(get(CONFIRMATION_BASE_ACTION, AccessContext.tenant(), controllerId, savedAction.getId())
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isNotFound());
@@ -196,18 +196,18 @@ class DdiConfirmationBaseTest extends AbstractDDiApiIntegrationTest {
         final String controllerId = savedTarget.getControllerId();
 
         final Action savedAction = deploymentManagement.findActiveActionsByTarget(controllerId, PAGE).getContent().get(0);
-        mvc.perform(get(CONTROLLER_BASE, tenantAware.getCurrentTenant(), controllerId).accept(MediaType.APPLICATION_JSON))
+        mvc.perform(get(CONTROLLER_BASE, AccessContext.tenant(), controllerId).accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$._links.confirmationBase.href").exists())
                 .andExpect(jsonPath("$._links.deploymentBase.href").doesNotExist());
 
-        mvc.perform(get(CONFIRMATION_BASE_ACTION, tenantAware.getCurrentTenant(), controllerId, savedAction.getId())
+        mvc.perform(get(CONFIRMATION_BASE_ACTION, AccessContext.tenant(), controllerId, savedAction.getId())
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk());
 
-        mvc.perform(get(DEPLOYMENT_BASE, tenantAware.getCurrentTenant(), controllerId, savedAction.getId())
+        mvc.perform(get(DEPLOYMENT_BASE, AccessContext.tenant(), controllerId, savedAction.getId())
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isNotFound());
@@ -262,7 +262,7 @@ class DdiConfirmationBaseTest extends AbstractDDiApiIntegrationTest {
             @Expect(type = DistributionSetUpdatedEvent.class, count = 1), // implicit lock
             @Expect(type = SoftwareModuleUpdatedEvent.class, count = 3), // implicit lock
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
-            @Expect(type = ActionCreatedEvent.class, count = 1), 
+            @Expect(type = ActionCreatedEvent.class, count = 1),
             @Expect(type = ActionUpdatedEvent.class, count = 2),
             @Expect(type = TargetUpdatedEvent.class, count = 1),
             @Expect(type = TargetUpdatedEvent.class, count = 1), 
@@ -301,13 +301,13 @@ class DdiConfirmationBaseTest extends AbstractDDiApiIntegrationTest {
 
         final String confirmationBaseActionLink = String.format(
                 "/%s/controller/v1/%s/confirmationBase/%d",
-                tenantAware.getCurrentTenant(), controllerId, actionId);
+                AccessContext.tenant(), controllerId, actionId);
 
         final String activateAutoConfLink = String.format(
                 "/%s/controller/v1/%s/confirmationBase/activateAutoConfirm",
-                tenantAware.getCurrentTenant(), controllerId);
+                AccessContext.tenant(), controllerId);
 
-        mvc.perform(get(CONFIRMATION_BASE, tenantAware.getCurrentTenant(), controllerId).accept(MediaType.APPLICATION_JSON))
+        mvc.perform(get(CONFIRMATION_BASE, AccessContext.tenant(), controllerId).accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("autoConfirm.active", equalTo(Boolean.FALSE)))
@@ -328,9 +328,9 @@ class DdiConfirmationBaseTest extends AbstractDDiApiIntegrationTest {
 
         final String deactivateAutoConfLink = String.format(
                 "/%s/controller/v1/%s/confirmationBase/deactivateAutoConfirm",
-                tenantAware.getCurrentTenant(), controllerId);
+                AccessContext.tenant(), controllerId);
 
-        mvc.perform(get(CONFIRMATION_BASE, tenantAware.getCurrentTenant(), controllerId).accept(MediaType.APPLICATION_JSON))
+        mvc.perform(get(CONFIRMATION_BASE, AccessContext.tenant(), controllerId).accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("autoConfirm.active", equalTo(Boolean.TRUE)))
@@ -354,12 +354,12 @@ class DdiConfirmationBaseTest extends AbstractDDiApiIntegrationTest {
 
         final DdiActivateAutoConfirmation body = new DdiActivateAutoConfirmation(initiator, remark);
 
-        mvc.perform(post(ACTIVATE_AUTO_CONFIRM, tenantAware.getCurrentTenant(), controllerId)
+        mvc.perform(post(ACTIVATE_AUTO_CONFIRM, AccessContext.tenant(), controllerId)
                         .content(getMapper().writeValueAsString(body)).contentType(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk());
 
-        assertThat(confirmationManagement.getStatus(controllerId)).hasValueSatisfying(status -> {
+        assertThat(confirmationManagement.findStatus(controllerId)).hasValueSatisfying(status -> {
             assertThat(status.getInitiator()).isEqualTo(initiator);
             assertThat(status.getRemark()).isEqualTo(remark);
             assertThat(status.getCreatedBy()).isEqualTo("bumlux");
@@ -375,11 +375,11 @@ class DdiConfirmationBaseTest extends AbstractDDiApiIntegrationTest {
 
         confirmationManagement.activateAutoConfirmation(controllerId, null, null);
 
-        mvc.perform(post(DEACTIVATE_AUTO_CONFIRM, tenantAware.getCurrentTenant(), controllerId))
+        mvc.perform(post(DEACTIVATE_AUTO_CONFIRM, AccessContext.tenant(), controllerId))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk());
 
-        assertThat(confirmationManagement.getStatus(controllerId)).isEmpty();
+        assertThat(confirmationManagement.findStatus(controllerId)).isEmpty();
     }
 
     /**
@@ -415,15 +415,15 @@ class DdiConfirmationBaseTest extends AbstractDDiApiIntegrationTest {
         // asserts that deployment link is not available
         final String expectedConfirmationBaseLink = String.format(
                 "/%s/controller/v1/%s/confirmationBase/%d",
-                tenantAware.getCurrentTenant(), controllerId, savedAction.getId());
+                AccessContext.tenant(), controllerId, savedAction.getId());
 
-        mvc.perform(get(CONTROLLER_BASE, tenantAware.getCurrentTenant(), controllerId).accept(MediaType.APPLICATION_JSON))
+        mvc.perform(get(CONTROLLER_BASE, AccessContext.tenant(), controllerId).accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$._links.deploymentBase.href").doesNotExist())
                 .andExpect(jsonPath("$._links.confirmationBase.href", containsString(expectedConfirmationBaseLink)));
 
-        mvc.perform(get(DEPLOYMENT_BASE, tenantAware.getCurrentTenant(), controllerId, savedAction.getId())
+        mvc.perform(get(DEPLOYMENT_BASE, AccessContext.tenant(), controllerId, savedAction.getId())
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isNotFound());
@@ -440,7 +440,7 @@ class DdiConfirmationBaseTest extends AbstractDDiApiIntegrationTest {
             @Expect(type = DistributionSetUpdatedEvent.class, count = 1), // implicit lock
             @Expect(type = SoftwareModuleUpdatedEvent.class, count = 3), // implicit lock
             @Expect(type = TargetAssignDistributionSetEvent.class, count = 1),
-            @Expect(type = ActionCreatedEvent.class, count = 1), 
+            @Expect(type = ActionCreatedEvent.class, count = 1),
             @Expect(type = ActionUpdatedEvent.class, count = 2),
             @Expect(type = TargetUpdatedEvent.class, count = 1),
             @Expect(type = TenantConfigurationCreatedEvent.class, count = 1) })
@@ -461,14 +461,14 @@ class DdiConfirmationBaseTest extends AbstractDDiApiIntegrationTest {
                 .andExpect(status().isOk());
 
         // confirmationBase not available in RUNNING state anymore
-        mvc.perform(get(CONFIRMATION_BASE_ACTION, tenantAware.getCurrentTenant(), savedTarget.getControllerId(),
+        mvc.perform(get(CONFIRMATION_BASE_ACTION, AccessContext.tenant(), savedTarget.getControllerId(),
                         savedAction.getId()).contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isNotFound());
 
         // assert confirmed message against deploymentBase endpoint
         // this call will update the action due to retrieved action status update
-        mvc.perform(get(DEPLOYMENT_BASE + "?actionHistory=2", tenantAware.getCurrentTenant(), savedTarget.getControllerId(),
+        mvc.perform(get(DEPLOYMENT_BASE + "?actionHistory=2", AccessContext.tenant(), savedTarget.getControllerId(),
                         savedAction.getId()).contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
@@ -488,9 +488,9 @@ class DdiConfirmationBaseTest extends AbstractDDiApiIntegrationTest {
     private void verifyActionInDeploymentBaseState(final String controllerId, final long actionId) throws Exception {
         final String expectedDeploymentBaseLink = String.format(
                 "/%s/controller/v1/%s/deploymentBase/%d",
-                tenantAware.getCurrentTenant(), controllerId, actionId);
+                AccessContext.tenant(), controllerId, actionId);
 
-        mvc.perform(get(CONTROLLER_BASE, tenantAware.getCurrentTenant(), controllerId).accept(MediaType.APPLICATION_JSON))
+        mvc.perform(get(CONTROLLER_BASE, AccessContext.tenant(), controllerId).accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$._links.deploymentBase.href", containsString(expectedDeploymentBaseLink)))
@@ -503,18 +503,18 @@ class DdiConfirmationBaseTest extends AbstractDDiApiIntegrationTest {
     }
 
     private void verifyActionInConfirmationBaseState(final String controllerId, final long actionId) throws Exception {
-        mvc.perform(get(CONTROLLER_BASE, tenantAware.getCurrentTenant(), controllerId).accept(MediaType.APPLICATION_JSON))
+        mvc.perform(get(CONTROLLER_BASE, AccessContext.tenant(), controllerId).accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$._links.confirmationBase.href").exists())
                 .andExpect(jsonPath("$._links.deploymentBase.href").doesNotExist());
 
-        mvc.perform(get(CONFIRMATION_BASE_ACTION, tenantAware.getCurrentTenant(), controllerId, actionId)
+        mvc.perform(get(CONFIRMATION_BASE_ACTION, AccessContext.tenant(), controllerId, actionId)
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk());
 
-        mvc.perform(get(DEPLOYMENT_BASE, tenantAware.getCurrentTenant(), controllerId, actionId)
+        mvc.perform(get(DEPLOYMENT_BASE, AccessContext.tenant(), controllerId, actionId)
                         .accept(MediaType.APPLICATION_JSON))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isNotFound());
@@ -529,7 +529,7 @@ class DdiConfirmationBaseTest extends AbstractDDiApiIntegrationTest {
 
         final String feedback = getJsonConfirmationFeedback(confirmation, code, Collections.singletonList(message));
         return mvc.perform(
-                post(CONFIRMATION_FEEDBACK, tenantAware.getCurrentTenant(), target.getControllerId(), action.getId())
+                post(CONFIRMATION_FEEDBACK, AccessContext.tenant(), target.getControllerId(), action.getId())
                         .content(feedback).contentType(MediaType.APPLICATION_JSON));
     }
 }

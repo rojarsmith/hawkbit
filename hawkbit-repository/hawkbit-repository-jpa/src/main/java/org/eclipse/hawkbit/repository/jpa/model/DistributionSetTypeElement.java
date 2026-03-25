@@ -9,14 +9,11 @@
  */
 package org.eclipse.hawkbit.repository.jpa.model;
 
-import java.io.Serial;
-import java.io.Serializable;
+import java.util.Objects;
 
 import jakarta.persistence.Column;
-import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
-import jakarta.persistence.ForeignKey;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapsId;
@@ -36,27 +33,20 @@ import org.eclipse.hawkbit.repository.model.SoftwareModuleType;
 @NoArgsConstructor // Default constructor for JPA
 @Entity
 @Table(name = "sp_ds_type_element")
-public class DistributionSetTypeElement implements Serializable {
-
-    @Serial
-    private static final long serialVersionUID = 1L;
+public class DistributionSetTypeElement {
 
     @EmbeddedId
     private DistributionSetTypeElementCompositeKey key;
 
     @MapsId("dsType")
     @ManyToOne(optional = false)
-    @JoinColumn(
-            name = "distribution_set_type", nullable = false, updatable = false,
-            foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_ds_type_element_distribution_set_type"))
+    @JoinColumn(name = "distribution_set_type", nullable = false, updatable = false)
     private JpaDistributionSetType dsType;
 
     @Getter
     @MapsId("smType")
     @ManyToOne(optional = false)
-    @JoinColumn(
-            name = "software_module_type", nullable = false, updatable = false,
-            foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_ds_type_element_software_module_type"))
+    @JoinColumn(name = "software_module_type", nullable = false, updatable = false)
     private JpaSoftwareModuleType smType;
 
     @Setter
@@ -85,28 +75,13 @@ public class DistributionSetTypeElement implements Serializable {
 
     @Override
     public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + (key == null ? 0 : key.hashCode());
-        return result;
+        return Objects.hash(key, mandatory);
     }
 
     @Override
     public boolean equals(final Object obj) {
-        if (this == obj) {
-            return true;
-        }
-        if (obj == null) {
-            return false;
-        }
-        if (getClass() != obj.getClass()) {
-            return false;
-        }
-        final DistributionSetTypeElement other = (DistributionSetTypeElement) obj;
-        if (key == null) {
-            return other.key == null;
-        } else {
-            return key.equals(other.key);
-        }
+        return obj instanceof DistributionSetTypeElement distributionSetTypeElement &&
+                Objects.equals(key, distributionSetTypeElement.key) &&
+                Objects.equals(mandatory, distributionSetTypeElement.mandatory);
     }
 }

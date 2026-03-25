@@ -14,7 +14,6 @@ import java.security.SecureRandom;
 import java.security.cert.CertificateException;
 import java.util.Base64;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
 
@@ -45,7 +44,7 @@ public class AuthenticationSetupHelper {
     private static final String AUTHENTICATION_MODE_HEADER_ENABLED = "authentication.header.enabled";
     private static final String AUTHENTICATION_MODE_HEADER_AUTHORITY_NAME = "authentication.header.authority";
 
-    private static final Random RND = new SecureRandom();
+    private static final Random SECURE_RND = new SecureRandom();
 
     @NonNull
     private final Tenant tenant;
@@ -54,7 +53,7 @@ public class AuthenticationSetupHelper {
 
     public static String randomToken() {
         final byte[] rnd = new byte[24];
-        RND.nextBytes(rnd);
+        SECURE_RND.nextBytes(rnd);
         return Base64.getEncoder().encodeToString(rnd);
     }
 
@@ -113,7 +112,7 @@ public class AuthenticationSetupHelper {
         }
     }
 
-    // if gateway token is configured then the gateway auth is enabled, so all devices use gateway token authentication.
+    // if gateway token is configured then the gateway authentication is enabled, so all devices use gateway token authentication.
     // otherwise, target token authentication is enabled - then all devices shall be registered and the target token shall be set to the one from
     // the DDI controller instance
     public void setupTargetAuthentication() {

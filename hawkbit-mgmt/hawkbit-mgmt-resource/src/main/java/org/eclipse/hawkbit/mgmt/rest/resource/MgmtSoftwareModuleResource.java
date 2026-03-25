@@ -16,12 +16,14 @@ import java.io.InputStream;
 import java.text.MessageFormat;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import jakarta.validation.ValidationException;
 
 import lombok.extern.slf4j.Slf4j;
-import org.eclipse.hawkbit.artifact.repository.urlhandler.ArtifactUrlHandler;
+import org.eclipse.hawkbit.artifact.model.ArtifactHashes;
+import org.eclipse.hawkbit.artifact.urlresolver.ArtifactUrlResolver;
 import org.eclipse.hawkbit.audit.AuditLog;
 import org.eclipse.hawkbit.mgmt.json.model.PagedList;
 import org.eclipse.hawkbit.mgmt.json.model.artifact.MgmtArtifact;
@@ -35,7 +37,6 @@ import org.eclipse.hawkbit.mgmt.rest.api.MgmtSoftwareModuleRestApi;
 import org.eclipse.hawkbit.mgmt.rest.resource.mapper.MgmtSoftwareModuleMapper;
 import org.eclipse.hawkbit.mgmt.rest.resource.util.PagingUtility;
 import org.eclipse.hawkbit.repository.ArtifactManagement;
-import org.eclipse.hawkbit.repository.EntityFactory;
 import org.eclipse.hawkbit.repository.SoftwareModuleManagement;
 import org.eclipse.hawkbit.repository.SoftwareModuleTypeManagement;
 import org.eclipse.hawkbit.repository.SystemManagement;
@@ -43,7 +44,8 @@ import org.eclipse.hawkbit.repository.exception.EntityNotFoundException;
 import org.eclipse.hawkbit.repository.model.Artifact;
 import org.eclipse.hawkbit.repository.model.ArtifactUpload;
 import org.eclipse.hawkbit.repository.model.SoftwareModule;
-import org.eclipse.hawkbit.repository.model.SoftwareModuleMetadata;
+import org.eclipse.hawkbit.repository.model.SoftwareModule.MetadataValue;
+import org.eclipse.hawkbit.repository.model.SoftwareModule.MetadataValueCreate;
 import org.eclipse.hawkbit.repository.model.SoftwareModuleType;
 import org.eclipse.hawkbit.rest.json.model.ResponseList;
 import org.springframework.data.domain.Page;
@@ -62,23 +64,25 @@ import org.springframework.web.multipart.MultipartFile;
 public class MgmtSoftwareModuleResource implements MgmtSoftwareModuleRestApi {
 
     private final ArtifactManagement artifactManagement;
-    private final SoftwareModuleManagement softwareModuleManagement;
-    private final SoftwareModuleTypeManagement softwareModuleTypeManagement;
-    private final ArtifactUrlHandler artifactUrlHandler;
+    private final SoftwareModuleManagement<? extends SoftwareModule> softwareModuleManagement;
+    private final SoftwareModuleTypeManagement<? extends SoftwareModuleType> softwareModuleTypeManagement;
+    private final ArtifactUrlResolver artifactUrlHandler;
+    private final MgmtSoftwareModuleMapper mgmtSoftwareModuleMapper;
     private final SystemManagement systemManagement;
-    private final EntityFactory entityFactory;
 
     MgmtSoftwareModuleResource(
-            final ArtifactManagement artifactManagement, final SoftwareModuleManagement softwareModuleManagement,
-            final SoftwareModuleTypeManagement softwareModuleTypeManagement,
-            final ArtifactUrlHandler artifactUrlHandler, final SystemManagement systemManagement,
-            final EntityFactory entityFactory) {
+            final ArtifactManagement artifactManagement,
+            final SoftwareModuleManagement<? extends SoftwareModule> softwareModuleManagement,
+            final SoftwareModuleTypeManagement<? extends SoftwareModuleType> softwareModuleTypeManagement,
+            final ArtifactUrlResolver artifactUrlHandler,
+            final MgmtSoftwareModuleMapper mgmtSoftwareModuleMapper,
+            final SystemManagement systemManagement) {
         this.artifactManagement = artifactManagement;
         this.softwareModuleManagement = softwareModuleManagement;
         this.softwareModuleTypeManagement = softwareModuleTypeManagement;
         this.artifactUrlHandler = artifactUrlHandler;
+        this.mgmtSoftwareModuleMapper = mgmtSoftwareModuleMapper;
         this.systemManagement = systemManagement;
-        this.entityFactory = entityFactory;
     }
 
     @Override
@@ -95,14 +99,17 @@ public class MgmtSoftwareModuleResource implements MgmtSoftwareModuleRestApi {
         }
 
         try (final InputStream in = file.getInputStream()) {
-            final Artifact result = artifactManagement.create(new ArtifactUpload(in, softwareModuleId, fileName,
-                    md5Sum == null ? null : md5Sum.toLowerCase(), sha1Sum == null ? null : sha1Sum.toLowerCase(),
-                    sha256Sum == null ? null : sha256Sum.toLowerCase(), false, file.getContentType(), file.getSize()));
+            final Artifact result = artifactManagement.create(new ArtifactUpload(
+                    in, file.getContentType(), file.getSize(),
+                    new ArtifactHashes(
+                            sha1Sum == null ? null : sha1Sum.toLowerCase(),
+                            md5Sum == null ? null : md5Sum.toLowerCase(),
+                            sha256Sum == null ? null : sha256Sum.toLowerCase()),
+                    softwareModuleId, fileName, false));
 
-            final MgmtArtifact reponse = MgmtSoftwareModuleMapper.toResponse(result);
-            MgmtSoftwareModuleMapper.addLinks(result, reponse);
-
-            return ResponseEntity.status(HttpStatus.CREATED).body(reponse);
+            final MgmtArtifact response = MgmtSoftwareModuleMapper.toResponse(result);
+            MgmtSoftwareModuleMapper.addLinks(result, response);
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (final IOException e) {
             log.error("Failed to store artifact", e);
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
@@ -134,12 +141,12 @@ public class MgmtSoftwareModuleResource implements MgmtSoftwareModuleRestApi {
     public ResponseEntity<MgmtArtifact> getArtifact(final Long softwareModuleId, final Long artifactId, final Boolean useArtifactUrlHandler) {
         final SoftwareModule module = findSoftwareModuleWithExceptionIfNotFound(softwareModuleId, artifactId);
 
-        final MgmtArtifact response = MgmtSoftwareModuleMapper.toResponse(module.getArtifact(artifactId).get());
+        final MgmtArtifact response = MgmtSoftwareModuleMapper.toResponse(module.getArtifact(artifactId).orElseThrow());
         if (!module.isDeleted()) {
             if (Boolean.TRUE.equals(useArtifactUrlHandler)) {
-                MgmtSoftwareModuleMapper.addLinks(module.getArtifact(artifactId).get(), response, artifactUrlHandler, systemManagement);
+                MgmtSoftwareModuleMapper.addLinks(module.getArtifact(artifactId).orElseThrow(), response, artifactUrlHandler, systemManagement);
             } else {
-                MgmtSoftwareModuleMapper.addLinks(module.getArtifact(artifactId).get(), response);
+                MgmtSoftwareModuleMapper.addLinks(module.getArtifact(artifactId).orElseThrow(), response);
             }
         }
 
@@ -152,18 +159,18 @@ public class MgmtSoftwareModuleResource implements MgmtSoftwareModuleRestApi {
         findSoftwareModuleWithExceptionIfNotFound(softwareModuleId, artifactId);
         artifactManagement.delete(artifactId);
 
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
     @Override
     public ResponseEntity<PagedList<MgmtSoftwareModule>> getSoftwareModules(
             final String rsqlParam, final int pagingOffsetParam, final int pagingLimitParam, final String sortParam) {
         final Pageable pageable = PagingUtility.toPageable(pagingOffsetParam, pagingLimitParam, sanitizeSoftwareModuleSortParam(sortParam));
-        final Slice<SoftwareModule> findModulesAll;
+        final Slice<? extends SoftwareModule> findModulesAll;
         final long countModulesAll;
         if (rsqlParam != null) {
             findModulesAll = softwareModuleManagement.findByRsql(rsqlParam, pageable);
-            countModulesAll = ((Page<SoftwareModule>) findModulesAll).getTotalElements();
+            countModulesAll = ((Page<?>) findModulesAll).getTotalElements();
         } else {
             findModulesAll = softwareModuleManagement.findAll(pageable);
             countModulesAll = softwareModuleManagement.count();
@@ -188,7 +195,7 @@ public class MgmtSoftwareModuleResource implements MgmtSoftwareModuleRestApi {
         log.debug("creating {} softwareModules", softwareModules.size());
 
         for (final MgmtSoftwareModuleRequestBodyPost sm : softwareModules) {
-            final Optional<SoftwareModuleType> opt = softwareModuleTypeManagement.findByKey(sm.getType());
+            final Optional<? extends SoftwareModuleType> opt = softwareModuleTypeManagement.findByKey(sm.getType());
             opt.ifPresent(smType -> {
                 if (smType.isDeleted()) {
                     final String text = "Cannot create Software Module from type with key {0}. Software Module Type already deleted!";
@@ -197,8 +204,8 @@ public class MgmtSoftwareModuleResource implements MgmtSoftwareModuleRestApi {
                 }
             });
         }
-        final Collection<SoftwareModule> createdSoftwareModules = softwareModuleManagement
-                .create(MgmtSoftwareModuleMapper.smFromRequest(entityFactory, softwareModules));
+        final Collection<? extends SoftwareModule> createdSoftwareModules = softwareModuleManagement
+                .create(mgmtSoftwareModuleMapper.smFromRequest(softwareModules));
         log.debug("{} softwareModules created, return status {}", softwareModules.size(), HttpStatus.CREATED);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(MgmtSoftwareModuleMapper.toResponse(createdSoftwareModules));
@@ -208,10 +215,12 @@ public class MgmtSoftwareModuleResource implements MgmtSoftwareModuleRestApi {
     public ResponseEntity<MgmtSoftwareModule> updateSoftwareModule(
             final Long softwareModuleId, final MgmtSoftwareModuleRequestBodyPut restSoftwareModule) {
         final SoftwareModule module = softwareModuleManagement
-                .update(entityFactory.softwareModule().update(softwareModuleId)
+                .update(SoftwareModuleManagement.Update.builder()
+                        .id(softwareModuleId)
                         .description(restSoftwareModule.getDescription())
                         .vendor(restSoftwareModule.getVendor())
-                        .locked(restSoftwareModule.getLocked()));
+                        .locked(restSoftwareModule.getLocked())
+                        .build());
 
         final MgmtSoftwareModule response = MgmtSoftwareModuleMapper.toResponse(module);
         MgmtSoftwareModuleMapper.addLinks(module, response);
@@ -225,12 +234,13 @@ public class MgmtSoftwareModuleResource implements MgmtSoftwareModuleRestApi {
         final SoftwareModule module = findSoftwareModuleWithExceptionIfNotFound(softwareModuleId, null);
         softwareModuleManagement.delete(module.getId());
 
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
     @Override
-    public void createMetadata(final Long softwareModuleId, final List<MgmtSoftwareModuleMetadata> metadataRest) {
-        softwareModuleManagement.createMetadata(MgmtSoftwareModuleMapper.fromRequestSwMetadata(entityFactory, softwareModuleId, metadataRest));
+    public ResponseEntity<Void> createMetadata(final Long softwareModuleId, final List<MgmtSoftwareModuleMetadata> metadataRest) {
+        softwareModuleManagement.createMetadata(softwareModuleId, MgmtSoftwareModuleMapper.fromRequestSwMetadata(metadataRest));
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     @Override
@@ -238,33 +248,33 @@ public class MgmtSoftwareModuleResource implements MgmtSoftwareModuleRestApi {
         // check if software module exists otherwise throw exception immediately
         findSoftwareModuleWithExceptionIfNotFound(softwareModuleId, null);
 
-        final List<SoftwareModuleMetadata> metadata = softwareModuleManagement.getMetadata(softwareModuleId);
+        final Map<String, MetadataValue> metadata = softwareModuleManagement.getMetadata(softwareModuleId);
         return ResponseEntity.ok(new PagedList<>(MgmtSoftwareModuleMapper.toResponseSwMetadata(metadata), metadata.size()));
     }
 
     @Override
     public ResponseEntity<MgmtSoftwareModuleMetadata> getMetadataValue(final Long softwareModuleId, final String metadataKey) {
-        final SoftwareModuleMetadata findOne = softwareModuleManagement.getMetadata(softwareModuleId).stream()
-                .filter(entry -> entry.getKey().equals(metadataKey))
-                .findFirst()
-                .orElseThrow(() -> new EntityNotFoundException("SoftwareModule metadata", softwareModuleId + ":" + metadataKey));
+        final MetadataValue metadataValue = softwareModuleManagement.getMetadata(softwareModuleId).get(metadataKey);
+        if (metadataValue == null) {
+            throw new EntityNotFoundException("SoftwareModule metadata", softwareModuleId + ":" + metadataKey);
+        }
 
-        return ResponseEntity.ok(MgmtSoftwareModuleMapper.toResponseSwMetadata(findOne));
+        return ResponseEntity.ok(MgmtSoftwareModuleMapper.toResponseSwMetadata(metadataKey, metadataValue));
     }
 
     @Override
-    public void updateMetadata(final Long softwareModuleId, final String metadataKey, final MgmtSoftwareModuleMetadataBodyPut metadata) {
-        softwareModuleManagement.updateMetadata(
-                entityFactory.softwareModuleMetadata()
-                        .update(softwareModuleId, metadataKey)
-                        .value(metadata.getValue())
-                        .targetVisible(metadata.getTargetVisible()));
+    public ResponseEntity<Void> updateMetadata(
+            final Long softwareModuleId, final String metadataKey, final MgmtSoftwareModuleMetadataBodyPut metadata) {
+        softwareModuleManagement.createMetadata(
+                softwareModuleId, metadataKey, new MetadataValueCreate(metadata.getValue(), metadata.getTargetVisible()));
+        return ResponseEntity.noContent().build();
     }
 
     @Override
     @AuditLog(entity = "SoftwareModule", type = AuditLog.Type.DELETE, description = "Delete Software Module Metadata")
-    public void deleteMetadata(final Long softwareModuleId, final String metadataKey) {
+    public ResponseEntity<Void> deleteMetadata(final Long softwareModuleId, final String metadataKey) {
         softwareModuleManagement.deleteMetadata(softwareModuleId, metadataKey);
+        return ResponseEntity.noContent().build();
     }
 
     private static MgmtRepresentationMode parseRepresentationMode(final String representationModeParam) {
@@ -276,7 +286,7 @@ public class MgmtSoftwareModuleResource implements MgmtSoftwareModuleRestApi {
     }
 
     private SoftwareModule findSoftwareModuleWithExceptionIfNotFound(final Long softwareModuleId, final Long artifactId) {
-        final SoftwareModule module = softwareModuleManagement.get(softwareModuleId)
+        final SoftwareModule module = softwareModuleManagement.find(softwareModuleId)
                 .orElseThrow(() -> new EntityNotFoundException(SoftwareModule.class, softwareModuleId));
 
         if (artifactId != null && module.getArtifact(artifactId).isEmpty()) {

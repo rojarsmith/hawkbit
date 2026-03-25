@@ -9,15 +9,11 @@
  */
 package org.eclipse.hawkbit.repository.jpa.model;
 
-import java.io.Serial;
-import java.io.Serializable;
 import java.util.List;
 
 import jakarta.persistence.CascadeType;
-import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.ForeignKey;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
 import jakarta.persistence.JoinColumn;
@@ -37,21 +33,16 @@ import org.eclipse.hawkbit.repository.model.Target;
 @IdClass(RolloutTargetGroupId.class)
 @Entity
 @Table(name = "sp_rollout_target_group")
-public class RolloutTargetGroup implements Serializable {
-
-    @Serial
-    private static final long serialVersionUID = 1L;
+public class RolloutTargetGroup {
 
     @Id
     @ManyToOne(optional = false, targetEntity = JpaRolloutGroup.class, fetch = FetchType.LAZY, cascade = { CascadeType.PERSIST })
-    @JoinColumn(name = "rollout_group", nullable = false, updatable = false, foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_rollout_target_group_rollout_group"))
+    @JoinColumn(name = "rollout_group", nullable = false, updatable = false)
     private JpaRolloutGroup rolloutGroup;
 
     @Id
     @ManyToOne(optional = false, targetEntity = JpaTarget.class, fetch = FetchType.LAZY, cascade = { CascadeType.PERSIST })
-    @JoinColumn(
-            name = "target", nullable = false, updatable = false,
-            foreignKey = @ForeignKey(value = ConstraintMode.CONSTRAINT, name = "fk_rollout_target_group_target"))
+    @JoinColumn(name = "target", nullable = false, updatable = false)
     private JpaTarget target;
 
     @OneToMany(targetEntity = JpaAction.class, fetch = FetchType.LAZY, cascade = { CascadeType.PERSIST })

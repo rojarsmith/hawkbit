@@ -24,7 +24,6 @@
     <name>hawkBit :: SDK :: Commons</name>
     <description>SDK commons</description>
 
-
     <dependencies>
         <dependency>
             <groupId>org.springframework.cloud</groupId>

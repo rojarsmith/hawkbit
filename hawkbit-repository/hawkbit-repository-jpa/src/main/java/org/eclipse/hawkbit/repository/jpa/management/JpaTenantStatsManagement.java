@@ -9,12 +9,14 @@
  */
 package org.eclipse.hawkbit.repository.jpa.management;
 
+import org.eclipse.hawkbit.context.AccessContext;
 import org.eclipse.hawkbit.repository.TenantStatsManagement;
 import org.eclipse.hawkbit.repository.jpa.repository.ActionRepository;
-import org.eclipse.hawkbit.repository.jpa.repository.LocalArtifactRepository;
+import org.eclipse.hawkbit.repository.jpa.repository.ArtifactRepository;
 import org.eclipse.hawkbit.repository.jpa.repository.TargetRepository;
-import org.eclipse.hawkbit.repository.report.model.TenantUsage;
-import org.eclipse.hawkbit.tenancy.TenantAware;
+import org.eclipse.hawkbit.repository.model.report.TenantUsage;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -23,26 +25,25 @@ import org.springframework.validation.annotation.Validated;
  * Management service for statistics of a single tenant.
  */
 @Validated
+@Service
+@ConditionalOnBooleanProperty(prefix = "hawkbit.jpa", name = { "enabled", "tenant-stats-management" }, matchIfMissing = true)
 public class JpaTenantStatsManagement implements TenantStatsManagement {
 
     private final TargetRepository targetRepository;
-    private final LocalArtifactRepository artifactRepository;
+    private final ArtifactRepository artifactRepository;
     private final ActionRepository actionRepository;
-    private final TenantAware tenantAware;
 
-    public JpaTenantStatsManagement(
-            final TargetRepository targetRepository, final LocalArtifactRepository artifactRepository, final ActionRepository actionRepository,
-            final TenantAware tenantAware) {
+    protected JpaTenantStatsManagement(
+            final TargetRepository targetRepository, final ArtifactRepository artifactRepository, final ActionRepository actionRepository) {
         this.targetRepository = targetRepository;
         this.artifactRepository = artifactRepository;
         this.actionRepository = actionRepository;
-        this.tenantAware = tenantAware;
     }
 
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public TenantUsage getStatsOfTenant() {
-        final String tenant = tenantAware.getCurrentTenant();
+        final String tenant = AccessContext.tenant();
 
         final TenantUsage result = new TenantUsage(tenant);
 

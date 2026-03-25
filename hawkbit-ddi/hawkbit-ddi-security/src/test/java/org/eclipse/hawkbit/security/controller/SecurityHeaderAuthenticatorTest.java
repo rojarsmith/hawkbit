@@ -10,15 +10,13 @@
 package org.eclipse.hawkbit.security.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.eclipse.hawkbit.tenancy.configuration.TenantConfigurationProperties.TenantConfigurationKey.AUTHENTICATION_HEADER_AUTHORITY;
+import static org.eclipse.hawkbit.tenancy.configuration.TenantConfigurationProperties.TenantConfigurationKey.AUTHENTICATION_HEADER_ENABLED;
 import static org.mockito.Mockito.when;
 
 import org.eclipse.hawkbit.repository.TenantConfigurationManagement;
+import org.eclipse.hawkbit.repository.helper.TenantConfigHelper;
 import org.eclipse.hawkbit.repository.model.TenantConfigurationValue;
-import org.eclipse.hawkbit.security.SecurityContextSerializer;
-import org.eclipse.hawkbit.security.SecurityContextTenantAware;
-import org.eclipse.hawkbit.security.SystemSecurityContext;
-import org.eclipse.hawkbit.tenancy.UserAuthoritiesResolver;
-import org.eclipse.hawkbit.tenancy.configuration.TenantConfigurationProperties.TenantConfigurationKey;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,53 +33,46 @@ class SecurityHeaderAuthenticatorTest {
     private static final String CA_COMMON_NAME = "ca-cn";
     private static final String CA_COMMON_NAME_VALUE = "box1";
 
-    private static final String X_SSL_ISSUER_HASH_1 = "X-Ssl-Issuer-Hash-1";
+    private static final String X_AUTHORITY_1 = "X-Authority-1";
 
-    private static final String SINGLE_HASH = "hash1";
-    private static final String SECOND_HASH = "hash2";
-    private static final String THIRD_HASH = "hash3";
-    private static final String UNKNOWN_HASH = "unknown";
+    private static final String SINGLE_AUTHORITY = "hash1";
+    private static final String SECOND_AUTHORITY = "hash2";
+    private static final String THIRD_AUTHORITY = "hash3";
+    private static final String UNKNOWN_AUTHORITY = "unknown";
 
-    private static final String MULTI_HASH = "HASH1;hash2,HASH3,HASH1";
+    private static final String MULTI_AUTHORITY = "HASH1;hash2,HASH3,HASH1";
 
-    private static final TenantConfigurationValue<String> CONFIG_VALUE_SINGLE_HASH = TenantConfigurationValue
-            .<String> builder().value(SINGLE_HASH).build();
-    private static final TenantConfigurationValue<String> CONFIG_VALUE_MULTI_HASH = TenantConfigurationValue
-            .<String> builder().value(MULTI_HASH).build();
-    private static final TenantConfigurationValue<Boolean> CONFIG_VALUE_ENABLED = TenantConfigurationValue
-            .<Boolean> builder().value(true).build();
-    private static final TenantConfigurationValue<Boolean> CONFIG_VALUE_DISABLED = TenantConfigurationValue
-            .<Boolean> builder().value(false).build();
+    private static final TenantConfigurationValue<String> CONFIG_VALUE_SINGLE_AUTHORITY = TenantConfigurationValue.<String> builder()
+            .value(SINGLE_AUTHORITY).build();
+    private static final TenantConfigurationValue<String> CONFIG_VALUE_MULTI_AUTHORITY = TenantConfigurationValue.<String> builder()
+            .value(MULTI_AUTHORITY).build();
+    private static final TenantConfigurationValue<Boolean> CONFIG_VALUE_ENABLED = TenantConfigurationValue.<Boolean> builder()
+            .value(true).build();
+    private static final TenantConfigurationValue<Boolean> CONFIG_VALUE_DISABLED = TenantConfigurationValue.<Boolean> builder()
+            .value(false).build();
 
     private Authenticator authenticator;
 
     @Mock
     private TenantConfigurationManagement tenantConfigurationManagementMock;
-    @Mock
-    private UserAuthoritiesResolver authoritiesResolver;
-    @Mock
-    private SecurityContextSerializer securityContextSerializer;
 
     @BeforeEach
     void before() {
-        final SecurityContextTenantAware tenantAware = new SecurityContextTenantAware(authoritiesResolver, securityContextSerializer);
-        authenticator = new SecurityHeaderAuthenticator(
-                tenantConfigurationManagementMock, tenantAware,
-                new SystemSecurityContext(tenantAware), CA_COMMON_NAME, "X-Ssl-Issuer-Hash-%d"
-        );
+        TenantConfigHelper.setTenantConfigurationManagement(tenantConfigurationManagementMock);
+        final DdiSecurityProperties.Rp rp = new DdiSecurityProperties.Rp();
+        rp.setControllerIdHeader(CA_COMMON_NAME);
+        authenticator = new SecurityHeaderAuthenticator(rp);
     }
 
     /**
      * Tests successful authentication with multiple a single hashes
      */
     @Test
-    void testWithSingleKnownHash() {
-        final ControllerSecurityToken securityToken = prepareSecurityToken(SINGLE_HASH);
-        when(tenantConfigurationManagementMock.getConfigurationValue(
-                TenantConfigurationKey.AUTHENTICATION_MODE_HEADER_AUTHORITY_NAME, String.class))
-                .thenReturn(CONFIG_VALUE_SINGLE_HASH);
-        when(tenantConfigurationManagementMock.getConfigurationValue(
-                TenantConfigurationKey.AUTHENTICATION_MODE_HEADER_ENABLED, Boolean.class))
+    void testWithSingleTrustedAuthority() {
+        final ControllerSecurityToken securityToken = prepareSecurityToken(SINGLE_AUTHORITY);
+        when(tenantConfigurationManagementMock.getConfigurationValue(AUTHENTICATION_HEADER_AUTHORITY, String.class))
+                .thenReturn(CONFIG_VALUE_SINGLE_AUTHORITY);
+        when(tenantConfigurationManagementMock.getConfigurationValue(AUTHENTICATION_HEADER_ENABLED, Boolean.class))
                 .thenReturn(CONFIG_VALUE_ENABLED);
 
         assertThat(authenticator.authenticate(securityToken))
@@ -93,21 +84,19 @@ class SecurityHeaderAuthenticatorTest {
      * Tests successful authentication with multiple hashes
      */
     @Test
-    void testWithMultipleKnownHashes() {
-        when(tenantConfigurationManagementMock.getConfigurationValue(
-                TenantConfigurationKey.AUTHENTICATION_MODE_HEADER_AUTHORITY_NAME, String.class))
-                .thenReturn(CONFIG_VALUE_MULTI_HASH);
-        when(tenantConfigurationManagementMock.getConfigurationValue(
-                TenantConfigurationKey.AUTHENTICATION_MODE_HEADER_ENABLED, Boolean.class))
+    void testWithMultipleTrustedAuthority() {
+        when(tenantConfigurationManagementMock.getConfigurationValue(AUTHENTICATION_HEADER_AUTHORITY, String.class))
+                .thenReturn(CONFIG_VALUE_MULTI_AUTHORITY);
+        when(tenantConfigurationManagementMock.getConfigurationValue(AUTHENTICATION_HEADER_ENABLED, Boolean.class))
                 .thenReturn(CONFIG_VALUE_ENABLED);
 
-        assertThat(authenticator.authenticate(prepareSecurityToken(SINGLE_HASH)))
+        assertThat(authenticator.authenticate(prepareSecurityToken(SINGLE_AUTHORITY)))
                 .isNotNull()
                 .hasFieldOrPropertyWithValue("principal", CA_COMMON_NAME_VALUE);
-        assertThat(authenticator.authenticate(prepareSecurityToken(SECOND_HASH)))
+        assertThat(authenticator.authenticate(prepareSecurityToken(SECOND_AUTHORITY)))
                 .isNotNull()
                 .hasFieldOrPropertyWithValue("principal", CA_COMMON_NAME_VALUE);
-        assertThat(authenticator.authenticate(prepareSecurityToken(THIRD_HASH)))
+        assertThat(authenticator.authenticate(prepareSecurityToken(THIRD_AUTHORITY)))
                 .isNotNull()
                 .hasFieldOrPropertyWithValue("principal", CA_COMMON_NAME_VALUE);
     }
@@ -116,13 +105,11 @@ class SecurityHeaderAuthenticatorTest {
      * Tests that if the hash is unknown, the authentication fails
      */
     @Test
-    void testWithUnknownHash() {
-        final ControllerSecurityToken securityToken = prepareSecurityToken(UNKNOWN_HASH);
-        when(tenantConfigurationManagementMock.getConfigurationValue(
-                TenantConfigurationKey.AUTHENTICATION_MODE_HEADER_AUTHORITY_NAME, String.class))
-                .thenReturn(CONFIG_VALUE_MULTI_HASH);
-        when(tenantConfigurationManagementMock.getConfigurationValue(
-                TenantConfigurationKey.AUTHENTICATION_MODE_HEADER_ENABLED, Boolean.class))
+    void testWithUnTrustedAuthority() {
+        final ControllerSecurityToken securityToken = prepareSecurityToken(UNKNOWN_AUTHORITY);
+        when(tenantConfigurationManagementMock.getConfigurationValue(AUTHENTICATION_HEADER_AUTHORITY, String.class))
+                .thenReturn(CONFIG_VALUE_MULTI_AUTHORITY);
+        when(tenantConfigurationManagementMock.getConfigurationValue(AUTHENTICATION_HEADER_ENABLED, Boolean.class))
                 .thenReturn(CONFIG_VALUE_ENABLED);
 
         assertThat(authenticator.authenticate(securityToken)).isNull();
@@ -135,7 +122,7 @@ class SecurityHeaderAuthenticatorTest {
     void testWithNonMatchingCN() {
         final ControllerSecurityToken securityToken = new ControllerSecurityToken("DEFAULT", "otherControllerID");
         securityToken.putHeader(CA_COMMON_NAME, CA_COMMON_NAME_VALUE);
-        securityToken.putHeader(X_SSL_ISSUER_HASH_1, SINGLE_HASH);
+        securityToken.putHeader(X_AUTHORITY_1, SINGLE_AUTHORITY);
 
         assertThat(authenticator.authenticate(securityToken)).isNull();
     }
@@ -152,11 +139,9 @@ class SecurityHeaderAuthenticatorTest {
      * Tests that if disabled, the authentication fails
      */
     @Test
-    void testWithSingleKnownHashButDisabled() {
-        final ControllerSecurityToken securityToken = prepareSecurityToken(SINGLE_HASH);
-        when(tenantConfigurationManagementMock.getConfigurationValue(
-                TenantConfigurationKey.AUTHENTICATION_MODE_HEADER_ENABLED, Boolean.class))
-                .thenReturn(CONFIG_VALUE_DISABLED);
+    void testWithSingleTrustedAuthorityButDisabled() {
+        final ControllerSecurityToken securityToken = prepareSecurityToken(SINGLE_AUTHORITY);
+        when(tenantConfigurationManagementMock.getConfigurationValue(AUTHENTICATION_HEADER_ENABLED, Boolean.class)).thenReturn(CONFIG_VALUE_DISABLED);
 
         assertThat(authenticator.authenticate(securityToken)).isNull();
     }
@@ -164,7 +149,7 @@ class SecurityHeaderAuthenticatorTest {
     private static ControllerSecurityToken prepareSecurityToken(final String issuerHashHeaderValue) {
         final ControllerSecurityToken securityToken = new ControllerSecurityToken("DEFAULT", CA_COMMON_NAME_VALUE);
         securityToken.putHeader(CA_COMMON_NAME, CA_COMMON_NAME_VALUE);
-        securityToken.putHeader(X_SSL_ISSUER_HASH_1, issuerHashHeaderValue);
+        securityToken.putHeader(X_AUTHORITY_1, issuerHashHeaderValue);
         return securityToken;
     }
 }

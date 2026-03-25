@@ -11,6 +11,8 @@ package org.eclipse.hawkbit.repository.exception;
 
 import java.io.Serial;
 
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import org.eclipse.hawkbit.exception.AbstractServerRtException;
 import org.eclipse.hawkbit.exception.SpServerError;
 import org.eclipse.hawkbit.repository.model.DistributionSet;
@@ -18,34 +20,16 @@ import org.eclipse.hawkbit.repository.model.DistributionSetType;
 import org.eclipse.hawkbit.repository.model.SoftwareModule;
 
 /**
- * Thrown if user tries to add a {@link SoftwareModule} to a
- * {@link DistributionSet} that is not defined by the
- * {@link DistributionSetType}.
+ * Thrown if user tries to add a {@link SoftwareModule} to a {@link DistributionSet} that is not defined by the {@link DistributionSetType}.
  */
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
 public class UnsupportedSoftwareModuleForThisDistributionSetException extends AbstractServerRtException {
 
     @Serial
     private static final long serialVersionUID = 1L;
 
-    /**
-     * Creates a new UnsupportedSoftwareModuleForThisDistributionSetException
-     * with {@link SpServerError#SP_DS_MODULE_UNSUPPORTED} error.
-     */
     public UnsupportedSoftwareModuleForThisDistributionSetException() {
         super(SpServerError.SP_DS_MODULE_UNSUPPORTED);
-    }
-
-    /**
-     * @param cause for the exception
-     */
-    public UnsupportedSoftwareModuleForThisDistributionSetException(final Throwable cause) {
-        super(SpServerError.SP_DS_MODULE_UNSUPPORTED, cause);
-    }
-
-    /**
-     * @param message of the error
-     */
-    public UnsupportedSoftwareModuleForThisDistributionSetException(final String message) {
-        super(message, SpServerError.SP_DS_MODULE_UNSUPPORTED);
     }
 }

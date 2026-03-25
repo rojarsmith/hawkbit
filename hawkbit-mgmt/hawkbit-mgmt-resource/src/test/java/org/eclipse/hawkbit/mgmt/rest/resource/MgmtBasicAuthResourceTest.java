@@ -19,13 +19,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.Base64;
 
-import org.eclipse.hawkbit.mgmt.rest.api.MgmtRestConstants;
-import org.eclipse.hawkbit.repository.jpa.RepositoryApplicationConfiguration;
+import org.eclipse.hawkbit.mgmt.rest.api.MgmtBasicAuthRestApi;
+import org.eclipse.hawkbit.repository.jpa.JpaRepositoryConfiguration;
 import org.eclipse.hawkbit.repository.test.TestConfiguration;
 import org.eclipse.hawkbit.repository.test.matcher.EventVerifier;
 import org.eclipse.hawkbit.repository.test.util.CleanupTestExecutionListener;
-import org.eclipse.hawkbit.repository.test.util.JUnitTestLoggerExtension;
 import org.eclipse.hawkbit.repository.test.util.SharedSqlTestDatabaseExtension;
+import org.eclipse.hawkbit.repository.test.util.TestLoggerExtension;
 import org.eclipse.hawkbit.repository.test.util.WithUser;
 import org.eclipse.hawkbit.rest.RestConfiguration;
 import org.eclipse.hawkbit.rest.util.MockMvcResultPrinter;
@@ -49,29 +49,26 @@ import org.springframework.web.context.WebApplicationContext;
 
 /**
  * Test for {@link MgmtBasicAuthResource}.
+ * <p/>
+ * Feature: Component Tests - Management API<br/>
+ * Story: Basic authentication Userinfo Resource
  */
 @ActiveProfiles({ "test" })
-@ExtendWith({ JUnitTestLoggerExtension.class, SharedSqlTestDatabaseExtension.class })
+@ExtendWith({ TestLoggerExtension.class, SharedSqlTestDatabaseExtension.class })
 @SpringBootTest
-// destroy the context after each test class because otherwise we get problem
-// when context is
-// refreshed we e.g. get two instances of CacheManager which leads to very
-// strange test failures.
+// destroy the context after each test class because otherwise we get problem when context is
+// refreshed we e.g. get two instances of CacheManager which leads to very strange test failures.
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-// Cleaning repository will fire "delete" events. We won't count them to the
-// test execution. So, the order execution between EventVerifier and Cleanup is
-// important!
-@TestExecutionListeners(listeners = { EventVerifier.class, CleanupTestExecutionListener.class },
+// Cleaning repository will fire "delete" events. We won't count them to the test execution. So, the order execution between EventVerifier and
+// Cleanup is important!
+@TestExecutionListeners(
+        listeners = { EventVerifier.class, CleanupTestExecutionListener.class },
         mergeMode = TestExecutionListeners.MergeMode.MERGE_WITH_DEFAULTS)
 @TestPropertySource(properties = "spring.main.allow-bean-definition-overriding=true")
 @WebAppConfiguration
 @AutoConfigureMockMvc
-@ContextConfiguration(classes = { MgmtApiConfiguration.class, RestConfiguration.class,
-        RepositoryApplicationConfiguration.class, TestConfiguration.class })
-/**
- * Feature: Component Tests - Management API<br/>
- * Story: Basic auth Userinfo Resource
- */
+@ContextConfiguration(
+        classes = { MgmtApiConfiguration.class, RestConfiguration.class, JpaRepositoryConfiguration.class, TestConfiguration.class })
 class MgmtBasicAuthResourceTest {
 
     @Autowired
@@ -82,12 +79,12 @@ class MgmtBasicAuthResourceTest {
     private static final String TEST_USER = "testUser";
 
     /**
-     * Test of userinfo api with basic auth validation
+     * Test of userinfo api with basic authentication validation
      */
     @Test
-    @WithUser(principal = TEST_USER, authorities = {"READ", "WRITE", "DELETE"})
+    @WithUser(principal = TEST_USER, authorities = { "READ", "WRITE", "DELETE" })
     void validateBasicAuthWithUserDetails() throws Exception {
-        withSecurityMock().perform(get(MgmtRestConstants.AUTH_V1_REQUEST_MAPPING))
+        withSecurityMock().perform(get(MgmtBasicAuthRestApi.USERINFO_V1))
                 .andDo(MockMvcResultPrinter.print())
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isOk())
@@ -99,11 +96,11 @@ class MgmtBasicAuthResourceTest {
     }
 
     /**
-     * Test of userinfo api with invalid basic auth fails
+     * Test of userinfo api with invalid basic authentication fails
      */
     @Test
     void validateBasicAuthFailsWithInvalidCredentials() throws Exception {
-        defaultMock.perform(get(MgmtRestConstants.AUTH_V1_REQUEST_MAPPING)
+        defaultMock.perform(get(MgmtBasicAuthRestApi.USERINFO_V1)
                         .header(HttpHeaders.AUTHORIZATION, getBasicAuth("wrongUser", "wrongSecret")))
                 .andDo(MockMvcResultPrinter.print())
                 .andExpect(status().isUnauthorized());

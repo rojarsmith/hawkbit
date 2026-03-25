@@ -9,10 +9,12 @@
  */
 package org.eclipse.hawkbit.event;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import com.fasterxml.jackson.databind.jsontype.NamedType;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -22,8 +24,6 @@ import org.eclipse.hawkbit.repository.event.remote.DistributionSetDeletedEvent;
 import org.eclipse.hawkbit.repository.event.remote.DistributionSetTagDeletedEvent;
 import org.eclipse.hawkbit.repository.event.remote.DistributionSetTypeDeletedEvent;
 import org.eclipse.hawkbit.repository.event.remote.DownloadProgressEvent;
-import org.eclipse.hawkbit.repository.event.remote.MultiActionAssignEvent;
-import org.eclipse.hawkbit.repository.event.remote.MultiActionCancelEvent;
 import org.eclipse.hawkbit.repository.event.remote.RolloutDeletedEvent;
 import org.eclipse.hawkbit.repository.event.remote.RolloutGroupDeletedEvent;
 import org.eclipse.hawkbit.repository.event.remote.RolloutStoppedEvent;
@@ -63,6 +63,14 @@ import org.eclipse.hawkbit.repository.event.remote.entity.TargetTypeUpdatedEvent
 import org.eclipse.hawkbit.repository.event.remote.entity.TargetUpdatedEvent;
 import org.eclipse.hawkbit.repository.event.remote.entity.TenantConfigurationCreatedEvent;
 import org.eclipse.hawkbit.repository.event.remote.entity.TenantConfigurationUpdatedEvent;
+import org.eclipse.hawkbit.repository.event.remote.service.ActionCreatedServiceEvent;
+import org.eclipse.hawkbit.repository.event.remote.service.ActionUpdatedServiceEvent;
+import org.eclipse.hawkbit.repository.event.remote.service.CancelTargetAssignmentServiceEvent;
+import org.eclipse.hawkbit.repository.event.remote.service.TargetAssignDistributionSetServiceEvent;
+import org.eclipse.hawkbit.repository.event.remote.service.TargetAttributesRequestedServiceEvent;
+import org.eclipse.hawkbit.repository.event.remote.service.TargetCreatedServiceEvent;
+import org.eclipse.hawkbit.repository.event.remote.service.TargetDeletedServiceEvent;
+import org.eclipse.hawkbit.repository.event.remote.service.TargetUpdatedServiceEvent;
 
 /**
  * The {@link EventType} class declares the event-type and it's corresponding
@@ -150,9 +158,6 @@ public class EventType {
         // target attributes requested flag
         TYPES.put(37, TargetAttributesRequestedEvent.class);
 
-        // deployment event for assignments and /or cancellations
-        TYPES.put(38, MultiActionAssignEvent.class);
-        TYPES.put(39, MultiActionCancelEvent.class);
 
         // tenant configuration
         TYPES.put(40, TenantConfigurationCreatedEvent.class);
@@ -166,6 +171,16 @@ public class EventType {
         TYPES.put(44, TargetTypeCreatedEvent.class);
         TYPES.put(45, TargetTypeUpdatedEvent.class);
         TYPES.put(46, TargetTypeDeletedEvent.class);
+
+        // processing events - start from 1000 to leave room for future db events
+        TYPES.put(1000, TargetCreatedServiceEvent.class);
+        TYPES.put(1001, TargetUpdatedServiceEvent.class);
+        TYPES.put(1002, TargetDeletedServiceEvent.class);
+        TYPES.put(1003, TargetAssignDistributionSetServiceEvent.class);
+        TYPES.put(1004, TargetAttributesRequestedServiceEvent.class);
+        TYPES.put(1005, CancelTargetAssignmentServiceEvent.class);
+        TYPES.put(1008, ActionCreatedServiceEvent.class);
+        TYPES.put(1009, ActionUpdatedServiceEvent.class);
     }
 
     /**
@@ -196,5 +211,11 @@ public class EventType {
 
     public Class<?> getTargetClass() {
         return TYPES.get(value);
+    }
+
+    public static Collection<NamedType> getNamedTypes() {
+        return TYPES.entrySet().stream()
+                .map(e -> new NamedType(e.getValue(), String.valueOf(e.getKey())))
+                .toList();
     }
 }

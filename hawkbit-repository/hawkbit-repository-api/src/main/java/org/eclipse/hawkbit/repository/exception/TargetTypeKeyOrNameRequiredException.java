@@ -11,12 +11,16 @@ package org.eclipse.hawkbit.repository.exception;
 
 import java.io.Serial;
 
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import org.eclipse.hawkbit.exception.AbstractServerRtException;
 import org.eclipse.hawkbit.exception.SpServerError;
 
 /**
  * Thrown if tried creation of type with no key nor name.
  */
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
 public class TargetTypeKeyOrNameRequiredException extends AbstractServerRtException {
 
     @Serial
@@ -24,11 +28,7 @@ public class TargetTypeKeyOrNameRequiredException extends AbstractServerRtExcept
 
     private static final SpServerError THIS_ERROR = SpServerError.SP_TARGET_TYPE_KEY_OR_NAME_REQUIRED;
 
-    /**
-     * Default constructor.
-     */
     public TargetTypeKeyOrNameRequiredException(final String message) {
-        super(message, THIS_ERROR);
+        super(THIS_ERROR, message);
     }
 }
-

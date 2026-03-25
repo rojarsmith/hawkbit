@@ -9,17 +9,13 @@
  */
 package org.eclipse.hawkbit.repository.model;
 
-import java.util.Optional;
 import java.util.Set;
 
 /**
- * A {@link DistributionSet} defines a meta package that combines a set of
- * {@link SoftwareModule}s which have to be or are provisioned to a
+ * A {@link DistributionSet} defines a meta package that combines a set of {@link SoftwareModule}s which have to be or are provisioned to a
  * {@link Target}.
- *
  * <p>
  * A {@link Target} has exactly one target {@link DistributionSet} assigned.
- * </p>
  */
 public interface DistributionSet extends NamedVersionedEntity {
 
@@ -44,44 +40,32 @@ public interface DistributionSet extends NamedVersionedEntity {
     Set<SoftwareModule> getModules();
 
     /**
-     * @return <code>true</code> if all defined
-     *         {@link DistributionSetType#getMandatoryModuleTypes()} of
-     *         {@link #getType()} are present in this {@link DistributionSet}.
-     */
-    boolean isComplete();
-
-    /**
-     * @return <code>true</code> if this {@link DistributionSet} is locked. If so it's 'functional'
-     *         properties (e.g. software modules) could not be modified anymore.
+     * @return <code>true</code> if this {@link DistributionSet} is locked. If so it's 'functional' properties (e.g. software modules) could not
+     *         be modified anymore.
      */
     boolean isLocked();
 
     /**
-     * @return <code>true</code> if this {@link DistributionSet} is deleted and only kept for history
-     *         purposes.
+     * @return <code>true</code> if this {@link DistributionSet} is deleted and only kept for history purposes.
      */
     boolean isDeleted();
 
     /**
-     * @return <code>false</code> if this {@link DistributionSet} is
-     *         invalidated.
+     * @return <code>false</code> if this {@link DistributionSet} is invalidated.
      */
     boolean isValid();
 
     /**
-     * @return <code>true</code> if {@link DistributionSet} contains a mandatory
-     *         migration step, i.e. unfinished {@link Action}s will kept active
-     *         and not automatically canceled if overridden by a newer update.
+     * @return <code>true</code> if {@link DistributionSet} contains a mandatory migration step, i.e. unfinished {@link Action}s will be kept
+     *         active and not automatically canceled if overridden by a newer update.
      */
     boolean isRequiredMigrationStep();
 
     /**
-     * Searches through modules for the given type.
+     * Returns if the distribution set could be assumed as completed. I.e. all requirements (e.g. mandatory software module types) are satisfied.
      *
-     * @param type to search for
-     * @return SoftwareModule of given type
+     * @return <code>true</code> if all defined {@link DistributionSetType#getMandatoryModuleTypes()} of {@link #getType()} are present in
+     *         this {@link DistributionSet}.
      */
-    default Optional<SoftwareModule> findFirstModuleByType(final SoftwareModuleType type) {
-        return getModules().stream().filter(module -> module.getType().equals(type)).findAny();
-    }
+    boolean isComplete();
 }

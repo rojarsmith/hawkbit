@@ -47,7 +47,7 @@
 
             <build>
                 <plugins>
-                    <!-- Static weaver for EclipseLink -->
+                    <!-- Static weaver for EclipseLink, needs to be in the module where the entity classes are -->
                     <plugin>
                         <groupId>com.ethlo.persistence.tools</groupId>
                         <artifactId>eclipselink-maven-plugin</artifactId>
@@ -97,7 +97,7 @@
         <!-- Hawkbit -->
         <dependency>
             <groupId>org.eclipse.hawkbit</groupId>
-            <artifactId>hawkbit-repository-jpa-api</artifactId>
+            <artifactId>hawkbit-ql-jpa</artifactId>
             <version>${project.version}</version>
         </dependency>
 
@@ -127,10 +127,6 @@
             <artifactId>spring-integration-jdbc</artifactId>
         </dependency>
         <dependency>
-            <groupId>cz.jirutka.rsql</groupId>
-            <artifactId>rsql-parser</artifactId>
-        </dependency>
-        <dependency>
             <groupId>org.jsoup</groupId>
             <artifactId>jsoup</artifactId>
         </dependency>
@@ -150,11 +146,6 @@
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>javax.el</groupId>
-            <artifactId>javax.el-api</artifactId>
-            <scope>test</scope>
-        </dependency>
 
         <!-- Enable metrics -->
         <dependency>
@@ -166,6 +157,11 @@
         <dependency>
             <groupId>org.hibernate.orm</groupId>
             <artifactId>hibernate-micrometer</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.github.classgraph</groupId>
+            <artifactId>classgraph</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

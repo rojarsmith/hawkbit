@@ -10,13 +10,18 @@
 package org.eclipse.hawkbit.repository.jpa.tenancy;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.fail;
+import static org.eclipse.hawkbit.context.AccessContext.asSystem;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.Callable;
 
+import org.eclipse.hawkbit.auth.SpRole;
 import org.eclipse.hawkbit.repository.exception.EntityNotFoundException;
+import org.eclipse.hawkbit.repository.exception.InsufficientPermissionException;
 import org.eclipse.hawkbit.repository.jpa.AbstractJpaIntegrationTest;
 import org.eclipse.hawkbit.repository.model.DistributionSet;
 import org.eclipse.hawkbit.repository.model.Target;
@@ -25,12 +30,12 @@ import org.eclipse.hawkbit.repository.test.util.SecurityContextSwitch;
 import org.eclipse.hawkbit.repository.test.util.WithUser;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Slice;
 
 /**
- * Multi-Tenancy tests which testing the CRUD operations of entities that all
- * CRUD-Operations are tenant aware and cannot access or delete entities not
- * belonging to the current tenant.
+ * Multi-Tenancy tests which testing the CRUD operations of entities that all CRUD-Operations are tenant aware and cannot access
+ * or delete entities not belonging to the current tenant.
  * <p/>
  * Feature: Component Tests - Repository<br/>
  * Story: Multi Tenancy
@@ -54,20 +59,19 @@ class MultiTenancyEntityTest extends AbstractJpaIntegrationTest {
         createTargetForTenant(knownControllerId, anotherTenant);
 
         // ensure both tenants see their target
-        final Slice<Target> findTargetsForTenant = findTargetsForTenant(tenant);
+        final Page<? extends Target> findTargetsForTenant = findTargetsForTenant(tenant);
         assertThat(findTargetsForTenant).hasSize(1);
         assertThat(findTargetsForTenant.getContent().get(0).getTenant().toUpperCase()).isEqualTo(tenant.toUpperCase());
-        final Slice<Target> findTargetsForAnotherTenant = findTargetsForTenant(anotherTenant);
+        final Page<? extends Target> findTargetsForAnotherTenant = findTargetsForTenant(anotherTenant);
         assertThat(findTargetsForAnotherTenant).hasSize(1);
-        assertThat(findTargetsForAnotherTenant.getContent().get(0).getTenant().toUpperCase())
-                .isEqualTo(anotherTenant.toUpperCase());
+        assertThat(findTargetsForAnotherTenant.getContent().get(0).getTenant().toUpperCase()).isEqualTo(anotherTenant.toUpperCase());
     }
 
     /**
      * Ensures that targets created by a tenant are not visible by another tenant.
      */
     @Test
-    @WithUser(tenantId = "mytenant", allSpPermissions = true)
+    @WithUser(tenant = "mytenant", authorities = SpRole.TENANT_ADMIN)
     void queryTargetFromDifferentTenantIsNotVisible() throws Exception {
         // create target for another tenant
         final String anotherTenant = "anotherTenant";
@@ -75,12 +79,12 @@ class MultiTenancyEntityTest extends AbstractJpaIntegrationTest {
         createTargetForTenant(controllerAnotherTenant, anotherTenant);
 
         // find all targets for current tenant "mytenant"
-        final Slice<Target> findTargetsAll = targetManagement.findAll(PAGE);
+        final Page<? extends Target> findTargetsAll = targetManagement.findAll(PAGE);
         // no target has been created for "mytenant"
         assertThat(findTargetsAll).isEmpty();
 
         // find all targets for anotherTenant
-        final Slice<Target> findTargetsForTenant = findTargetsForTenant(anotherTenant);
+        final Page<? extends Target> findTargetsForTenant = findTargetsForTenant(anotherTenant);
         // another tenant should have targets
         assertThat(findTargetsForTenant).hasSize(1);
     }
@@ -89,38 +93,47 @@ class MultiTenancyEntityTest extends AbstractJpaIntegrationTest {
      * Ensures that tenant with proper permissions can read and delete other tenants.
      */
     @Test
-    @WithUser(tenantId = "mytenant", allSpPermissions = true)
-    void deleteAnotherTenantPossible() throws Exception {
+    @WithUser(tenant = "mytenant", authorities = SpRole.TENANT_ADMIN)
+    void deleteAnotherTenantNotPossibleWithTenantPermissions() throws Exception {
         // create target for another tenant
         final String anotherTenant = "anotherTenant";
         final String controllerAnotherTenant = "anotherController";
         createTargetForTenant(controllerAnotherTenant, anotherTenant);
 
-        assertThat(systemManagement.findTenants(PAGE)).as("Expected number if tenants before deletion is").hasSize(3);
+        assertThat(listTenants()).as("Expected number if tenants before deletion is").hasSize(3);
+        assertThatExceptionOfType(InsufficientPermissionException.class).isThrownBy(() -> systemManagement.deleteTenant(anotherTenant));
+        assertThat(listTenants()).as("Expected number if tenants after deletion is").hasSize(3);
+    }
 
+    @Test
+    @WithUser(tenant = "mytenant", authorities = { SpRole.SYSTEM_ROLE })
+    void deleteAnotherTenantPossibleWithSystemRole() throws Exception {
+        // create target for another tenant
+        final String anotherTenant = "anotherTenant";
+        final String controllerAnotherTenant = "anotherController";
+        createTargetForTenant(controllerAnotherTenant, anotherTenant);
+
+        assertThat(listTenants()).as("Expected number if tenants before deletion is").hasSize(3);
         systemManagement.deleteTenant(anotherTenant);
-
-        assertThat(systemManagement.findTenants(PAGE)).as("Expected number if tenants after deletion is").hasSize(2);
+        assertThat(listTenants()).as("Expected number if tenants after deletion is").hasSize(2);
     }
 
     /**
      * Ensures that tenant metadata is retrieved for the current tenant.
      */
     @Test
-    @WithUser(tenantId = "mytenant", autoCreateTenant = false, allSpPermissions = true)
-    void getTenanatMetdata() throws Exception {
-
-        // logged in tenant mytenant - check if tenant default data is
-        // autogenerated
+    @WithUser(tenant = "mytenant", autoCreateTenant = false, authorities = SpRole.TENANT_ADMIN)
+    void getTenantMetdata() throws Exception {
+        // logged in tenant mytenant - check if tenant default data is autogenerated
         assertThat(distributionSetTypeManagement.findAll(PAGE)).isEmpty();
-        SecurityContextSwitch.runAsPrivileged(() ->
+        SecurityContextSwitch.asPrivileged(() ->
                 assertThat(systemManagement.createTenantMetadata("mytenant").getTenant().toUpperCase()).isEqualTo("mytenant".toUpperCase()));
 
         assertThat(distributionSetTypeManagement.findAll(PAGE)).isNotEmpty();
 
         // check that the cache is not getting in the way, i.e. "bumlux" results in bumlux and not mytenant
-        assertThat(SecurityContextSwitch.runAs(
-                SecurityContextSwitch.withUserAndTenantAllSpPermissions("user", "bumlux"),
+        assertThat(SecurityContextSwitch.getAs(
+                SecurityContextSwitch.withTenantAndUserAndAllPermissions("bumlux", "user"),
                 () -> systemManagement.getTenantMetadataWithoutDetails().getTenant().toUpperCase()))
                 .isEqualTo("bumlux".toUpperCase());
     }
@@ -129,7 +142,7 @@ class MultiTenancyEntityTest extends AbstractJpaIntegrationTest {
      * Ensures that targets created from a different tenant cannot be deleted from other tenants
      */
     @Test
-    @WithUser(tenantId = "mytenant", allSpPermissions = true)
+    @WithUser(tenant = "mytenant", authorities = SpRole.TENANT_ADMIN)
     void deleteTargetFromOtherTenantIsNotPossible() throws Exception {
         // create target for another tenant
         final String anotherTenant = "anotherTenant";
@@ -144,7 +157,7 @@ class MultiTenancyEntityTest extends AbstractJpaIntegrationTest {
             // ok
         }
 
-        Slice<Target> targetsForAnotherTenant = findTargetsForTenant(anotherTenant);
+        Page<? extends Target> targetsForAnotherTenant = findTargetsForTenant(anotherTenant);
         assertThat(targetsForAnotherTenant).hasSize(1);
 
         // ensure another tenant can delete the target
@@ -167,25 +180,25 @@ class MultiTenancyEntityTest extends AbstractJpaIntegrationTest {
         createDistributionSetForTenant(anotherTenant);
 
         // ensure both tenants see their distribution sets
-        final Slice<DistributionSet> findDistributionSetsForTenant = findDistributionSetForTenant(tenant);
+        final Slice<? extends DistributionSet> findDistributionSetsForTenant = findDistributionSetForTenant(tenant);
         assertThat(findDistributionSetsForTenant).hasSize(1);
         assertThat(findDistributionSetsForTenant.getContent().get(0).getTenant().toUpperCase())
                 .isEqualTo(tenant.toUpperCase());
-        final Slice<DistributionSet> findDistributionSetsForAnotherTenant = findDistributionSetForTenant(anotherTenant);
+        final Slice<? extends DistributionSet> findDistributionSetsForAnotherTenant = findDistributionSetForTenant(anotherTenant);
         assertThat(findDistributionSetsForAnotherTenant).hasSize(1);
         assertThat(findDistributionSetsForAnotherTenant.getContent().get(0).getTenant().toUpperCase())
                 .isEqualTo(anotherTenant.toUpperCase());
     }
 
     private <T> T runAsTenant(final String tenant, final Callable<T> callable) throws Exception {
-        return SecurityContextSwitch.runAs(SecurityContextSwitch.withUserAndTenantAllSpPermissions("user", tenant), callable);
+        return SecurityContextSwitch.callAs(SecurityContextSwitch.withTenantAndUserAndAllPermissions(tenant, "user"), callable);
     }
 
     private Target createTargetForTenant(final String controllerId, final String tenant) throws Exception {
         return runAsTenant(tenant, () -> testdataFactory.createTarget(controllerId));
     }
 
-    private Slice<Target> findTargetsForTenant(final String tenant) throws Exception {
+    private Page<? extends Target> findTargetsForTenant(final String tenant) throws Exception {
         return runAsTenant(tenant, () -> targetManagement.findAll(PAGE));
     }
 
@@ -196,11 +209,17 @@ class MultiTenancyEntityTest extends AbstractJpaIntegrationTest {
         });
     }
 
-    private DistributionSet createDistributionSetForTenant(final String tenant) throws Exception {
-        return runAsTenant(tenant, () -> testdataFactory.createDistributionSet());
+    private void createDistributionSetForTenant(final String tenant) throws Exception {
+        runAsTenant(tenant, () -> testdataFactory.createDistributionSet());
     }
 
-    private Slice<DistributionSet> findDistributionSetForTenant(final String tenant) throws Exception {
-        return runAsTenant(tenant, () -> distributionSetManagement.findByCompleted(true, PAGE));
+    private Slice<? extends DistributionSet> findDistributionSetForTenant(final String tenant) throws Exception {
+        return runAsTenant(tenant, () -> distributionSetManagement.findAll(PAGE));
+    }
+
+    private List<String> listTenants() {
+        final List<String> tenants = new ArrayList<>();
+        asSystem(() -> systemManagement.forEachTenantAsSystem(tenants::add));
+        return tenants;
     }
 }

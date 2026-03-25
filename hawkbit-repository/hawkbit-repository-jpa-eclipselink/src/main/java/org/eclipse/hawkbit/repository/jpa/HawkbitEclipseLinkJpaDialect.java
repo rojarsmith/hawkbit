@@ -22,33 +22,23 @@ import org.springframework.orm.jpa.JpaSystemException;
 import org.springframework.orm.jpa.vendor.EclipseLinkJpaDialect;
 
 /**
- * {@link EclipseLinkJpaDialect} with additional exception translation
- * mechanisms based on {@link SQLStateSQLExceptionTranslator}.
- *
- * There are multiple variations of exceptions coming out of persistence
- * provider:
- *
- * <p>
- * 1) {@link PersistenceException}s that can be mapped by
- * {@link EclipseLinkJpaDialect} into corresponding {@link DataAccessException}.
- * <p>
- * 2) {@link PersistenceException}s that could not be mapped by
- * {@link EclipseLinkJpaDialect} directly but instead are wrapped into
- * {@link JpaSystemException}.
- * <p>
- * 2.a) here the wrapped exception's causes might be an {@link SQLException}
- * which might be mappable by {@link SQLStateSQLExceptionTranslator} or
- * <p>
- * 2.b.) the wrapped exception's causes due not contain an {@link SQLException}
- * and as a result cannot be mapped.
- * <p>
- * 3) A {@link RuntimeException} that is no {@link PersistenceException}.
- * <p>
- * 3.a) here a cause might be an {@link SQLException} which might be mappable by
- * {@link SQLStateSQLExceptionTranslator} or
- * <p>
- * 3.b.) the cause is not an {@link SQLException} and as a result cannot be
- * mapped.
+ * {@link EclipseLinkJpaDialect} with additional exception translation mechanisms based on {@link SQLStateSQLExceptionTranslator}.
+ * There are multiple variations of exceptions coming out of persistence provider:
+ * <ol>
+ *     <li>{@link PersistenceException}s that can be mapped by {@link EclipseLinkJpaDialect} into corresponding {@link DataAccessException}</li>
+ *     <li>{@link PersistenceException}s that could not be mapped by {@link EclipseLinkJpaDialect} directly but instead are wrapped into {@link JpaSystemException}.
+ *         <ol>
+ *             <li>here the wrapped exception's causes might be an {@link SQLException} which might be mappable by {@link SQLStateSQLExceptionTranslator} or </li>
+ *             <li>the wrapped exception's causes due not contain an {@link SQLException} and as a result cannot be mapped. </li>
+ *         </ol>
+ *     </li>
+ *     <li>A {@link RuntimeException} that is no {@link PersistenceException}.
+ *         <ol>
+ *              <li>here a cause might be an {@link SQLException} which might be mappable by {@link SQLStateSQLExceptionTranslator} or </li>
+ *              <li>the cause is not an {@link SQLException} and as a result cannot be mapped.</li>
+ *         </ol>
+ *     </li>
+ * </ol>
  */
 class HawkbitEclipseLinkJpaDialect extends EclipseLinkJpaDialect {
 
@@ -58,15 +48,13 @@ class HawkbitEclipseLinkJpaDialect extends EclipseLinkJpaDialect {
     @Override
     public DataAccessException translateExceptionIfPossible(@NonNull final RuntimeException ex) {
         final DataAccessException dataAccessException = super.translateExceptionIfPossible(ex);
-
         if (dataAccessException == null) {
             return searchAndTranslateSqlException(ex);
         }
         return translateJpaSystemExceptionIfPossible(dataAccessException);
     }
 
-    private static DataAccessException translateJpaSystemExceptionIfPossible(
-            final DataAccessException accessException) {
+    private static DataAccessException translateJpaSystemExceptionIfPossible(final DataAccessException accessException) {
         if (!(accessException instanceof JpaSystemException)) {
             return accessException;
         }
@@ -83,7 +71,6 @@ class HawkbitEclipseLinkJpaDialect extends EclipseLinkJpaDialect {
         if (sqlException == null) {
             return null;
         }
-
         return JpaExceptionTranslator.getTranslator().translate("", null, sqlException);
     }
 
@@ -96,7 +83,6 @@ class HawkbitEclipseLinkJpaDialect extends EclipseLinkJpaDialect {
             }
             exception = cause;
         } while (exception != null);
-
         return null;
     }
 }

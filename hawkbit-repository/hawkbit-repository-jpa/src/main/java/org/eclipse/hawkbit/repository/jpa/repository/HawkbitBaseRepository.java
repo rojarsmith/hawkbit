@@ -19,7 +19,6 @@ import jakarta.persistence.NoResultException;
 import jakarta.persistence.TypedQuery;
 import jakarta.transaction.Transactional;
 
-import org.eclipse.hawkbit.repository.BaseRepositoryTypeProvider;
 import org.eclipse.hawkbit.repository.jpa.acm.AccessController;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,7 +41,7 @@ import org.springframework.util.ObjectUtils;
  * @param <ID> the type of the id of the entity the repository manages
  */
 @SuppressWarnings("java:S119") // inherited from SimpleJpaRepository
-public class HawkbitBaseRepository<T, ID extends Serializable> extends SimpleJpaRepository<T, ID>
+public final class HawkbitBaseRepository<T, ID extends Serializable> extends SimpleJpaRepository<T, ID>
         implements JpaSpecificationEntityGraphExecutor<T>, NoCountSliceRepository<T>, ACMRepository<T> {
 
     private final EntityManager entityManager;
@@ -174,17 +173,5 @@ public class HawkbitBaseRepository<T, ID extends Serializable> extends SimpleJpa
 
         final List<S> content = query.getResultList();
         return new PageImpl<>(content, pageable, content.size());
-    }
-
-    /**
-     * Simple implementation of {@link BaseRepositoryTypeProvider} leveraging our
-     * {@link HawkbitBaseRepository} for all current use cases
-     */
-    public static class RepositoryTypeProvider implements BaseRepositoryTypeProvider {
-
-        @Override
-        public Class<?> getBaseRepositoryType(final Class<?> repositoryType) {
-            return HawkbitBaseRepository.class;
-        }
     }
 }

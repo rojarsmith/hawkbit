@@ -9,15 +9,16 @@
  */
 package org.eclipse.hawkbit.security.controller;
 
+import static org.eclipse.hawkbit.context.AccessContext.asTenant;
+
+import java.io.Serial;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
 import lombok.EqualsAndHashCode;
-import org.eclipse.hawkbit.im.authentication.SpPermission;
-import org.eclipse.hawkbit.repository.TenantConfigurationManagement;
-import org.eclipse.hawkbit.security.SystemSecurityContext;
-import org.eclipse.hawkbit.tenancy.TenantAware;
+import org.eclipse.hawkbit.auth.SpRole;
+import org.eclipse.hawkbit.repository.helper.TenantConfigHelper;
 import org.eclipse.hawkbit.tenancy.TenantAwareAuthenticationDetails;
 import org.slf4j.Logger;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
@@ -46,23 +47,8 @@ public interface Authenticator {
 
     abstract class AbstractAuthenticator implements Authenticator {
 
-        protected final TenantConfigurationManagement tenantConfigurationManagement;
-        protected final TenantAware tenantAware;
-        protected final SystemSecurityContext systemSecurityContext;
-        private final TenantAware.TenantRunner<Boolean> isEnabledTenantRunner;
-
-        protected AbstractAuthenticator(
-                final TenantConfigurationManagement tenantConfigurationManagement,
-                final TenantAware tenantAware, final SystemSecurityContext systemSecurityContext) {
-            this.tenantConfigurationManagement = tenantConfigurationManagement;
-            this.tenantAware = tenantAware;
-            this.systemSecurityContext = systemSecurityContext;
-            isEnabledTenantRunner = () -> systemSecurityContext.runAsSystem(
-                    () -> tenantConfigurationManagement.getConfigurationValue(getTenantConfigurationKey(), Boolean.class).getValue());
-        }
-
         protected boolean isEnabled(final ControllerSecurityToken securityToken) {
-            return tenantAware.runAsTenant(securityToken.getTenant(), isEnabledTenantRunner);
+            return asTenant(securityToken.getTenant(), () -> TenantConfigHelper.getAsSystem(getTenantConfigurationKey(), Boolean.class));
         }
 
         protected abstract String getTenantConfigurationKey();
@@ -76,8 +62,11 @@ public interface Authenticator {
         @EqualsAndHashCode(callSuper = true)
         private static class AuthenticatedController extends AbstractAuthenticationToken {
 
+            @Serial
+            private static final long serialVersionUID = 1L;
+
             private static final Collection<GrantedAuthority> CONTROLLER_AUTHORITY =
-                    List.of(new SimpleGrantedAuthority(SpPermission.SpringEvalExpressions.CONTROLLER_ROLE));
+                    List.of(new SimpleGrantedAuthority(SpRole.CONTROLLER_ROLE));
             private final String controllerId;
 
             AuthenticatedController(final String tenant, final String controllerId) {

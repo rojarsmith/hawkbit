@@ -58,43 +58,6 @@ public final class DistributionSetSpecification {
     }
 
     /**
-     * {@link Specification} for retrieving {@link DistributionSet}s by its COMPLETED attribute.
-     *
-     * @param isCompleted TRUE/FALSE are compared to the attribute COMPLETED. If NULL the attribute is ignored
-     * @return the {@link DistributionSet} {@link Specification}
-     */
-    public static Specification<JpaDistributionSet> isCompleted(final Boolean isCompleted) {
-        return (dsRoot, query, cb) -> cb.equal(dsRoot.get(JpaDistributionSet_.complete), isCompleted);
-    }
-
-    /**
-     * {@link Specification} for retrieving {@link DistributionSet}s by its VALID attribute.
-     *
-     * @param isValid TRUE/FALSE are compared to the attribute VALID. If NULL the attribute is ignored
-     * @return the {@link DistributionSet} {@link Specification}
-     */
-    public static Specification<JpaDistributionSet> isValid(final Boolean isValid) {
-        return (dsRoot, query, cb) -> cb.equal(dsRoot.get(JpaDistributionSet_.valid), isValid);
-    }
-
-    /**
-     * {@link Specification} for retrieving {@link DistributionSet} with given {@link DistributionSet#getId()}.
-     *
-     * @param distid to search
-     * @return the {@link DistributionSet} {@link Specification}
-     */
-    public static Specification<JpaDistributionSet> byIdFetch(final Long distid) {
-        return (dsRoot, query, cb) -> {
-            final Predicate predicate = cb.equal(dsRoot.get(AbstractJpaBaseEntity_.id), distid);
-            dsRoot.fetch(JpaDistributionSet_.modules, JoinType.LEFT);
-            dsRoot.fetch(JpaDistributionSet_.type, JoinType.LEFT);
-            query.distinct(true);
-
-            return predicate;
-        };
-    }
-
-    /**
      * {@link Specification} for retrieving {@link DistributionSet} with given {@link DistributionSet#getId()}s.
      *
      * @param distids to search
@@ -160,16 +123,6 @@ public final class DistributionSetSpecification {
      */
     public static Specification<JpaDistributionSet> byType(final Long typeId) {
         return (dsRoot, query, cb) -> cb.equal(dsRoot.get(JpaDistributionSet_.type).get(AbstractJpaBaseEntity_.id), typeId);
-    }
-
-    /**
-     * {@link Specification} for retrieving {@link DistributionSet} for given id collection of {@link DistributionSet#getType()}.
-     *
-     * @param typeIds id collection of distribution set type to search
-     * @return the {@link DistributionSet} {@link Specification}
-     */
-    public static Specification<JpaDistributionSet> hasType(final Collection<Long> typeIds) {
-        return (dsRoot, query, cb) -> dsRoot.get(JpaDistributionSet_.type).get(AbstractJpaBaseEntity_.id).in(typeIds);
     }
 
     /**

@@ -15,18 +15,15 @@ import java.util.concurrent.TimeUnit;
 import org.eclipse.hawkbit.repository.model.Action.Status;
 
 /**
- * Status information of an {@link Action} which can be provided by the
- * {@link Target} or is added by the update server itself. This can be the start
- * of the {@link Action} life cycle, the end and update notifications in
- * between.
+ * Status information of an {@link Action} which can be provided by the {@link Target} or is added by the update server itself.
+ * This can be the start of the {@link Action} life cycle, the end and update notifications in between.
  */
 public interface ActionStatus extends TenantAwareBaseEntity {
 
     /**
-     * @return time in {@link TimeUnit#MILLISECONDS} when the status was
-     *         reported.
+     * @return time in {@link TimeUnit#MILLISECONDS} when the status was reported.
      */
-    long getOccurredAt();
+    long getTimestamp();
 
     /**
      * @return {@link Action} this {@link ActionStatus} belongs to.
@@ -34,9 +31,8 @@ public interface ActionStatus extends TenantAwareBaseEntity {
     Action getAction();
 
     /**
-     * @return the {@link Status} of this {@link ActionStatus}. Caused
-     *         potentially a transition change of the {@link #getAction()} if
-     *         different from the previous {@link ActionStatus#getStatus()}.
+     * @return the {@link Status} of this {@link ActionStatus}. Caused potentially a transition change of the {@link #getAction()} if
+     *         different from the previous getStatus call.
      */
     Status getStatus();
 

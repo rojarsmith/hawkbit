@@ -10,6 +10,7 @@
 package org.eclipse.hawkbit.repository.jpa.management;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 import org.eclipse.hawkbit.repository.event.remote.RolloutDeletedEvent;
 import org.eclipse.hawkbit.repository.event.remote.entity.DistributionSetCreatedEvent;
@@ -21,6 +22,7 @@ import org.eclipse.hawkbit.repository.event.remote.entity.RolloutUpdatedEvent;
 import org.eclipse.hawkbit.repository.event.remote.entity.SoftwareModuleCreatedEvent;
 import org.eclipse.hawkbit.repository.event.remote.entity.SoftwareModuleUpdatedEvent;
 import org.eclipse.hawkbit.repository.event.remote.entity.TargetCreatedEvent;
+import org.eclipse.hawkbit.repository.exception.EntityNotFoundException;
 import org.eclipse.hawkbit.repository.jpa.AbstractJpaIntegrationTest;
 import org.eclipse.hawkbit.repository.jpa.model.JpaRolloutGroup;
 import org.eclipse.hawkbit.repository.model.RolloutGroup;
@@ -41,8 +43,8 @@ class RolloutGroupManagementTest extends AbstractJpaIntegrationTest {
     @Test
     @ExpectEvents({ @Expect(type = TargetCreatedEvent.class, count = 0) })
     void nonExistingEntityAccessReturnsNotPresent() {
-        assertThat(rolloutGroupManagement.get(NOT_EXIST_IDL)).isNotPresent();
-        assertThat(rolloutGroupManagement.getWithDetailedStatus(NOT_EXIST_IDL)).isNotPresent();
+        assertThatExceptionOfType(EntityNotFoundException.class).isThrownBy(() -> rolloutGroupManagement.get(NOT_EXIST_IDL));
+        assertThatExceptionOfType(EntityNotFoundException.class).isThrownBy(() -> rolloutGroupManagement.getWithDetailedStatus(NOT_EXIST_IDL));
     }
 
     /**
@@ -64,7 +66,6 @@ class RolloutGroupManagementTest extends AbstractJpaIntegrationTest {
     void entityQueriesReferringToNotExistingEntitiesThrowsException() {
         testdataFactory.createRollout();
 
-        verifyThrownExceptionBy(() -> rolloutGroupManagement.countByRollout(NOT_EXIST_IDL), "Rollout");
         verifyThrownExceptionBy(() -> rolloutGroupManagement.countTargetsOfRolloutsGroup(NOT_EXIST_IDL), "RolloutGroup");
         verifyThrownExceptionBy(() -> rolloutGroupManagement.findByRolloutWithDetailedStatus(NOT_EXIST_IDL, PAGE), "Rollout");
         verifyThrownExceptionBy(() -> rolloutGroupManagement.findByRolloutAndRsql(NOT_EXIST_IDL, "name==*", PAGE), "Rollout");
@@ -82,10 +83,10 @@ class RolloutGroupManagementTest extends AbstractJpaIntegrationTest {
                         testdataFactory.createAndStartRollout(1, 0, 1, "100", "80").getId(), PAGE).getContent()
                 .get(0).getId();
         for (final RolloutGroup.RolloutGroupStatus status : RolloutGroup.RolloutGroupStatus.values()) {
-            final JpaRolloutGroup rolloutGroup = ((JpaRolloutGroup) rolloutGroupManagement.get(id).orElseThrow());
+            final JpaRolloutGroup rolloutGroup = (JpaRolloutGroup) rolloutGroupManagement.get(id);
             rolloutGroup.setStatus(status);
             rolloutGroupRepository.save(rolloutGroup);
-            assertThat(rolloutGroupManagement.get(id).orElseThrow().getStatus()).isEqualTo(status);
+            assertThat(rolloutGroupManagement.get(id).getStatus()).isEqualTo(status);
         }
     }
 }

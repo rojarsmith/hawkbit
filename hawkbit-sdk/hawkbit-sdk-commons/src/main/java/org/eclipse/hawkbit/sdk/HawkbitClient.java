@@ -20,7 +20,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Proxy;
 import java.net.HttpURLConnection;
-import java.net.URL;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyManagementException;
 import java.security.KeyStore;
@@ -90,23 +91,25 @@ import org.springframework.web.multipart.MultipartFile;
 public class HawkbitClient {
 
     private static final String AUTHORIZATION = "Authorization";
+    // @formatter:off
     public static final BiFunction<Tenant, Controller, RequestInterceptor> DEFAULT_REQUEST_INTERCEPTOR_FN =
             (tenant, controller) -> controller == null
                     ? template ->
-                            template.header(
-                                    AUTHORIZATION,
-                                    "Basic " + Base64.getEncoder().encodeToString(
-                                            (Objects.requireNonNull(tenant.getUsername(), "User is null!") +
-                                                    ":" +
-                                                    Objects.requireNonNull(tenant.getPassword(), "Password is not available!"))
-                                            .getBytes(StandardCharsets.ISO_8859_1)))
+                        template.header(
+                                AUTHORIZATION,
+                                "Basic " + Base64.getEncoder().encodeToString(
+                                        (Objects.requireNonNull(tenant.getUsername(), "User is null!") +
+                                                ":" +
+                                                Objects.requireNonNull(tenant.getPassword(), "Password is not available!"))
+                                        .getBytes(StandardCharsets.ISO_8859_1)))
                     : template -> {
                         if (!ObjectUtils.isEmpty(tenant.getGatewayToken())) {
                             template.header(AUTHORIZATION, "GatewayToken " + tenant.getGatewayToken());
                         } else if (!ObjectUtils.isEmpty(controller.getSecurityToken())) {
                             template.header(AUTHORIZATION, "TargetToken " + controller.getSecurityToken());
-                        } // else do not send authentication, no auth or certificate based
+                        } // else do not send authentication, no authentication or certificate based
                     };
+    // @formatter:on
     private static final ErrorDecoder DEFAULT_ERROR_DECODER_0 = new ErrorDecoder.Default();
     public static final ErrorDecoder DEFAULT_ERROR_DECODER = (methodKey, response) -> {
         final Exception e = DEFAULT_ERROR_DECODER_0.decode(methodKey, response);
@@ -118,6 +121,7 @@ public class HawkbitClient {
             new DefaultHttpRequestRetryStrategy(
                     Integer.getInteger("hawkbit.sdk.http.maxRetry", 3),
                     TimeValue.ofSeconds(Integer.getInteger("hawkbit.sdk.http.defaultRetryIntervalSec", 10)));
+    private static final int BUFFER_SIZE = 8096;
 
     private final HawkbitServer hawkBitServer;
 
@@ -130,8 +134,7 @@ public class HawkbitClient {
 
     private final HttpRequestRetryStrategy httpRequestRetryStrategy;
 
-    public HawkbitClient(
-            final HawkbitServer hawkBitServer, final Encoder encoder, final Decoder decoder, final Contract contract) {
+    public HawkbitClient(final HawkbitServer hawkBitServer, final Encoder encoder, final Decoder decoder, final Contract contract) {
         this(hawkBitServer, encoder, decoder, contract, null, null);
     }
 
@@ -223,6 +226,7 @@ public class HawkbitClient {
     }
 
     private static final Cleaner CLEANER = Cleaner.create();
+
     private <T> T service0(final Class<T> serviceType, final Tenant tenant, final Controller controller) {
         final String url = controller == null ? hawkBitServer.getMgmtUrl() : hawkBitServer.getDdiUrl();
         final HttpClientKey key = new HttpClientKey(
@@ -260,7 +264,7 @@ public class HawkbitClient {
     private Object callMultipartFormDataRequest(
             final Method method, final Object[] args,
             final Tenant tenant, final Controller controller,
-            final Class<?>[] parameterTypes, final ObjectMapper objectMapper) throws IOException {
+            final Class<?>[] parameterTypes, final ObjectMapper objectMapper) throws URISyntaxException, IOException {
         final PostMapping postMapping = method.getAnnotation(PostMapping.class);
         final Annotation[][] parametersAnnotations = method.getParameterAnnotations();
         // build path - replace @PathVariables
@@ -272,8 +276,8 @@ public class HawkbitClient {
             }
         }
 
-        final HttpURLConnection conn = (HttpURLConnection) new URL(
-                (controller == null ? hawkBitServer.getMgmtUrl() : hawkBitServer.getDdiUrl()) + path).openConnection();
+        final HttpURLConnection conn = (HttpURLConnection) new URI(
+                (controller == null ? hawkBitServer.getMgmtUrl() : hawkBitServer.getDdiUrl()) + path).toURL().openConnection();
         conn.setRequestMethod("POST");
 
         // deal with authentication - only from headers1
@@ -291,6 +295,7 @@ public class HawkbitClient {
 
         conn.setDoOutput(true);
         conn.setDoInput(true);
+        conn.setChunkedStreamingMode(BUFFER_SIZE);
 
         try (final OutputStream out = new BufferedOutputStream(conn.getOutputStream())) {
             for (int i = 0; i < args.length; i++) {
@@ -360,6 +365,7 @@ public class HawkbitClient {
     }
 
     private static final String CRLF = "\r\n";
+
     private void writeMultipartFile(
             final MultipartFile multipartFile, final OutputStream out, final String boundary, final Annotation[] parametersAnnotations)
             throws IOException {
@@ -371,13 +377,14 @@ public class HawkbitClient {
                     "Content-Disposition: form-data; name=\"" + name + "\"; filename=\"" + multipartFile.getName() + "\"\r\n" +
                     "Content-Type: " + multipartFile.getContentType() + "\r\n\r\n"
             ).getBytes(StandardCharsets.UTF_8));
-            final byte[] buff = new byte[8096];
+            final byte[] buff = new byte[BUFFER_SIZE];
             for (int read; (read = in.read(buff)) != -1; ) {
                 out.write(buff, 0, read);
             }
             out.write(CRLF.getBytes(StandardCharsets.UTF_8));
         }
     }
+
     private void writeSimpleFormData(
             final Object arg, final OutputStream out, final String boundary, final Annotation[] parameterAnnotations) throws IOException {
         if (arg != null) {
@@ -401,14 +408,8 @@ public class HawkbitClient {
         return null;
     }
 
-    private static final String KEYSTORE_PASSWORD;
-    static {
-        final Random random = new SecureRandom();
-        final byte[] bytes = new byte[16];
-        random.nextBytes(bytes);
-        KEYSTORE_PASSWORD = Base64.getEncoder().encodeToString(bytes);
-    }
     private static final Map<HttpClientKey, HttpClientWrapper> HTTP_CLIENTS = new HashMap<>();
+
     private static HttpClient httpClient(final HttpClientKey key) {
         synchronized (HTTP_CLIENTS) {
             final HttpClientWrapper httpClientWrapper = HTTP_CLIENTS.get(key);
@@ -421,7 +422,7 @@ public class HawkbitClient {
                     try {
                         builder.setConnectionManager(
                                 PoolingHttpClientConnectionManagerBuilder.create()
-                                        .setTlsSocketStrategy(getTlsSocketStragegy(key.getClientCertificate(), key.getServerCertificates()))
+                                        .setTlsSocketStrategy(getTlsSocketStrategy(key.getClientCertificate(), key.getServerCertificates()))
                                         .build());
                     } catch (final RuntimeException e) {
                         throw e;
@@ -439,12 +440,17 @@ public class HawkbitClient {
         }
     }
 
-    private static TlsSocketStrategy getTlsSocketStragegy(final Certificate clientCertificate, final X509Certificate[] serverCertificates)
+    private static final Random SECURE_RND = new SecureRandom();
+
+    private static TlsSocketStrategy getTlsSocketStrategy(final Certificate clientCertificate, final X509Certificate[] serverCertificates)
             throws KeyStoreException, NoSuchAlgorithmException, UnrecoverableKeyException, KeyManagementException, CertificateException,
             IOException {
         final SSLContextBuilder sslContextBuilder = SSLContextBuilder.create();
         if (clientCertificate != null) {
-            sslContextBuilder.loadKeyMaterial(clientCertificate.toKeyStore(KEYSTORE_PASSWORD), KEYSTORE_PASSWORD.toCharArray());
+            final byte[] bytes = new byte[16];
+            SECURE_RND.nextBytes(bytes);
+            final String keystorePassword = Base64.getEncoder().encodeToString(bytes);
+            sslContextBuilder.loadKeyMaterial(clientCertificate.toKeyStore(keystorePassword), keystorePassword.toCharArray());
         }
         if (serverCertificates == null) {
             // trust all

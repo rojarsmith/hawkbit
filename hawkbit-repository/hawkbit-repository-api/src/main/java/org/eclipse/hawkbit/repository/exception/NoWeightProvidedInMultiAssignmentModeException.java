@@ -11,13 +11,16 @@ package org.eclipse.hawkbit.repository.exception;
 
 import java.io.Serial;
 
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import org.eclipse.hawkbit.exception.AbstractServerRtException;
 import org.eclipse.hawkbit.exception.SpServerError;
 
 /**
- * This exception is thrown if multi assignments is enabled and an target
- * distribution set assignment request does not contain a weight value
+ * This exception is thrown if multi assignments is enabled and a target distribution set assignment request does not contain a weight value
  */
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
 public class NoWeightProvidedInMultiAssignmentModeException extends AbstractServerRtException {
 
     @Serial
@@ -25,38 +28,7 @@ public class NoWeightProvidedInMultiAssignmentModeException extends AbstractServ
 
     private static final SpServerError THIS_ERROR = SpServerError.SP_NO_WEIGHT_PROVIDED_IN_MULTIASSIGNMENT_MODE;
 
-    /**
-     * Default constructor.
-     */
     public NoWeightProvidedInMultiAssignmentModeException() {
         super(THIS_ERROR);
-    }
-
-    /**
-     * Parameterized constructor.
-     *
-     * @param cause of the exception
-     */
-    public NoWeightProvidedInMultiAssignmentModeException(final Throwable cause) {
-        super(THIS_ERROR, cause);
-    }
-
-    /**
-     * Parameterized constructor.
-     *
-     * @param message of the exception
-     * @param cause of the exception
-     */
-    public NoWeightProvidedInMultiAssignmentModeException(final String message, final Throwable cause) {
-        super(message, THIS_ERROR, cause);
-    }
-
-    /**
-     * Parameterized constructor.
-     *
-     * @param message of the exception
-     */
-    public NoWeightProvidedInMultiAssignmentModeException(final String message) {
-        super(message, THIS_ERROR);
     }
 }
