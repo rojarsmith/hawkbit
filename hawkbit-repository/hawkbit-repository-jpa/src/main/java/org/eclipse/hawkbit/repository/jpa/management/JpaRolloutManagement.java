@@ -561,6 +561,10 @@ public class JpaRolloutManagement implements RolloutManagement {
                 .getContent();
         log.info("Found {} active actions for rollout {}", actions.size(), rollout.getId());
 
+        if (actions.isEmpty()) {
+            return;
+        }
+        
         storeActionsAndStatuses(actions, Action.Status.CANCELED);
 
         // find next active actions - filter by targetId list and isActive
@@ -604,10 +608,10 @@ public class JpaRolloutManagement implements RolloutManagement {
     private int updateTargetAssignedDsWithFirstActiveAction(List<Long> targetIds) {
         final Query updateQuery = entityManager.createNativeQuery(
                 "UPDATE sp_target t " +
-                        "SET t.assigned_distribution_set = ( " +
+                        "SET assigned_distribution_set = ( " +
                         "SELECT a.distribution_set" +
                         "   FROM sp_action a" +
-                        "   WHERE a.target = t.id AND a.active = 1" +
+                        "   WHERE a.target = t.id AND a.active = TRUE" +
                         "   ORDER BY a.id ASC" +
                         "   LIMIT 1" +
                         ") " +
@@ -623,10 +627,10 @@ public class JpaRolloutManagement implements RolloutManagement {
     private int updateTargetAssignedDsWithInstalledIfNoActiveActions(List<Long> targetIds) {
         final Query updateQuery = entityManager.createNativeQuery(
                 "UPDATE sp_target t " +
-                        "SET t.assigned_distribution_set = t.installed_distribution_set, t.update_status = 1 " +
+                        "SET assigned_distribution_set = t.installed_distribution_set, update_status = 1 " +
                         "WHERE t.id IN (" + Jpa.formatNativeQueryInClause("tid", targetIds) + ") " +
                         "    AND (SELECT count(*) FROM sp_action a " +
-                        "        WHERE a.target=t.id and a.active=1) = 0"
+                        "        WHERE a.target = t.id and a.active = TRUE) = 0"
         );
         Jpa.setNativeQueryInParameter(updateQuery, "tid", targetIds);
         final int updated = updateQuery.executeUpdate();
